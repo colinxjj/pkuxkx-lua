@@ -7,9 +7,9 @@
 --       data type:
 --       room: id, paths
 --
-require "minheap"
-require "db"
-memdb:init("pkuxkx.db")
+require "utils/minheap"
+require "utils/db"
+memdb:init("data/pkuxkx.db")
 --[[
 -- Data structures used in shortestpath algorithm:
 -- Path, Room, Distance
@@ -110,7 +110,8 @@ function travel:hypo(startid, endid)
   return 0;
 end
 
-function travel:shortestpath(startid, targetid)
+-- apply A* algorithm but not guarantee the path is shortest
+function travel:searchpath(startid, targetid)
   -- the opens stores the checked nodes with real distance spent,
   -- and the total hypothesis distance to target
   local opens = minheap:new()
@@ -126,14 +127,16 @@ function travel:shortestpath(startid, targetid)
     --            print(i, v)
     --        end
     local min = opens:removeMin()
-    local paths = self.rooms[min.id].paths
+    local minRoom = self.rooms[min.id]
+    local paths = minRoom and minRoom.paths or {}
     if #paths ~= 0 then
       for i =1, #paths do
         local path = paths[i]
         local endid = path.endid
         if endid == targetid then
           prev[endid] = min.id
-          return traceprev(prev, endid)
+--          return traceprev(prev, endid)
+          return prev
         end
         if not closes[endid] then
           local newDistance = Distance:new {id=endid, real=min.real + path.weight, hypo=self:hypo(endid, targetid)}
@@ -141,12 +144,12 @@ function travel:shortestpath(startid, targetid)
             local currDistance = opens:get(endid)
             if newDistance < currDistance then
               --                            print("newDistance < currDistance", newDistance, currDistance)
-              opens:adjust(endid, newDistance)
+              opens:replace(newDistance)
               prev[endid] = min.id
             end
           else
             --                        print("put endid into queue", endid, newDistance)
-            opens:put(endid, newDistance)
+            opens:insert(newDistance)
             prev[endid] = min.id
           end
         end
@@ -154,7 +157,6 @@ function travel:shortestpath(startid, targetid)
     end
     closes[min.id] = true
   end
-
 end
 
 -- do initialization

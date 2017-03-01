@@ -11,7 +11,7 @@
 --       the position in heap by its id
 --
 
-minheap = {}
+local minheap = {}
 
 -- args:
 function minheap:new()
@@ -27,6 +27,15 @@ end
 
 function minheap:updatePos(pos)
   self.map[self.array[pos].id] = pos
+end
+
+function minheap:contains(id)
+  return self.map[id] ~= nil
+end
+
+function minheap:get(id)
+  if self.map[id] == nil then return nil end
+  return self.array[self.map[id]]
 end
 
 function minheap:insert(elem)
@@ -83,16 +92,15 @@ function minheap:removeMin()
   return first
 end
 
--- adjust elem value and fix the heap again
--- the second argument is required and must be a function that modify the elem internally
--- this is useful when we implement path algorithm
-function minheap:decreaseElem(id, decrease)
-  local pos = self.map[id]
+function minheap:replace(newElem)
+  local pos = self.map[newElem.id]
+  if pos == nil then error("cannot find element with id" .. newElem.id) end
   local elem = self.array[pos]
-  decrease(elem)
+  if newElem > elem then error("current version only support replace element with smaller one") end
+  self.array[pos] = newElem
+  -- we also need to fix the order in heap to make sure it's minimized
   local parent = math.floor(pos / 2)
   while pos > 1 do
-    print(pos, self.array[pos].id, parent, self.array[parent].id)
     if self.array[pos] < self.array[parent] then
       self.array[pos], self.array[parent] = self.array[parent], self.array[pos]
       -- after the swap, we need to update the position map
