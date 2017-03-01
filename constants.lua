@@ -133,3 +133,22 @@ eHotspotNotInstalled = 30072;    -- Hotspot has not been defined for this window
 eNoSuchWindow = 30073;           -- Requested miniwindow does not exist
 eBrushStyleNotValid = 30074;     -- Invalid settings for brush parameter
 
+-- pseudo functions
+-- long AddTriggerEx(
+--    BSTR TriggerName, BSTR MatchText, BSTR ResponseText,
+--    long Flags, short Colour, short Wildcard, BSTR SoundFileName,
+--    BSTR ScriptName, short SendTo, short Sequence)
+function AddTriggerEx() end
+
+function GetUniqueID() end
+
+function SetTriggerOption() end
+
+function SendNoEcho() end
+
+function Trim() end
+
+
+utils = {}
+
+function utils.split() end
