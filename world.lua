@@ -1,9 +1,5 @@
 --
--- Created by IntelliJ IDEA.
--- User: zhe.jiang
--- Date: 2017/3/1
--- Time: 14:07
--- To change this template use File | Settings | File Templates.
+-- Simulating MushClient world
 --
 
 trigger_flag = {}
