@@ -438,6 +438,20 @@ local minheap = define_minheap()
 -- Path.lua
 -- data structure of Path
 --------------------------------------------------------------
+local define_PathMode = function()
+  local PathMode = {}
+  PathMode.Normal = 1
+  PathMode.MultipleCmds = 2
+  PathMode.Trigger = 3
+
+  return PathMode
+end
+local PathMode = define_PathMode()
+
+--------------------------------------------------------------
+-- Path.lua
+-- data structure of Path
+--------------------------------------------------------------
 local define_Path = function()
   local Path = {
     __eq = function(a, b) return a.weight == b.weight end,
@@ -456,6 +470,7 @@ local define_Path = function()
     obj.path = args.path
     obj.endcode = args.endcode
     obj.weight = args.weight or 1
+    obj.category = args.category or PathMode.Normal
     setmetatable(obj, self)
     return obj
   end
@@ -522,29 +537,63 @@ local define_Distance = function()
 end
 local Distance = define_Distance()
 
+local define_PlanMode = function()
+  local PlanMode = {}
+  PlanMode.Quick = 1
+  PlanMode.Delay = 2
+  PlanMode.Trigger = 3
+
+  return PlanMode
+end
+local PlanMode = define_PathMode()
+
 --------------------------------------------------------------
--- Distance.lua
--- data structure of Distance
+-- Plan.lua
+-- This class handles how to walk in xkx world
+-- there are three mode as below
+-- Quick
+-- Delay
+-- Trigger
+--
+-- Quick mode tries to walk to target place as fast as possible
+-- but still wait if needed, e.g. take on a boat,
+-- blocked by someone, ...
+-- Delay mode tries to walk to target with delay of given amount
+-- of time on each step
+-- Trigger mode has the most power. We can define actions before,
+-- or after each move.
+--
+--
 --------------------------------------------------------------
 local define_Plan = function()
   local Plan = {}
+  local emptyF = function() end
   Plan._startid = -1
   Plan._paths = {}
-  Plan._len = 0
   Plan._started = false
   Plan._finished = false
+  Plan.beforeStart = emptyF
+  Plan.afterFinish = emptyF
+  Plan.beforeMove = emptyF
+  Plan.afterMove = emptyF
+  -- OOP
+  Plan.__index = Plan
 
-  function Plan:len() end
+  function Plan:len()
+    return #(self._paths)
+  end
 
-  function Plan:next() end
+  function Plan:next()
+    return table.remove(self._paths)
+  end
 
-  function Plan:isStarted() end
+  function Plan:isStarted()
+    return self._started
+  end
 
-  function Plan:isFinished() end
-
-  function Plan:start() end
-
-  function Plan:finish() end
+  function Plan:isFinished()
+    return self._finished
+  end
 
   function Plan:new(args)
     assert(type(args.startid) == "number", "startid of args must be number")
@@ -552,6 +601,7 @@ local define_Plan = function()
     local obj = {}
     obj._startid = args.startid
     obj._paths = args.paths
+
     setmetatable(obj, self)
     return obj
   end
@@ -569,6 +619,8 @@ local define_Algo = function()
 
   local defaultHypothesis = function(startid, endid) return 0 end
 
+  -- function returns table contianing path in reverse order,
+  -- the start point and end point
   local finalizePathStack = function(rooms, prev, endid)
     local stack = {}
     local toid = endid
@@ -578,7 +630,7 @@ local define_Algo = function()
       table.insert(stack, path)
       toid, fromid = fromid, prev[fromid]
     end
-    return stack, toid
+    return stack, toid, endid
   end
 
   Algo.astar = function(startid, targetid, rooms, hf)
@@ -602,7 +654,6 @@ local define_Algo = function()
         local endid = path.endid
         if endid == targetid then
           prev[endid] = min.id
-          --          return traceprev(prev, endid)
           return finalizePathStack(rooms, prev, endid)
         end
         if not closes[endid] then
@@ -856,77 +907,75 @@ world = {}
 local _triggers = {}
 local _tsize = 0
 world.add_trigger = function(name, delay)
---    print(triggers, name, _triggers[name])
-    if not _triggers[name] then
-        _tsize = _tsize + 1
-    end
-    _triggers[name] = delay
---    print(_tsize)
+  if not _triggers[name] then
+    _tsize = _tsize + 1
+  end
+  _triggers[name] = delay
 end
 
 world.dispatch = function()
-    while true do
-        if _tsize == 0 then break end
---        print("----")
---        tprint(_triggers)
-        local copy = {}
-        for name, delay in pairs(_triggers) do
-            copy[name] = delay
-        end
-        for name, delay in pairs(copy) do
-            if delay <= 0 then
-                _triggers[name] = nil
-                _tsize = _tsize - 1
-                wait.trigger_resume(name)
---                if not ok then error("failed to resume thread") end
-            else
-                _triggers[name] = delay - 1
-            end
-        end
---        sleep(1)
+  while true do
+    if _tsize == 0 then break end
+    --        print("----")
+    --        tprint(_triggers)
+    local copy = {}
+    for name, delay in pairs(_triggers) do
+      copy[name] = delay
     end
+    for name, delay in pairs(copy) do
+      if delay <= 0 then
+        _triggers[name] = nil
+        _tsize = _tsize - 1
+        wait.trigger_resume(name)
+        --                if not ok then error("failed to resume thread") end
+      else
+        _triggers[name] = delay - 1
+      end
+    end
+    --        sleep(1)
+  end
 end
 
 local step = function(paths, steps)
-    local steps = steps or 5
-    return coroutine.create(function()
-        while (#paths > 0) do
-            local segment = {}
-            local i = 1
-            local path = table.remove(paths)
-            while path and i <= steps do
-                i = i + 1
-                table.insert(segment, path.path)
-                path = table.remove(paths)
-            end
-            print(table.concat(segment, ";"))
-            coroutine.yield()
-        end
-    end)
+  local steps = steps or 5
+  return coroutine.create(function()
+    while (#paths > 0) do
+      local segment = {}
+      local i = 1
+      local path = table.remove(paths)
+      while path and i <= steps do
+        i = i + 1
+        table.insert(segment, path.path)
+        path = table.remove(paths)
+      end
+      print(table.concat(segment, ";"))
+      coroutine.yield()
+    end
+  end)
 end
 
 local id = 0
 local uniqueId = function()
-    id = id + 1
-    return id
+  id = id + 1
+  return id
 end
 
 local continueWalk = function(step)
-    return coroutine.create(function()
-        local name
-        while true do
-            name = "walk_trg" .. uniqueId()
-            local ok = coroutine.resume(step)
-            if ok then
-                -- continue to work
-                threads[name] = assert(coroutine.running(), "walk must be in coroutine")
-                world.add_trigger(name, 1)
-                coroutine.yield()
-            else
-                break
-            end
-        end
-    end)
+  return coroutine.create(function()
+    local name
+    while true do
+      name = "walk_trg" .. uniqueId()
+      local ok = coroutine.resume(step)
+      if ok then
+        -- continue to work
+        threads[name] = assert(coroutine.running(), "walk must be in coroutine")
+        world.add_trigger(name, 1)
+        coroutine.yield()
+      else
+        break
+      end
+    end
+  end)
 end
 
 local walker = continueWalk(step(paths, 5))
