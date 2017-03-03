@@ -570,6 +570,7 @@ local define_Plan = function()
   local emptyF = function() end
   Plan._startid = -1
   Plan._paths = {}
+  Plan._mode = nil
   Plan._started = false
   Plan._finished = false
   Plan.beforeStart = emptyF
@@ -579,12 +580,20 @@ local define_Plan = function()
   -- OOP
   Plan.__index = Plan
 
+  local pathEvaluations = {
+    [PathMode.Normal] = function(path)
+      print(path.path)
+    end,
+    [PathMode.MultipleCmds] = function(path)
+      print(path.path)
+    end,
+    [PathMode.Trigger] = function(path)
+      print(path.path)
+    end
+  }
+
   function Plan:len()
     return #(self._paths)
-  end
-
-  function Plan:next()
-    return table.remove(self._paths)
   end
 
   function Plan:isStarted()
@@ -595,13 +604,30 @@ local define_Plan = function()
     return self._finished
   end
 
+--  function Plan:co()
+--    return coroutine.create(function()
+--      while #(self._paths) do
+--        local path = table.remove(self._paths)
+--
+--    end)
+--  end
+
   function Plan:new(args)
     assert(type(args.startid) == "number", "startid of args must be number")
     assert(args.paths, "paths of args cannot be nil")
+    assert(args.mode, "mode of args cannot be nil")
+    assert(args.beforeStart == nil or type(args.beforeStart) == "function", "beforeStart must be nil or function")
+    assert(args.afterFinish == nil or type(args.afterFinish) == "function", "afterFinish must be nil or function")
+    assert(args.beforeMove == nil or type(args.beforeMove) == "function", "beforeMove must be nil or function")
+    assert(args.afterMove == nil or type(args.afterMove) == "function", "afterMove must be nil or function")
     local obj = {}
     obj._startid = args.startid
     obj._paths = args.paths
-
+    obj._mode = args.mode
+    if (args.beforeStart) then obj.beforeStart = args.beforeStart end
+    if (args.afterFinish) then obj.afterFinish = args.afterFinish end
+    if (args.beforeMove) then obj.beforeMove = args.beforeMove end
+    if (args.afterMove) then obj.afterMove = args.afterMove end
     setmetatable(obj, self)
     return obj
   end
