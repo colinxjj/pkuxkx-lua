@@ -438,15 +438,15 @@ local minheap = define_minheap()
 -- Path.lua
 -- data structure of Path
 --------------------------------------------------------------
-local define_PathMode = function()
-  local PathMode = {}
-  PathMode.Normal = 1
-  PathMode.MultipleCmds = 2
-  PathMode.Trigger = 3
+local define_PathCategory = function()
+  local PathCategory = {}
+  PathCategory.Normal = 1
+  PathCategory.MultipleCmds = 2
+  PathCategory.Trigger = 3
 
-  return PathMode
+  return PathCategory
 end
-local PathMode = define_PathMode()
+local PathCategory = define_PathCategory()
 
 --------------------------------------------------------------
 -- Path.lua
@@ -470,7 +470,7 @@ local define_Path = function()
     obj.path = args.path
     obj.endcode = args.endcode
     obj.weight = args.weight or 1
-    obj.category = args.category or PathMode.Normal
+    obj.category = args.category or PathCategory.Normal
     setmetatable(obj, self)
     return obj
   end
@@ -545,7 +545,7 @@ local define_PlanMode = function()
 
   return PlanMode
 end
-local PlanMode = define_PathMode()
+local PlanMode = define_PlanMode()
 
 --------------------------------------------------------------
 -- Plan.lua
@@ -573,6 +573,8 @@ local define_Plan = function()
   Plan._mode = nil
   Plan._started = false
   Plan._finished = false
+  Plan._quickSteps = 10
+  Plan._delay = 0.2
   Plan.beforeStart = emptyF
   Plan.afterFinish = emptyF
   Plan.beforeMove = emptyF
@@ -580,17 +582,25 @@ local define_Plan = function()
   -- OOP
   Plan.__index = Plan
 
-  local pathEvaluations = {
-    [PathMode.Normal] = function(path)
-      print(path.path)
-    end,
-    [PathMode.MultipleCmds] = function(path)
-      print(path.path)
-    end,
-    [PathMode.Trigger] = function(path)
-      print(path.path)
-    end
-  }
+--  local pathEval = {
+--    [PathCategory.Normal] = function(path)
+--      return function()
+--        print(path)
+--      end
+--    end,
+--    [PathCategory.MultipleCmds] = function(path)
+--      return function()
+--        print(path)
+--      end
+--    end,
+--    -- need refinement
+--    [PathCategory.Trigger] = function(path, walker)
+--      return coroutine.create(function()
+--        print("this is a direct trigger and resume walker right now")
+--        coroutine.resume(walker)
+--      end)
+--    end
+--  }
 
   function Plan:len()
     return #(self._paths)
@@ -604,13 +614,33 @@ local define_Plan = function()
     return self._finished
   end
 
---  function Plan:co()
---    return coroutine.create(function()
---      while #(self._paths) do
---        local path = table.remove(self._paths)
---
---    end)
---  end
+
+  function Plan:createCo()
+    if self._mode == PlanMode.Quick then
+
+
+      return coroutine.create(function()
+        local steps = self._quickSteps
+        local i = 1
+        while #(self._paths) do
+          if i >= steps then
+            -- coroutine to have a rest
+            local currCo = coroutine.running()
+            -- add trigger for currCo here
+            -- ???
+            coroutine.yield()
+            i = 0
+          end
+          i = i + 1
+          local next = table.remove(self._paths)
+          -- refine here
+
+        end
+
+      end)
+    end
+
+  end
 
   function Plan:new(args)
     assert(type(args.startid) == "number", "startid of args must be number")
@@ -624,6 +654,13 @@ local define_Plan = function()
     obj._startid = args.startid
     obj._paths = args.paths
     obj._mode = args.mode
+    if args.mode == PlanMode.Quick then
+      obj._quickSteps = args.quickSteps or Plan._quickSteps
+    elseif args.mode == PlanMode.Delay then
+      obj._delay = args.delay or Plan._delay
+    elseif args.mode == PlanMode.Trigger then
+
+    end
     if (args.beforeStart) then obj.beforeStart = args.beforeStart end
     if (args.afterFinish) then obj.afterFinish = args.afterFinish end
     if (args.beforeMove) then obj.beforeMove = args.beforeMove end
