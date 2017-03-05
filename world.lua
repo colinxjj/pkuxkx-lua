@@ -144,7 +144,19 @@ function SendNoEcho() end
 
 function Trim() end
 
+function ColourNote() end
 
 utils = {}
 
-function utils.split() end
+function utils.split(str, delim)
+  local results = {}
+  local s = 1
+  local ss, se = string.find(str, delim, s)
+  while ss do
+    table.insert(results, string.sub(str, s, ss - 1))
+    s = se + 1
+    ss, se = string.find(str, delim, s)
+  end
+  table.insert(results, string.sub(self, s))
+  return results
+end

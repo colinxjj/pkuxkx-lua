@@ -16,11 +16,13 @@ local predefines = function()
     socket.select(nil, nil, n)
   end
   require "tprint"
+  require "wait"
 end
 predefines()
 
 local define_helper = function()
   local helper = {}
+
   -- convert chinese string to number
   local _nums = {
     ["一"] = 1,
@@ -185,6 +187,8 @@ local define_helper = function()
     end
     return place
   end
+
+  -- convenient way to add trigger
 end
 local helper = define_helper()
 
@@ -582,25 +586,47 @@ local define_Plan = function()
   -- OOP
   Plan.__index = Plan
 
---  local pathEval = {
---    [PathCategory.Normal] = function(path)
---      return function()
---        print(path)
---      end
---    end,
---    [PathCategory.MultipleCmds] = function(path)
---      return function()
---        print(path)
---      end
---    end,
---    -- need refinement
---    [PathCategory.Trigger] = function(path, walker)
---      return coroutine.create(function()
---        print("this is a direct trigger and resume walker right now")
---        coroutine.resume(walker)
---      end)
---    end
---  }
+  local pathEval = function(path)
+    if path.category == PathCategory.Normal then
+      print(path.path)
+    elseif path.category == PathCategory.MultipleCmds then
+      local cmds = utils.split(path.path, ";")
+      for i= 1, #cmds do
+        print(cmds[i])
+      end
+    elseif path.category == PathCategory.Trigger then
+      SendNoEcho("set travel trigger")
+      wait.regexp("")
+    else
+      error("unexpected path category " .. path.category)
+    end
+  end
+
+  function Plan:createCo()
+    return coroutine.create(function()
+      local steps = self._quickSteps
+      local delay = self._delay
+      local i = 1
+      while #(self._paths) do
+        if i >= steps then
+          SendNoEcho("set travel rest")
+          wait.regexp("")
+          i = 0
+        end
+        i = i + 1
+        local next = table.remove(self._paths)
+        if self._mode == PlanMode.Delay then
+          wait.time(delay)
+        elseif self._mode == PlanMode.Trigger then
+          SendNoEcho("set travel go")
+          wait.regexp("")
+        end
+        self:beforeMove()
+        pathEval(path)
+        self:afterMove()
+      end
+    end)
+  end
 
   function Plan:len()
     return #(self._paths)
@@ -614,32 +640,11 @@ local define_Plan = function()
     return self._finished
   end
 
-
-  function Plan:createCo()
-    if self._mode == PlanMode.Quick then
-
-
-      return coroutine.create(function()
-        local steps = self._quickSteps
-        local i = 1
-        while #(self._paths) do
-          if i >= steps then
-            -- coroutine to have a rest
-            local currCo = coroutine.running()
-            -- add trigger for currCo here
-            -- ???
-            coroutine.yield()
-            i = 0
-          end
-          i = i + 1
-          local next = table.remove(self._paths)
-          -- refine here
-
-        end
-
-      end)
-    end
-
+  function Plan:start()
+    local walker = self:createCo()
+    self:beforeStart()
+    coroutine.resume(walker)
+    self.afterFinish()
   end
 
   function Plan:new(args)
@@ -812,6 +817,10 @@ local define_travel = function()
     return Algo.astar(startid, endid, self.rooms)
   end
 
+  function travel:flyto(startid, endid, mode, args)
+    
+  end
+
   function travel:locate()
     check(EnableTriggerGroup("travel_locate_start", true))
     check(SendNoEcho("set travel_locate start"))
@@ -936,114 +945,5 @@ end
 local travel = define_travel()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-local paths, startid = travel:search(1, 5)
-
-wait = {}
-local threads = {}
-
-wait.trigger_resume = function(name)
-  local thread = threads[name]
-  if thread then
-    threads[name] = nil
-    coroutine.resume(thread)
-    --        if not ok then error(err) end
-  end
-end
-
-world = {}
-local _triggers = {}
-local _tsize = 0
-world.add_trigger = function(name, delay)
-  if not _triggers[name] then
-    _tsize = _tsize + 1
-  end
-  _triggers[name] = delay
-end
-
-world.dispatch = function()
-  while true do
-    if _tsize == 0 then break end
-    --        print("----")
-    --        tprint(_triggers)
-    local copy = {}
-    for name, delay in pairs(_triggers) do
-      copy[name] = delay
-    end
-    for name, delay in pairs(copy) do
-      if delay <= 0 then
-        _triggers[name] = nil
-        _tsize = _tsize - 1
-        wait.trigger_resume(name)
-        --                if not ok then error("failed to resume thread") end
-      else
-        _triggers[name] = delay - 1
-      end
-    end
-    --        sleep(1)
-  end
-end
-
-local step = function(paths, steps)
-  local steps = steps or 5
-  return coroutine.create(function()
-    while (#paths > 0) do
-      local segment = {}
-      local i = 1
-      local path = table.remove(paths)
-      while path and i <= steps do
-        i = i + 1
-        table.insert(segment, path.path)
-        path = table.remove(paths)
-      end
-      print(table.concat(segment, ";"))
-      coroutine.yield()
-    end
-  end)
-end
-
-local id = 0
-local uniqueId = function()
-  id = id + 1
-  return id
-end
-
-local continueWalk = function(step)
-  return coroutine.create(function()
-    local name
-    while true do
-      name = "walk_trg" .. uniqueId()
-      local ok = coroutine.resume(step)
-      if ok then
-        -- continue to work
-        threads[name] = assert(coroutine.running(), "walk must be in coroutine")
-        world.add_trigger(name, 1)
-        coroutine.yield()
-      else
-        break
-      end
-    end
-  end)
-end
-
-local walker = continueWalk(step(paths, 5))
-coroutine.resume(walker)
-
-world.dispatch()
-
-
+local paths, sid, eid = travel:search(1, 50000000)
+tprint(paths)
