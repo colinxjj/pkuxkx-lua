@@ -817,15 +817,14 @@ local define_travel = function()
     return Algo.astar(startid, endid, self.rooms)
   end
 
-  function travel:flyto(startid, endid, mode, args)
-    
-  end
-
   function travel:locate()
     check(EnableTriggerGroup("travel_locate_start", true))
     check(SendNoEcho("set travel_locate start"))
     check(SendNoEcho("look"))
     check(SendNoEcho("set travel_locate stop"))
+    print("roomName:" .. self.roomName)
+    print("exits:" .. self.exits)
+    print("roomDesc:" .. self.roomDesc)
   end
 
   local initLocateTriggers = function()
@@ -945,5 +944,7 @@ end
 local travel = define_travel()
 
 
-local paths, sid, eid = travel:search(1, 50000000)
-tprint(paths)
+for i = 2,1000 do
+  local paths, sid, eid = travel:search(1, i)
+  if not paths then print(i) end
+end
