@@ -22,6 +22,32 @@ predefines()
 
 local define_helper = function()
   local helper = {}
+  -- add trigger but disabled
+  local TRIGGER_BASE_FLAG = trigger_flag.RegularExpression
+    + trigger_flag.Replace + trigger_flag.KeepEvaluating
+  local COPY_WILDCARDS_NONE = 0
+  local SOUND_FILE_NONE = ""
+  -- make sure the name is unique
+  local _global_trigger_functions = {}
+  helper.addTrigger = function(name, regexp, group, response, sequence)
+    local sequence = sequence or 10
+    if type(response) == "string" then
+      check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, response, sendto.world, sequence))
+    elseif type(response) == "function" then
+      _G[name] = response
+      _global_trigger_functions[name] = true
+      check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_color.NoChange))
+    end
+    SetTriggerOption(name, "group", group)
+  end
+
+  helper.removeTrigger = function(name)
+    if _global_trigger_functions[name] then
+      _global_trigger_functions[name] = nil
+      _G[name] = nil
+    end
+    check(DeleteTrigger(name))
+  end
 
   -- convert chinese string to number
   local _nums = {
@@ -785,32 +811,6 @@ local define_travel = function()
     travel.rooms = rooms
   end
 
-  -- add trigger but disabled
-  local TRIGGER_BASE_FLAG = trigger_flag.RegularExpression
-    + trigger_flag.Replace + trigger_flag.KeepEvaluating
-  local COPY_WILDCARDS_NONE = 0
-  local SOUND_FILE_NONE = ""
-  -- make sure the name is unique
-  local _global_trigger_functions = {}
-  local add_trigger = function(name, regexp, group, response, sequence)
-    local sequence = sequence or 10
-    if type(response) == "string" then
-      check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, response, sendto.world, sequence))
-    elseif type(response) == "function" then
-      _G[name] = response
-      _global_trigger_functions[name] = true
-      check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_color.NoChange))
-    end
-    SetTriggerOption(name, "group", group)
-  end
-
-  local remove_trigger = function(name)
-    if _global_trigger_functions[name] then
-      _G[name] = nil
-    end
-    check(DeleteTrigger(name))
-  end
-
   -- bind search implementation to A* algorithm
   -- should enhance with hypothesis functions to reduce search range
   function travel:search(startid, endid)
@@ -834,7 +834,7 @@ local define_travel = function()
       check(EnableTriggerGroup("travel_locate", true))
       travel.clearRoomInfo()
     end
-    add_trigger(
+    helper.addTrigger(
       "trigger" .. GetUniqueID(),
       "^[ >]*设定环境变量：travel_locate = \"start\"",
       "travel_locate_start",
@@ -847,7 +847,7 @@ local define_travel = function()
       travel.roomDescInline = true
       travel.roomExitsInline = true
     end
-    add_trigger(
+    helper.addTrigger(
       "trigger" .. GetUniqueID(),
       "^[ >]*([^ ]+) \- \[[^ ]+\]$",
       "travel_locate",
@@ -859,7 +859,7 @@ local define_travel = function()
       travel.roomName = wildcards[1]
       travel.roomDescInline = true
     end
-    add_trigger(
+    helper.addTrigger(
       "trigger" .. GetUniqueID(),
       "^[ >]*([^ ]+) \- $",
       "travel_locate",
@@ -873,7 +873,7 @@ local define_travel = function()
         travel.roomDesc = currDesc .. wildcards[1]
       end
     end
-    add_trigger(
+    helper.addTrigger(
       "trigger" .. GetUniqueID(),
       "^ *(.*?) *$",
       "travel_locate",
@@ -886,7 +886,7 @@ local define_travel = function()
       local season = wildcards[1]
       local datetime = wildcards[2]
     end
-    add_trigger(
+    helper.addTrigger(
       "trigger" .. GetUniqueID(),
       "^    「([^」]+)」: (.*)$",
       "travel_locate",
@@ -913,7 +913,7 @@ local define_travel = function()
       end
 
     end
-    add_trigger(
+    helper.addTrigger(
       "trigger" .. GetUniqueID(),
       "^\\s*这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
       "travel_locate",

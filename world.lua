@@ -146,6 +146,10 @@ function Trim() end
 
 function ColourNote() end
 
+function GetTriggerList() end
+
+function GetTriggerInfo() end
+
 utils = {}
 
 function utils.split(str, delim)
