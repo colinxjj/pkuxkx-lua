@@ -51,6 +51,19 @@ sendto.script = 12
 sendto.immediate = 13
 sendto.scriptafteromit = 14
 
+alias_flag = {}
+alias_flag.Enabled = 1
+alias_flag.KeepEvaluating = 8
+alias_flag.IgnoreAliasCase = 32
+alias_flag.OmitFromLogFile = 64
+alias_flag.RegularExpression = 128
+alias_flag.ExpandVariables = 512
+alias_flag.Replace = 1024
+alias_flag.AliasSpeedWalk = 2048
+alias_flag.AliasQueue = 4096
+alias_flag.AliasMenu = 8192
+alias_flag.Temporary = 16384
+
 -- error code
 eOK = 0; -- No error
 eWorldOpen = 30001; -- The world is already open
