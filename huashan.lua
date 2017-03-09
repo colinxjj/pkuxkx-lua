@@ -299,7 +299,9 @@ local define_patrol = function()
     GOT_JOB="^[ >]*岳灵珊拿出一张地图，把华山需要巡逻的区域用不同颜色标注出来，并和你说了一遍。$",
     PATROLLING="^[ >]*你在(\w+)巡弋，尚未发现敌踪。$",
     GO="^[ >]*设定环境变量：huashan_patrol = \"go\"",
-    POTENTIAL_ROOM="^[ >]*([^ ]+)$"
+    POTENTIAL_ROOM="^[ >]*([^ ]+)$",
+    REJECT_LING="^[ >]*岳灵珊不想要令牌，你就自个留着吧。",
+    ACCEPT_LING="^[ >]*你给岳灵珊一块令牌。$"
   }
   patrol.currRoom = nil
 
@@ -425,7 +427,7 @@ local define_patrol = function()
       group = "huashan_patrol_ask"
     }
     helper.addTrigger {
-      regexp = "^[ >]*你给岳灵珊一块令牌。$",
+      regexp = patrol.regexp.ACCEPT_LING,
       response = function()
         check(EnableTriggerGroup("huashan_patrol_finish", false))
         print("任务完成！")
@@ -433,7 +435,7 @@ local define_patrol = function()
       group = "huashan_patrol_finish"
     }
     helper.addTrigger {
-      regexp = "^[ >]*岳灵珊不想要令牌，你就自个留着吧。",
+      regexp = patrol.regexp.REJECT_LING,
       response = function()
         check(EnableTriggerGroup("huashan_patrol_finish", false))
         print("任务未完成！请手动完成")
@@ -476,3 +478,5 @@ huashan.patrol = define_patrol()
 huashan.patrol.init()
 
 return huashan
+
+

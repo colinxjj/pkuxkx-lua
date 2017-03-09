@@ -149,9 +149,17 @@ eBrushStyleNotValid = 30074;     -- Invalid settings for brush parameter
 --    BSTR ScriptName, short SendTo, short Sequence)
 function AddTriggerEx() end
 
-function GetUniqueID() end
+function AddAlias() end
+
+local id = 0
+function GetUniqueID()
+  id = id + 1
+  return id
+end
 
 function SetTriggerOption() end
+
+function SetAliasOption() end
 
 function SendNoEcho() end
 
@@ -159,9 +167,15 @@ function Trim() end
 
 function ColourNote() end
 
-function GetTriggerList() end
+function GetTriggerList() return {} end
 
 function GetTriggerInfo() end
+
+function GetAliasList() return {} end
+
+function GetAliasInfo() end
+
+function Note() end
 
 utils = {}
 

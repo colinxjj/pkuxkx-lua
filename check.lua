@@ -14,12 +14,18 @@ require "check
   check (SetVariable ("abc-", "def")) --> The name of this object is invalid
 --]]
 
-function check (result)
-  if result ~= error_code.eOK then
-    error (error_desc [result] or
-      string.format ("Unknown error code: %i", result),
-      2) -- error level - whoever called this function
-  end -- if
-end -- function check
+
+-- simulation
+-- comment all below
+
+function check() end
+
+--function check (result)
+--  if result ~= error_code.eOK then
+--    error (error_desc [result] or
+--      string.format ("Unknown error code: %i", result),
+--      2) -- error level - whoever called this function
+--  end -- if
+--end -- function check
 
 return check
