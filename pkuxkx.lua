@@ -23,9 +23,86 @@ local predefines = function()
   -- define useful constants here
   trigger_info_flag = {}
   trigger_info_flag.group = 26
-
   alias_info_flag = {}
   alias_info_flag.group = 16
+
+  -- error code
+  eOK = 0; -- No error
+  eWorldOpen = 30001; -- The world is already open
+  eWorldClosed = 30002; -- The world is closed, this action cannot be performed
+  eNoNameSpecified = 30003; -- No name has been specified where one is required
+  eCannotPlaySound = 30004; -- The sound file could not be played
+  eTriggerNotFound = 30005; -- The specified trigger name does not exist
+  eTriggerAlreadyExists = 30006; -- Attempt to add a trigger that already exists
+  eTriggerCannotBeEmpty = 30007; -- The trigger "match" string cannot be empty
+  eInvalidObjectLabel = 30008; -- The name of this object is invalid
+  eScriptNameNotLocated = 30009; -- Script name is not in the script file
+  eAliasNotFound = 30010; -- The specified alias name does not exist
+  eAliasAlreadyExists = 30011; -- Attempt to add a alias that already exists
+  eAliasCannotBeEmpty = 30012; -- The alias "match" string cannot be empty
+  eCouldNotOpenFile = 30013; -- Unable to open requested file
+  eLogFileNotOpen = 30014; -- Log file was not open
+  eLogFileAlreadyOpen = 30015; -- Log file was already open
+  eLogFileBadWrite = 30016; -- Bad write to log file
+  eTimerNotFound = 30017; -- The specified timer name does not exist
+  eTimerAlreadyExists = 30018; -- Attempt to add a timer that already exists
+  eVariableNotFound = 30019; -- Attempt to delete a variable that does not exist
+  eCommandNotEmpty = 30020; -- Attempt to use SetCommand with a non-empty command window
+  eBadRegularExpression = 30021; -- Bad regular expression syntax
+  eTimeInvalid = 30022; -- Time given to AddTimer is invalid
+  eBadMapItem = 30023; -- Direction given to AddToMapper is invalid
+  eNoMapItems = 30024; -- No items in mapper
+  eUnknownOption = 30025; -- Option name not found
+  eOptionOutOfRange = 30026; -- New value for option is out of range
+  eTriggerSequenceOutOfRange = 30027; -- Trigger sequence value invalid
+  eTriggerSendToInvalid = 30028; -- Where to send trigger text to is invalid
+  eTriggerLabelNotSpecified = 30029; -- Trigger label not specified/invalid for 'send to variable'
+  ePluginFileNotFound = 30030; -- File name specified for plugin not found
+  eProblemsLoadingPlugin = 30031; -- There was a parsing or other problem loading the plugin
+  ePluginCannotSetOption = 30032; -- Plugin is not allowed to set this option
+  ePluginCannotGetOption = 30033; -- Plugin is not allowed to get this option
+  eNoSuchPlugin = 30034; -- Requested plugin is not installed
+  eNotAPlugin = 30035; -- Only a plugin can do this
+  eNoSuchRoutine = 30036; -- Plugin does not support that subroutine (subroutine not in script)
+  ePluginDoesNotSaveState = 30037; -- Plugin does not support saving state
+  ePluginCouldNotSaveState = 30037; -- Plugin could not save state (eg. no state directory)
+  ePluginDisabled = 30039; -- Plugin is currently disabled
+  eErrorCallingPluginRoutine = 30040; -- Could not call plugin routine
+  eCommandsNestedTooDeeply = 30041; -- Calls to "Execute" nested too deeply
+  eCannotCreateChatSocket = 30042; -- Unable to create socket for chat connection
+  eCannotLookupDomainName = 30043; -- Unable to do DNS (domain name) lookup for chat connection
+  eNoChatConnections = 30044; -- No chat connections open
+  eChatPersonNotFound = 30045; -- Requested chat person not connected
+  eBadParameter = 30046; -- General problem with a parameter to a script call
+  eChatAlreadyListening = 30047; -- Already listening for incoming chats
+  eChatIDNotFound = 30048; -- Chat session with that ID not found
+  eChatAlreadyConnected = 30049; -- Already connected to that server/port
+  eClipboardEmpty = 30050; -- Cannot get (text from the) clipboard
+  eFileNotFound = 30051; -- Cannot open the specified file
+  eAlreadyTransferringFile = 30052; -- Already transferring a file
+  eNotTransferringFile = 30053; -- Not transferring a file
+  eNoSuchCommand = 30054; -- There is not a command of that name
+  eArrayAlreadyExists = 30055;  -- Chat session with that ID not found
+  eArrayDoesNotExist = 30056;  -- Already connected to that server/port
+  eArrayNotEvenNumberOfValues = 30057;  -- Cannot get (text from the) clipboard
+  eImportedWithDuplicates = 30058;  -- Cannot open the specified file
+  eBadDelimiter = 30059;  -- Already transferring a file
+  eSetReplacingExistingValue = 30060;  -- Not transferring a file
+  eKeyDoesNotExist = 30061;  -- There is not a command of that name
+  eCannotImport = 30062;  -- There is not a command of that name
+  eItemInUse = 30063;   -- Cannot delete trigger/alias/timer because it is executing a script
+  eSpellCheckNotActive = 30064;     -- Spell checker is not active
+  eSpellCheckNotActive = 30064;    -- Spell checker is not active
+  eCannotAddFont = 30065;          -- Cannot create requested font
+  ePenStyleNotValid = 30066;       -- Invalid settings for pen parameter
+  eUnableToLoadImage = 30067;      -- Bitmap image could not be loaded
+  eImageNotInstalled = 30068;      -- Image has not been loaded into window
+  eInvalidNumberOfPoints = 30069;  -- Number of points supplied is incorrect
+  eInvalidPoint = 30070;           -- Point is not numeric
+  eHotspotPluginChanged = 30071;   -- Hotspot processing must all be in same plugin
+  eHotspotNotInstalled = 30072;    -- Hotspot has not been defined for this window
+  eNoSuchWindow = 30073;           -- Requested miniwindow does not exist
+  eBrushStyleNotValid = 30074;     -- Invalid settings for brush parameter
 end
 predefines()
 
@@ -47,7 +124,7 @@ local define_helper = function()
     if type(args.response) == "string" then
       check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, response, sendto.world, sequence))
     elseif type(response) == "function" then
-      _G[name] = response
+      _G.world[name] = response
       _global_trigger_callbacks[name] = true
       check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, name, sendto.script, sequence))
     else
@@ -59,9 +136,11 @@ local define_helper = function()
   helper.removeTrigger = function(name)
     if _global_trigger_callbacks[name] then
       _global_trigger_callbacks[name] = nil
-      _G[name] = nil
+      _G.world[name] = nil
     end
-    check(DeleteTrigger(name))
+    local retCode = DeleteTrigger(name)
+    print("remove trigger", name, retCode)
+    assert(retCode == eOK or retCode == eTriggerNotFound)
   end
 
   helper.removeTriggerGroups = function(...)
@@ -70,10 +149,12 @@ local define_helper = function()
       groups[group] = true
     end
     local triggerList = GetTriggerList()
-    for i, trigger in ipairs(triggerList) do
-      local group = GetTriggerInfo(trigger, trigger_info_flag.group)
-      if groups[group] then
-        helper.removeTrigger(trigger)
+    if triggerList then
+      for i, trigger in ipairs(triggerList) do
+        local group = GetTriggerInfo(trigger, trigger_info_flag.group)
+        if groups[group] then
+          helper.removeTrigger(trigger)
+        end
       end
     end
   end
@@ -86,7 +167,7 @@ local define_helper = function()
     local group = assert(args.group, "group of alias cannot be empty")
     local name = args.name or "auto_added_alias_" .. GetUniqueID()
     if type(response) == "function" then
-      _G[name] = response
+      _G.world[name] = response
       _global_alias_callbacks[name] = true
       check(AddAlias(name, regexp, name, ALIAS_BASE_FLAG, ""))
       check(SetAliasOption(name, "send_to", sendto.script))
@@ -97,9 +178,10 @@ local define_helper = function()
   helper.removeAlias = function(name)
     if _global_alias_callbacks[name] then
       _global_alias_callbacks[name] = nil
-      _G[name] = nil
+      _G.world[name] = nil
     end
-    check(DeleteAlias(name))
+    local retCode = DeleteAlias(name)
+    assert(retCode == eOK or retCode == eAliasNotFound)
   end
 
   helper.removeAliasGroups = function(...)
@@ -108,10 +190,12 @@ local define_helper = function()
       groups[group] = true
     end
     local aliasList = GetAliasList()
-    for i, alias in ipairs(aliasList) do
-      local group = GetAliasInfo(alias, alias_info_flag.group)
-      if groups[group] then
-        helper.removeTrigger(alias)
+    if aliasList then
+      for i, alias in ipairs(aliasList) do
+        local group = GetAliasInfo(alias, alias_info_flag.group)
+        if groups[group] then
+          helper.removeTrigger(alias)
+        end
       end
     end
   end
@@ -1320,168 +1404,168 @@ local define_locate = function()
 end
 local locate = define_locate().newInstance()
 
-
---------------------------------------------------------------
--- travel.lua
--- Implement the walk, locate, traverse functionalities
--- in xkx world
---------------------------------------------------------------
-local define_travel = function()
-  local prototype = {}
-  prototype.__index = prototype
-
-  prototype.roomName = nil
-  prototype.roomDescInline = false
-  prototype.roomDesc = nil
-  prototype.exitsInline = false
-  prototype.exits = nil
-
-  function prototype.clearRoomInfo()
-    travel.roomName = nil
-    travel.roomDescInline = false
-    travel.roomDesc = nil
-    travel.exitsInline = false
-    travel.exits = nil
-  end
-
-  local initRoomsAndPaths = function()
-    local rooms = dal:getAllRooms()
-    local allPaths = dal:getAllPaths()
-    for i = 1, #allPaths do
-      local path = allPaths[i]
-      local startroom = rooms[path.startid]
-      if startroom then
-        startroom:addPath(path)
-      end
-    end
-    prototype.rooms = rooms
-  end
-
-  -- bind search implementation to A* algorithm
-  -- should enhance with hypothesis functions to reduce search range
-  function prototype:search(startid, endid)
-    return Algo.astar {
-      rooms = self.rooms,
-      startid = startid,
-      targetid = endid
-    }
-  end
-
-  function prototype:locate()
-    check(EnableTriggerGroup("travel_locate_start", true))
-    check(SendNoEcho("set travel_locate start"))
-    check(SendNoEcho("look"))
-    check(SendNoEcho("set travel_locate stop"))
-    print("roomName:" .. self.roomName)
-    print("exits:" .. self.exits)
-    print("roomDesc:" .. self.roomDesc)
-  end
-
-  local initLocateTriggers = function()
-    -- start trigger
-    helper.addTrigger {
-      group = "travel_locate_start",
-      regexp = "^[ >]*设定环境变量：travel_locate = \"start\"",
-      response = function(name, line, wildcards)
-        print("trigger "..name.." triggered")
-        check(EnableTriggerGroup("travel_locate", true))
-        travel.clearRoomInfo()
-      end
-    }
-    -- room name trigger with area
-    helper.addTrigger {
-      group = "travel_locate",
-      regexp = "^[ >]*([^ ]+) \- \[[^ ]+\]$",
-      response = function(name, line, wildcards)
-        print("trigger "..name.." triggered")
-        travel.roomName = wildcards[1]
-        travel.roomDescInline = true
-        travel.roomExitsInline = true
-      end
-    }
-    -- room name trigger without area
-    helper.addTrigger {
-      group = "travel_locate",
-      regexp = "^[ >]*([^ ]+) \- $",
-      response = function(name, line, wildcards)
-        print("trigger "..name.." triggered")
-        travel.roomName = wildcards[1]
-        travel.roomDescInline = true
-      end
-    }
-
-    -- room desc
-    local roomDescCaught = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
-      if travel.roomDescInline then
-        local currDesc = travel.roomDesc or ""
-        travel.roomDesc = currDesc .. wildcards[1]
-      end
-    end
-    helper.addTrigger(
-      "trigger" .. GetUniqueID(),
-      "^ *(.*?) *$",
-      "travel_locate",
-      roomDescCaught
-    )
-    -- room desc end
-    local seasonCaught = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
-      if travel.roomDescInline then travel.roomDescInline = false end
-      local season = wildcards[1]
-      local datetime = wildcards[2]
-    end
-    helper.addTrigger(
-      "trigger" .. GetUniqueID(),
-      "^    「([^」]+)」: (.*)$",
-      "travel_locate",
-      seasonCaught,
-      5 -- higher than room desc
-    )
-    -- room desc end
-    local exitsCaught = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
-      if travel.roomDescInline then travel.roomDescInline = false end
-      if travel.exitsInline then
-        travel.exitsInline = false
-        local exits = wildcards[2] or "look"
-        exits = string.gsub(exits,"。","")
-        exits = string.gsub(exits," ","")
-        exits = string.gsub(exits,"、", ";")
-        exits = string.gsub(exits, "和", ";")
-        local tb = {}
-        for _, str in ipairs(utils.split(exits,";")) do
-          local t = Trim(str)
-          if t ~= "" then table.insert(tb, t) end
-        end
-        travel.exits = table.concat(tb, ";") .. ";"
-      end
-
-    end
-    helper.addTrigger(
-      "trigger" .. GetUniqueID(),
-      "^\\s*这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
-      "travel_locate",
-      exitsCaught,
-      5 -- higher than room desc
-    )
-    -- stop trigger
-    local stop = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
-      check(EnableTriggerGroup("travel_locate_start", false))
-      check(EnableTriggerGroup("travel_locate", false))
-      -- summary
-      print("roomName", travel.roomName)
-      print("roomDescInline", travel.roomDescInline)
-      print("roomDesc", travel.roomDesc)
-      print("exitsInline", travel.exitsInline)
-      print("exits", travel.exits)
-    end
-  end
-
-  initRoomsAndPaths()
-  if _G["world"] then initLocateTriggers() end
-
-  return prototype
-end
-local travel = define_travel()
+--
+----------------------------------------------------------------
+---- travel.lua
+---- Implement the walk, locate, traverse functionalities
+---- in xkx world
+----------------------------------------------------------------
+--local define_travel = function()
+--  local prototype = {}
+--  prototype.__index = prototype
+--
+--  prototype.roomName = nil
+--  prototype.roomDescInline = false
+--  prototype.roomDesc = nil
+--  prototype.exitsInline = false
+--  prototype.exits = nil
+--
+--  function prototype.clearRoomInfo()
+--    travel.roomName = nil
+--    travel.roomDescInline = false
+--    travel.roomDesc = nil
+--    travel.exitsInline = false
+--    travel.exits = nil
+--  end
+--
+--  local initRoomsAndPaths = function()
+--    local rooms = dal:getAllRooms()
+--    local allPaths = dal:getAllPaths()
+--    for i = 1, #allPaths do
+--      local path = allPaths[i]
+--      local startroom = rooms[path.startid]
+--      if startroom then
+--        startroom:addPath(path)
+--      end
+--    end
+--    prototype.rooms = rooms
+--  end
+--
+--  -- bind search implementation to A* algorithm
+--  -- should enhance with hypothesis functions to reduce search range
+--  function prototype:search(startid, endid)
+--    return Algo.astar {
+--      rooms = self.rooms,
+--      startid = startid,
+--      targetid = endid
+--    }
+--  end
+--
+--  function prototype:locate()
+--    check(EnableTriggerGroup("travel_locate_start", true))
+--    check(SendNoEcho("set travel_locate start"))
+--    check(SendNoEcho("look"))
+--    check(SendNoEcho("set travel_locate stop"))
+--    print("roomName:" .. self.roomName)
+--    print("exits:" .. self.exits)
+--    print("roomDesc:" .. self.roomDesc)
+--  end
+--
+--  local initLocateTriggers = function()
+--    -- start trigger
+--    helper.addTrigger {
+--      group = "travel_locate_start",
+--      regexp = "^[ >]*设定环境变量：travel_locate = \"start\"",
+--      response = function(name, line, wildcards)
+--        print("trigger "..name.." triggered")
+--        check(EnableTriggerGroup("travel_locate", true))
+--        travel.clearRoomInfo()
+--      end
+--    }
+--    -- room name trigger with area
+--    helper.addTrigger {
+--      group = "travel_locate",
+--      regexp = "^[ >]*([^ ]+) \- \[[^ ]+\]$",
+--      response = function(name, line, wildcards)
+--        print("trigger "..name.." triggered")
+--        travel.roomName = wildcards[1]
+--        travel.roomDescInline = true
+--        travel.roomExitsInline = true
+--      end
+--    }
+--    -- room name trigger without area
+--    helper.addTrigger {
+--      group = "travel_locate",
+--      regexp = "^[ >]*([^ ]+) \- $",
+--      response = function(name, line, wildcards)
+--        print("trigger "..name.." triggered")
+--        travel.roomName = wildcards[1]
+--        travel.roomDescInline = true
+--      end
+--    }
+--
+--    -- room desc
+--    local roomDescCaught = function(name, line, wildcards)
+--      print("trigger "..name.." triggered")
+--      if travel.roomDescInline then
+--        local currDesc = travel.roomDesc or ""
+--        travel.roomDesc = currDesc .. wildcards[1]
+--      end
+--    end
+--    helper.addTrigger(
+--      "trigger" .. GetUniqueID(),
+--      "^ *(.*?) *$",
+--      "travel_locate",
+--      roomDescCaught
+--    )
+--    -- room desc end
+--    local seasonCaught = function(name, line, wildcards)
+--      print("trigger "..name.." triggered")
+--      if travel.roomDescInline then travel.roomDescInline = false end
+--      local season = wildcards[1]
+--      local datetime = wildcards[2]
+--    end
+--    helper.addTrigger(
+--      "trigger" .. GetUniqueID(),
+--      "^    「([^」]+)」: (.*)$",
+--      "travel_locate",
+--      seasonCaught,
+--      5 -- higher than room desc
+--    )
+--    -- room desc end
+--    local exitsCaught = function(name, line, wildcards)
+--      print("trigger "..name.." triggered")
+--      if travel.roomDescInline then travel.roomDescInline = false end
+--      if travel.exitsInline then
+--        travel.exitsInline = false
+--        local exits = wildcards[2] or "look"
+--        exits = string.gsub(exits,"。","")
+--        exits = string.gsub(exits," ","")
+--        exits = string.gsub(exits,"、", ";")
+--        exits = string.gsub(exits, "和", ";")
+--        local tb = {}
+--        for _, str in ipairs(utils.split(exits,";")) do
+--          local t = Trim(str)
+--          if t ~= "" then table.insert(tb, t) end
+--        end
+--        travel.exits = table.concat(tb, ";") .. ";"
+--      end
+--
+--    end
+--    helper.addTrigger(
+--      "trigger" .. GetUniqueID(),
+--      "^\\s*这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
+--      "travel_locate",
+--      exitsCaught,
+--      5 -- higher than room desc
+--    )
+--    -- stop trigger
+--    local stop = function(name, line, wildcards)
+--      print("trigger "..name.." triggered")
+--      check(EnableTriggerGroup("travel_locate_start", false))
+--      check(EnableTriggerGroup("travel_locate", false))
+--      -- summary
+--      print("roomName", travel.roomName)
+--      print("roomDescInline", travel.roomDescInline)
+--      print("roomDesc", travel.roomDesc)
+--      print("exitsInline", travel.exitsInline)
+--      print("exits", travel.exits)
+--    end
+--  end
+--
+--  initRoomsAndPaths()
+--  if _G["world"] then initLocateTriggers() end
+--
+--  return prototype
+--end
+--local travel = define_travel()
