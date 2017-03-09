@@ -122,7 +122,7 @@ local define_helper = function()
     local name = args.name or "auto_added_trigger_" .. GetUniqueID()
     local sequence = args.sequence or 10
     if type(args.response) == "string" then
-      check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, response, sendto.world, sequence))
+      check(AddTriggerEx(name, regexp, response, TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, "", sendto.world, sequence))
     elseif type(response) == "function" then
       _G.world[name] = response
       _global_trigger_callbacks[name] = true
@@ -169,7 +169,7 @@ local define_helper = function()
     if type(response) == "function" then
       _G.world[name] = response
       _global_alias_callbacks[name] = true
-      check(AddAlias(name, regexp, name, ALIAS_BASE_FLAG, ""))
+      check(AddAlias(name, regexp, "", ALIAS_BASE_FLAG, name))
       check(SetAliasOption(name, "send_to", sendto.script))
       check(SetAliasOption(name, "group", group))
     end
@@ -194,7 +194,7 @@ local define_helper = function()
       for i, alias in ipairs(aliasList) do
         local group = GetAliasInfo(alias, alias_info_flag.group)
         if groups[group] then
-          helper.removeTrigger(alias)
+          helper.removeAlias(alias)
         end
       end
     end
@@ -202,15 +202,15 @@ local define_helper = function()
 
   -- convert chinese string to number
   local _nums = {
-    ["ä¸€"] = 1,
-    ["äºŒ"] = 2,
-    ["ä¸‰"] = 3,
-    ["å››"] = 4,
-    ["äº”"] = 5,
-    ["å…­"] = 6,
-    ["ä¸ƒ"] = 7,
-    ["å…«"] = 8,
-    ["ä¹"] = 9
+    ["Ò»"] = 1,
+    ["¶ş"] = 2,
+    ["Èı"] = 3,
+    ["ËÄ"] = 4,
+    ["Îå"] = 5,
+    ["Áù"] = 6,
+    ["Æß"] = 7,
+    ["°Ë"] = 8,
+    ["¾Å"] = 9
   }
   helper.ch2number = function (str)
     if (#str % 2) == 1 then
@@ -221,18 +221,18 @@ local define_helper = function()
     local unit = 1
     for i = #str - 2, 0, -2 do
       local char = string.sub(str, i + 1, i + 2)
-      if char == "å" then
+      if char == "Ê®" then
         unit = 10 * _10k
         if i == 0 then
           result = result + unit
         elseif _nums[string.sub(str, i - 1, i)] == nil then
           result = result + unit
         end
-      elseif char == "ç™¾" then
+      elseif char == "°Ù" then
         unit = 100 * _10k
-      elseif char == "åƒ" then
+      elseif char == "Ç§" then
         unit = 1000 * _10k
-      elseif char == "ä¸‡" then
+      elseif char == "Íò" then
         unit = 10000 * _10k
         _10k = 10000
       else
@@ -246,26 +246,26 @@ local define_helper = function()
 
   -- convert chinese directions
   local _dirs = {
-    ["ä¸Š"] = "up",
-    ["ä¸‹"] = "down",
-    ["å—"] = "south",
-    ["ä¸œ"] = "east",
-    ["è¥¿"] = "west",
-    ["åŒ—"] = "north",
-    ["å—ä¸Š"] = "southup",
-    ["å—ä¸‹"] = "southdown",
-    ["è¥¿ä¸Š"] = "westup",
-    ["è¥¿ä¸‹"] = "westdown",
-    ["ä¸œä¸Š"] = "eastup",
-    ["ä¸œä¸‹"] = "eastdown",
-    ["åŒ—ä¸Š"] = "northup",
-    ["åŒ—ä¸‹"] = "northdown",
-    ["è¥¿åŒ—"] = "northwest",
-    ["ä¸œåŒ—"] = "northeast",
-    ["è¥¿å—"] = "southwest",
-    ["ä¸œå—"] = "southeast",
-    ["å°é“"] = "xiaodao",
-    ["å°è·¯"] = "xiaolu"
+    ["ÉÏ"] = "up",
+    ["ÏÂ"] = "down",
+    ["ÄÏ"] = "south",
+    ["¶«"] = "east",
+    ["Î÷"] = "west",
+    ["±±"] = "north",
+    ["ÄÏÉÏ"] = "southup",
+    ["ÄÏÏÂ"] = "southdown",
+    ["Î÷ÉÏ"] = "westup",
+    ["Î÷ÏÂ"] = "westdown",
+    ["¶«ÉÏ"] = "eastup",
+    ["¶«ÏÂ"] = "eastdown",
+    ["±±ÉÏ"] = "northup",
+    ["±±ÏÂ"] = "northdown",
+    ["Î÷±±"] = "northwest",
+    ["¶«±±"] = "northeast",
+    ["Î÷ÄÏ"] = "southwest",
+    ["¶«ÄÏ"] = "southeast",
+    ["Ğ¡µÀ"] = "xiaodao",
+    ["Ğ¡Â·"] = "xiaolu"
   }
   helper.ch2direction = function (str) return _dirs(str) end
 
@@ -274,80 +274,80 @@ local define_helper = function()
     {
     },
     {
-      ["ä¸­åŸ"] = true,
-      ["æ›²é˜œ"] = true,
-      ["ä¿¡é˜³"] = true,
-      ["æ³°å±±"] = true,
-      ["é•¿æ±Ÿ"] = true,
-      ["å˜‰å…´"] = true,
-      ["æ³‰å·"] = true,
-      ["æ±Ÿå·"] = true,
-      ["ç‰™å±±"] = true,
-      ["è¥¿æ¹–"] = true,
-      ["ç¦å·"] = true,
-      ["å—æ˜Œ"] = true,
-      ["é•‡æ±Ÿ"] = true,
-      ["è‹å·"] = true,
-      ["æ˜†æ˜"] = true,
-      ["æ¡ƒæº"] = true,
-      ["å²³é˜³"] = true,
-      ["æˆéƒ½"] = true,
-      ["åŒ—äº¬"] = true,
-      ["å¤©å›"] = true,
-      ["æ´›é˜³"] = true,
-      ["çµå·"] = true,
-      ["æ™‹é˜³"] = true,
-      ["è¥„é˜³"] = true,
-      ["é•¿å®‰"] = true,
-      ["æ‰¬å·"] = true,
-      ["ä¸å¸®"] = true,
-      ["å³¨åµ‹"] = true,
-      ["åå±±"] = true,
-      ["å…¨çœŸ"] = true,
-      ["å¤å¢“"] = true,
-      ["æ˜Ÿå®¿"] = true,
-      ["æ˜æ•™"] = true,
-      ["çµé¹«"] = true,
-      ["å…°å·"] = true
+      ["ÖĞÔ­"] = true,
+      ["Çú¸·"] = true,
+      ["ĞÅÑô"] = true,
+      ["Ì©É½"] = true,
+      ["³¤½­"] = true,
+      ["¼ÎĞË"] = true,
+      ["ÈªÖİ"] = true,
+      ["½­Öİ"] = true,
+      ["ÑÀÉ½"] = true,
+      ["Î÷ºş"] = true,
+      ["¸£Öİ"] = true,
+      ["ÄÏ²ı"] = true,
+      ["Õò½­"] = true,
+      ["ËÕÖİ"] = true,
+      ["À¥Ã÷"] = true,
+      ["ÌÒÔ´"] = true,
+      ["ÔÀÑô"] = true,
+      ["³É¶¼"] = true,
+      ["±±¾©"] = true,
+      ["ÌìÌ³"] = true,
+      ["ÂåÑô"] = true,
+      ["ÁéÖİ"] = true,
+      ["½úÑô"] = true,
+      ["ÏåÑô"] = true,
+      ["³¤°²"] = true,
+      ["ÑïÖİ"] = true,
+      ["Ø¤°ï"] = true,
+      ["¶ëáÒ"] = true,
+      ["»ªÉ½"] = true,
+      ["È«Õæ"] = true,
+      ["¹ÅÄ¹"] = true,
+      ["ĞÇËŞ"] = true,
+      ["Ã÷½Ì"] = true,
+      ["ÁéğÕ"] = true,
+      ["À¼Öİ"] = true
     },
     {
-      ["ä¸´å®‰åºœ"] = true,
-      ["å½’äº‘åº„"] = true,
-      ["å°å±±æ‘"] = true,
-      ["å¼ å®¶å£"] = true,
-      ["éº’éºŸæ‘"] = true,
-      ["ç´«ç¦åŸ"] = true,
-      ["ç¥é¾™å²›"] = true,
-      ["æ€æ‰‹å¸®"] = true,
-      ["å²³ç‹å¢“"] = true,
-      ["æ¡ƒèŠ±å²›"] = true,
-      ["å¤©é¾™å¯º"] = true,
-      ["æ­¦å½“å±±"] = true,
-      ["å°‘æ—å¯º"] = true,
-      ["ç™½é©¼å±±"] = true,
-      ["å‡Œéœ„åŸ"] = true,
-      ["å¤§è½®å¯º"] = true,
-      ["æ— é‡å±±"] = true,
-      ["å¤©åœ°ä¼š"] = true
+      ["ÁÙ°²¸®"] = true,
+      ["¹éÔÆ×¯"] = true,
+      ["Ğ¡É½´å"] = true,
+      ["ÕÅ¼Ò¿Ú"] = true,
+      ["÷è÷ë´å"] = true,
+      ["×Ï½û³Ç"] = true,
+      ["ÉñÁúµº"] = true,
+      ["É±ÊÖ°ï"] = true,
+      ["ÔÀÍõÄ¹"] = true,
+      ["ÌÒ»¨µº"] = true,
+      ["ÌìÁúËÂ"] = true,
+      ["Îäµ±É½"] = true,
+      ["ÉÙÁÖËÂ"] = true,
+      ["°×ÍÕÉ½"] = true,
+      ["ÁèÏö³Ç"] = true,
+      ["´óÂÖËÂ"] = true,
+      ["ÎŞÁ¿É½"] = true,
+      ["ÌìµØ»á"] = true
     },
     {
-      ["è¥¿æ¹–æ¢…åº„"] = true,
-      ["é•¿æ±Ÿå—å²¸"] = true,
-      ["é•¿æ±ŸåŒ—å²¸"] = true,
-      ["é»„æ²³å—å²¸"] = true,
-      ["é»„æ²³åŒ—å²¸"] = true,
-      ["å¤§ç†åŸä¸­"] = true,
-      ["å¹³è¥¿ç‹åºœ"] = true,
-      ["åº·äº²ç‹åºœ"] = true,
-      ["æ—¥æœˆç¥æ•™"] = true,
-      ["ä¸ç»¸ä¹‹è·¯"] = true,
-      ["å§‘è‹æ…•å®¹"] = true,
-      ["å³¨çœ‰åå±±"] = true
+      ["Î÷ºşÃ·×¯"] = true,
+      ["³¤½­ÄÏ°¶"] = true,
+      ["³¤½­±±°¶"] = true,
+      ["»ÆºÓÄÏ°¶"] = true,
+      ["»ÆºÓ±±°¶"] = true,
+      ["´óÀí³ÇÖĞ"] = true,
+      ["Æ½Î÷Íõ¸®"] = true,
+      ["¿µÇ×Íõ¸®"] = true,
+      ["ÈÕÔÂÉñ½Ì"] = true,
+      ["Ë¿³ñÖ®Â·"] = true,
+      ["¹ÃËÕÄ½Èİ"] = true,
+      ["¶ëÃ¼ºóÉ½"] = true
     },
     {
-      ["å»ºåº·åºœå—åŸ"] = true,
-      ["å»ºåº·åºœåŒ—åŸ"] = true,
-      ["æ­å·æç£åºœ"] = true
+      ["½¨¿µ¸®ÄÏ³Ç"] = true,
+      ["½¨¿µ¸®±±³Ç"] = true,
+      ["º¼ÖİÌá¶½¸®"] = true
     }
   }
   helper.ch2place = function(str)
@@ -768,7 +768,7 @@ local PlanMode = define_PlanMode()
 --  local prototype = {}
 --  prototype.__index = prototype
 --  prototype.regexp = {
---    WRONG_WAY = "^[ >]*è¿™ä¸ªæ–¹å‘æ²¡æœ‰è·¯ã€‚"
+--    WRONG_WAY = "^[ >]*Õâ¸ö·½ÏòÃ»ÓĞÂ·¡£"
 --  }
 --  -- always be overwrite by instance variable
 --  prototype.startid = -1
@@ -862,7 +862,7 @@ local PlanMode = define_PlanMode()
 --      regexp = prototype.regexp.WRONG_WAY,
 --      response = function(name, line, wildcards)
 --        self._mayBeLost = true
---        if self._DEBUG then Note("è¡Œèµ°è·¯å¾„å‡ºç°é”™è¯¯") end
+--        if self._DEBUG then Note("ĞĞ×ßÂ·¾¶³öÏÖ´íÎó") end
 --      end,
 --      group = "travel_assist"
 --    }
@@ -1239,15 +1239,15 @@ local define_locate = function()
   local prototype = {}
   prototype.__index = prototype
   prototype.regexp = {
-    SET_LOCATE_START = "^[ >]*è®¾å®šç¯å¢ƒå˜é‡ï¼šlocate = \"start\"",
-    SET_LOCATE_STOP = "^[ >]*è®¾å®šç¯å¢ƒå˜é‡ï¼šlocate = \"stop\"",
-    ROOM_NAME_WITH_AREA = "^[ >]*([^ ]+) \- \[[^ ]+\]$",
-    ROOM_NAME_WITHOUT_AREA = "^[ >]*([^ ]+) \- $",
+    SET_LOCATE_START = "^[ >]*Éè¶¨»·¾³±äÁ¿£ºlocate = \"start\"",
+    SET_LOCATE_STOP = "^[ >]*Éè¶¨»·¾³±äÁ¿£ºlocate = \"stop\"",
+    ROOM_NAME_WITH_AREA = "^[ >]{,8}([^ ]+) \- \[[^ ]+\]$",
+    ROOM_NAME_WITHOUT_AREA = "^[ >]{,8}([^ ]+) \- $",
     -- a very short line also might be the room name line
-    ROOM_NAME_SINGLE = "^[ >]*([^ ]{1,8}) *$",
-    ROOM_DESC = "^ *(.*?) *$",
-    SEASON_TIME_DESC = "^    ã€Œ([^ã€]+)ã€: (.*)$",
-    EXITS_DESC = "^\\s*è¿™é‡Œ(æ˜æ˜¾|å”¯ä¸€)çš„å‡ºå£æ˜¯(.*)$|^\\s*è¿™é‡Œæ²¡æœ‰ä»»ä½•æ˜æ˜¾çš„å‡ºè·¯\\w*"
+    ROOM_NAME_SINGLE = "^[ >]{,8}([^ ]{1,8}) *$",
+    ROOM_DESC = "^ {,8}(.*?) *$",
+    SEASON_TIME_DESC = "^    ¡¸([^¡¹]+)¡¹: (.*)$",
+    EXITS_DESC = "^\\s*ÕâÀï(Ã÷ÏÔ|Î¨Ò»)µÄ³ö¿ÚÊÇ(.*)$|^\\s*ÕâÀïÃ»ÓĞÈÎºÎÃ÷ÏÔµÄ³öÂ·\\w*"
   }
 
   function prototype.newInstance()
@@ -1281,8 +1281,8 @@ local define_locate = function()
 
     -- start trigger
     local start = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
-      check(EnableTriggerGroup("locate", true))
+      print("locate start triggered")
+      EnableTriggerGroup("locate", true)
       self:clearRoomInfo()
     end
     helper.addTrigger {
@@ -1292,7 +1292,7 @@ local define_locate = function()
     }
     -- room name trigger
     local roomNameCaught = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
+      print("locate room name triggered")
       local roomName = wildcards[1]
       self._potentialRoomIds = dal:getRoomsByName(roomName)
       if #(self._potentialRoomIds) == 1 then
@@ -1321,7 +1321,7 @@ local define_locate = function()
     }
     -- room desc trigger
     local roomDescCaught = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
+      print("locate room desc triggered")
       if self._roomDescInline then
         local currDesc = self.roomDesc or ""
         self.roomDesc = currDesc .. wildcards[1]
@@ -1334,7 +1334,7 @@ local define_locate = function()
     }
     -- season/time trigger
     local seasonCaught = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
+      print("locate season/time triggered")
       if self._roomDescInline then self._roomDescInline = false end
       local season = wildcards[1]
       local datetime = wildcards[2]
@@ -1347,15 +1347,15 @@ local define_locate = function()
     }
     -- exits trigger
     local exitsCaught = function(name, line, wildcards)
-      print("trigger "..name.." triggered")
+      print("locate exits triggered")
       if self._roomDescInline then self._roomDescInline = false end
       if self._exitsInline then
         self._exitsInline = false
         local exits = wildcards[2] or "look"
-        exits = string.gsub(exits,"ã€‚","")
+        exits = string.gsub(exits,"¡£","")
         exits = string.gsub(exits," ","")
-        exits = string.gsub(exits,"ã€", ";")
-        exits = string.gsub(exits, "å’Œ", ";")
+        exits = string.gsub(exits,"¡¢", ";")
+        exits = string.gsub(exits, "ºÍ", ";")
         local tb = {}
         for _, str in ipairs(utils.split(exits,";")) do
           local t = Trim(str)
@@ -1390,14 +1390,19 @@ local define_locate = function()
   end
 
   function prototype:locate()
-    self._locateInProcess = true
-    check(EnableTriggerGroup("locate_start", true))
-    check(SendNoEcho("set travel_locate start"))
-    check(SendNoEcho("look"))
-    check(SendNoEcho("set travel_locate stop"))
-    wait.regexp(self.regexp.SET_LOCATE_STOP)
-    self._locateInProcess = false
-    self:show()
+    local locater = coroutine.create(function()
+      self._locateInProcess = true
+      EnableTriggerGroup("locate_start", true)
+      check(SendNoEcho("set locate start"))
+      check(SendNoEcho("look"))
+      check(SendNoEcho("set locate stop"))
+      wait.regexp(self.regexp.SET_LOCATE_STOP)
+      EnableTriggerGroup("locate_start", false)
+      EnableTriggerGroup("locate", false)
+      self._locateInProcess = false
+      self:show()
+    end)
+    return coroutine.resume(locater)
   end
 
   return prototype
@@ -1452,7 +1457,7 @@ local locate = define_locate().newInstance()
 --  end
 --
 --  function prototype:locate()
---    check(EnableTriggerGroup("travel_locate_start", true))
+--    EnableTriggerGroup("travel_locate_start", true)
 --    check(SendNoEcho("set travel_locate start"))
 --    check(SendNoEcho("look"))
 --    check(SendNoEcho("set travel_locate stop"))
@@ -1465,10 +1470,10 @@ local locate = define_locate().newInstance()
 --    -- start trigger
 --    helper.addTrigger {
 --      group = "travel_locate_start",
---      regexp = "^[ >]*è®¾å®šç¯å¢ƒå˜é‡ï¼štravel_locate = \"start\"",
+--      regexp = "^[ >]*Éè¶¨»·¾³±äÁ¿£ºtravel_locate = \"start\"",
 --      response = function(name, line, wildcards)
 --        print("trigger "..name.." triggered")
---        check(EnableTriggerGroup("travel_locate", true))
+--        EnableTriggerGroup("travel_locate", true)
 --        travel.clearRoomInfo()
 --      end
 --    }
@@ -1517,7 +1522,7 @@ local locate = define_locate().newInstance()
 --    end
 --    helper.addTrigger(
 --      "trigger" .. GetUniqueID(),
---      "^    ã€Œ([^ã€]+)ã€: (.*)$",
+--      "^    ¡¸([^¡¹]+)¡¹: (.*)$",
 --      "travel_locate",
 --      seasonCaught,
 --      5 -- higher than room desc
@@ -1529,10 +1534,10 @@ local locate = define_locate().newInstance()
 --      if travel.exitsInline then
 --        travel.exitsInline = false
 --        local exits = wildcards[2] or "look"
---        exits = string.gsub(exits,"ã€‚","")
+--        exits = string.gsub(exits,"¡£","")
 --        exits = string.gsub(exits," ","")
---        exits = string.gsub(exits,"ã€", ";")
---        exits = string.gsub(exits, "å’Œ", ";")
+--        exits = string.gsub(exits,"¡¢", ";")
+--        exits = string.gsub(exits, "ºÍ", ";")
 --        local tb = {}
 --        for _, str in ipairs(utils.split(exits,";")) do
 --          local t = Trim(str)
@@ -1544,7 +1549,7 @@ local locate = define_locate().newInstance()
 --    end
 --    helper.addTrigger(
 --      "trigger" .. GetUniqueID(),
---      "^\\s*è¿™é‡Œ(æ˜æ˜¾|å”¯ä¸€)çš„å‡ºå£æ˜¯(.*)$|^\\s*è¿™é‡Œæ²¡æœ‰ä»»ä½•æ˜æ˜¾çš„å‡ºè·¯\\w*",
+--      "^\\s*ÕâÀï(Ã÷ÏÔ|Î¨Ò»)µÄ³ö¿ÚÊÇ(.*)$|^\\s*ÕâÀïÃ»ÓĞÈÎºÎÃ÷ÏÔµÄ³öÂ·\\w*",
 --      "travel_locate",
 --      exitsCaught,
 --      5 -- higher than room desc
@@ -1552,8 +1557,8 @@ local locate = define_locate().newInstance()
 --    -- stop trigger
 --    local stop = function(name, line, wildcards)
 --      print("trigger "..name.." triggered")
---      check(EnableTriggerGroup("travel_locate_start", false))
---      check(EnableTriggerGroup("travel_locate", false))
+--      EnableTriggerGroup("travel_locate_start", false)
+--      EnableTriggerGroup("travel_locate", false)
 --      -- summary
 --      print("roomName", travel.roomName)
 --      print("roomDescInline", travel.roomDescInline)

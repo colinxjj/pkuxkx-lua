@@ -69,15 +69,15 @@ local define_helper = function()
 
   -- convert chinese string to number
   local _nums = {
-    ["ä¸€"] = 1,
-    ["äºŒ"] = 2,
-    ["ä¸‰"] = 3,
-    ["å››"] = 4,
-    ["äº”"] = 5,
-    ["å…­"] = 6,
-    ["ä¸ƒ"] = 7,
-    ["å…«"] = 8,
-    ["ä¹"] = 9
+    ["Ò»"] = 1,
+    ["¶ş"] = 2,
+    ["Èı"] = 3,
+    ["ËÄ"] = 4,
+    ["Îå"] = 5,
+    ["Áù"] = 6,
+    ["Æß"] = 7,
+    ["°Ë"] = 8,
+    ["¾Å"] = 9
   }
   helper.ch2number = function (str)
     if (#str % 2) == 1 then
@@ -88,18 +88,18 @@ local define_helper = function()
     local unit = 1
     for i = #str - 2, 0, -2 do
       local char = string.sub(str, i + 1, i + 2)
-      if char == "å" then
+      if char == "Ê®" then
         unit = 10 * _10k
         if i == 0 then
           result = result + unit
         elseif _nums[string.sub(str, i - 1, i)] == nil then
           result = result + unit
         end
-      elseif char == "ç™¾" then
+      elseif char == "°Ù" then
         unit = 100 * _10k
-      elseif char == "åƒ" then
+      elseif char == "Ç§" then
         unit = 1000 * _10k
-      elseif char == "ä¸‡" then
+      elseif char == "Íò" then
         unit = 10000 * _10k
         _10k = 10000
       else
@@ -113,26 +113,26 @@ local define_helper = function()
 
   -- convert chinese directions
   local _dirs = {
-    ["ä¸Š"] = "up",
-    ["ä¸‹"] = "down",
-    ["å—"] = "south",
-    ["ä¸œ"] = "east",
-    ["è¥¿"] = "west",
-    ["åŒ—"] = "north",
-    ["å—ä¸Š"] = "southup",
-    ["å—ä¸‹"] = "southdown",
-    ["è¥¿ä¸Š"] = "westup",
-    ["è¥¿ä¸‹"] = "westdown",
-    ["ä¸œä¸Š"] = "eastup",
-    ["ä¸œä¸‹"] = "eastdown",
-    ["åŒ—ä¸Š"] = "northup",
-    ["åŒ—ä¸‹"] = "northdown",
-    ["è¥¿åŒ—"] = "northwest",
-    ["ä¸œåŒ—"] = "northeast",
-    ["è¥¿å—"] = "southwest",
-    ["ä¸œå—"] = "southeast",
-    ["å°é“"] = "xiaodao",
-    ["å°è·¯"] = "xiaolu"
+    ["ÉÏ"] = "up",
+    ["ÏÂ"] = "down",
+    ["ÄÏ"] = "south",
+    ["¶«"] = "east",
+    ["Î÷"] = "west",
+    ["±±"] = "north",
+    ["ÄÏÉÏ"] = "southup",
+    ["ÄÏÏÂ"] = "southdown",
+    ["Î÷ÉÏ"] = "westup",
+    ["Î÷ÏÂ"] = "westdown",
+    ["¶«ÉÏ"] = "eastup",
+    ["¶«ÏÂ"] = "eastdown",
+    ["±±ÉÏ"] = "northup",
+    ["±±ÏÂ"] = "northdown",
+    ["Î÷±±"] = "northwest",
+    ["¶«±±"] = "northeast",
+    ["Î÷ÄÏ"] = "southwest",
+    ["¶«ÄÏ"] = "southeast",
+    ["Ğ¡µÀ"] = "xiaodao",
+    ["Ğ¡Â·"] = "xiaolu"
   }
   helper.ch2direction = function (str) return _dirs(str) end
 
@@ -141,80 +141,80 @@ local define_helper = function()
     {
     },
     {
-      ["ä¸­åŸ"] = true,
-      ["æ›²é˜œ"] = true,
-      ["ä¿¡é˜³"] = true,
-      ["æ³°å±±"] = true,
-      ["é•¿æ±Ÿ"] = true,
-      ["å˜‰å…´"] = true,
-      ["æ³‰å·"] = true,
-      ["æ±Ÿå·"] = true,
-      ["ç‰™å±±"] = true,
-      ["è¥¿æ¹–"] = true,
-      ["ç¦å·"] = true,
-      ["å—æ˜Œ"] = true,
-      ["é•‡æ±Ÿ"] = true,
-      ["è‹å·"] = true,
-      ["æ˜†æ˜"] = true,
-      ["æ¡ƒæº"] = true,
-      ["å²³é˜³"] = true,
-      ["æˆéƒ½"] = true,
-      ["åŒ—äº¬"] = true,
-      ["å¤©å›"] = true,
-      ["æ´›é˜³"] = true,
-      ["çµå·"] = true,
-      ["æ™‹é˜³"] = true,
-      ["è¥„é˜³"] = true,
-      ["é•¿å®‰"] = true,
-      ["æ‰¬å·"] = true,
-      ["ä¸å¸®"] = true,
-      ["å³¨åµ‹"] = true,
-      ["åå±±"] = true,
-      ["å…¨çœŸ"] = true,
-      ["å¤å¢“"] = true,
-      ["æ˜Ÿå®¿"] = true,
-      ["æ˜æ•™"] = true,
-      ["çµé¹«"] = true,
-      ["å…°å·"] = true
+      ["ÖĞÔ­"] = true,
+      ["Çú¸·"] = true,
+      ["ĞÅÑô"] = true,
+      ["Ì©É½"] = true,
+      ["³¤½­"] = true,
+      ["¼ÎĞË"] = true,
+      ["ÈªÖİ"] = true,
+      ["½­Öİ"] = true,
+      ["ÑÀÉ½"] = true,
+      ["Î÷ºş"] = true,
+      ["¸£Öİ"] = true,
+      ["ÄÏ²ı"] = true,
+      ["Õò½­"] = true,
+      ["ËÕÖİ"] = true,
+      ["À¥Ã÷"] = true,
+      ["ÌÒÔ´"] = true,
+      ["ÔÀÑô"] = true,
+      ["³É¶¼"] = true,
+      ["±±¾©"] = true,
+      ["ÌìÌ³"] = true,
+      ["ÂåÑô"] = true,
+      ["ÁéÖİ"] = true,
+      ["½úÑô"] = true,
+      ["ÏåÑô"] = true,
+      ["³¤°²"] = true,
+      ["ÑïÖİ"] = true,
+      ["Ø¤°ï"] = true,
+      ["¶ëáÒ"] = true,
+      ["»ªÉ½"] = true,
+      ["È«Õæ"] = true,
+      ["¹ÅÄ¹"] = true,
+      ["ĞÇËŞ"] = true,
+      ["Ã÷½Ì"] = true,
+      ["ÁéğÕ"] = true,
+      ["À¼Öİ"] = true
     },
     {
-      ["ä¸´å®‰åºœ"] = true,
-      ["å½’äº‘åº„"] = true,
-      ["å°å±±æ‘"] = true,
-      ["å¼ å®¶å£"] = true,
-      ["éº’éºŸæ‘"] = true,
-      ["ç´«ç¦åŸ"] = true,
-      ["ç¥é¾™å²›"] = true,
-      ["æ€æ‰‹å¸®"] = true,
-      ["å²³ç‹å¢“"] = true,
-      ["æ¡ƒèŠ±å²›"] = true,
-      ["å¤©é¾™å¯º"] = true,
-      ["æ­¦å½“å±±"] = true,
-      ["å°‘æ—å¯º"] = true,
-      ["ç™½é©¼å±±"] = true,
-      ["å‡Œéœ„åŸ"] = true,
-      ["å¤§è½®å¯º"] = true,
-      ["æ— é‡å±±"] = true,
-      ["å¤©åœ°ä¼š"] = true
+      ["ÁÙ°²¸®"] = true,
+      ["¹éÔÆ×¯"] = true,
+      ["Ğ¡É½´å"] = true,
+      ["ÕÅ¼Ò¿Ú"] = true,
+      ["÷è÷ë´å"] = true,
+      ["×Ï½û³Ç"] = true,
+      ["ÉñÁúµº"] = true,
+      ["É±ÊÖ°ï"] = true,
+      ["ÔÀÍõÄ¹"] = true,
+      ["ÌÒ»¨µº"] = true,
+      ["ÌìÁúËÂ"] = true,
+      ["Îäµ±É½"] = true,
+      ["ÉÙÁÖËÂ"] = true,
+      ["°×ÍÕÉ½"] = true,
+      ["ÁèÏö³Ç"] = true,
+      ["´óÂÖËÂ"] = true,
+      ["ÎŞÁ¿É½"] = true,
+      ["ÌìµØ»á"] = true
     },
     {
-      ["è¥¿æ¹–æ¢…åº„"] = true,
-      ["é•¿æ±Ÿå—å²¸"] = true,
-      ["é•¿æ±ŸåŒ—å²¸"] = true,
-      ["é»„æ²³å—å²¸"] = true,
-      ["é»„æ²³åŒ—å²¸"] = true,
-      ["å¤§ç†åŸä¸­"] = true,
-      ["å¹³è¥¿ç‹åºœ"] = true,
-      ["åº·äº²ç‹åºœ"] = true,
-      ["æ—¥æœˆç¥æ•™"] = true,
-      ["ä¸ç»¸ä¹‹è·¯"] = true,
-      ["å§‘è‹æ…•å®¹"] = true,
-      ["å³¨çœ‰åå±±"] = true
+      ["Î÷ºşÃ·×¯"] = true,
+      ["³¤½­ÄÏ°¶"] = true,
+      ["³¤½­±±°¶"] = true,
+      ["»ÆºÓÄÏ°¶"] = true,
+      ["»ÆºÓ±±°¶"] = true,
+      ["´óÀí³ÇÖĞ"] = true,
+      ["Æ½Î÷Íõ¸®"] = true,
+      ["¿µÇ×Íõ¸®"] = true,
+      ["ÈÕÔÂÉñ½Ì"] = true,
+      ["Ë¿³ñÖ®Â·"] = true,
+      ["¹ÃËÕÄ½Èİ"] = true,
+      ["¶ëÃ¼ºóÉ½"] = true
     },
     {
-      ["å»ºåº·åºœå—åŸ"] = true,
-      ["å»ºåº·åºœåŒ—åŸ"] = true,
-      ["æ­å·æç£åºœ"] = true
+      ["½¨¿µ¸®ÄÏ³Ç"] = true,
+      ["½¨¿µ¸®±±³Ç"] = true,
+      ["º¼ÖİÌá¶½¸®"] = true
     }
   }
   helper.ch2place = function(str)
@@ -247,61 +247,61 @@ local define_patrol = function()
   local patrol = {}
   patrol.__index = patrol
   patrol._paths = {
-    {path="n",name="ç»ƒæ­¦åœº"},
-    {path="n",name="ç‰å¥³å³°"},
-    {path="e",name="ç‰å¥³ç¥ "},
-    {path="sd",name="åå±±å°è·¯"},
-    {path="sd",name="åå±±å°è·¯"},
-    {path="sd",name="å°é™¢"},
-    {path="nu",name="åå±±å°è·¯"},
-    {path="nu",name="åå±±å°è·¯"},
-    {path="nu",name="ç‰å¥³ç¥ "},
-    {path="w",name="ç‰å¥³å³°"},
-    {path="nd",name="é•‡å²³å®«"},
-    {path="eu",name="æœé˜³å³°"},
-    {path="wd",name="é•‡å²³å®«"},
-    {path="nu",name="è‹é¾™å²­"},
-    {path="wu",name="èˆèº«å´–"},
-    {path="ed",name="è‹é¾™å²­"},
-    {path="nd",name="çŒ¢ç‹²æ„"},
-    {path="nd",name="è€å›æ²Ÿ"},
-    {path="nu",name="åå±±åˆ«é™¢"},
-    {path="sd",name="è€å›æ²Ÿ"},
-    {path="wd",name="ç™¾å°ºå³¡"},
-    {path="nd",name="åƒå°ºå¹¢"},
-    {path="wd",name="é’æŸ¯åª"},
-    {path="nd",name="èèåª"},
-    {path="nw",name="åå±±è„šä¸‹"},
-    {path="n",name="ç‰æ³‰é™¢"}}
+    {path="n",name="Á·Îä³¡"},
+    {path="n",name="ÓñÅ®·å"},
+    {path="e",name="ÓñÅ®ìô"},
+    {path="sd",name="ºóÉ½Ğ¡Â·"},
+    {path="sd",name="ºóÉ½Ğ¡Â·"},
+    {path="sd",name="Ğ¡Ôº"},
+    {path="nu",name="ºóÉ½Ğ¡Â·"},
+    {path="nu",name="ºóÉ½Ğ¡Â·"},
+    {path="nu",name="ÓñÅ®ìô"},
+    {path="w",name="ÓñÅ®·å"},
+    {path="nd",name="ÕòÔÀ¹¬"},
+    {path="eu",name="³¯Ñô·å"},
+    {path="wd",name="ÕòÔÀ¹¬"},
+    {path="nu",name="²ÔÁúÁë"},
+    {path="wu",name="ÉáÉíÑÂ"},
+    {path="ed",name="²ÔÁúÁë"},
+    {path="nd",name="â©áø³î"},
+    {path="nd",name="ÀÏ¾ı¹µ"},
+    {path="nu",name="»ªÉ½±ğÔº"},
+    {path="sd",name="ÀÏ¾ı¹µ"},
+    {path="wd",name="°Ù³ßÏ¿"},
+    {path="nd",name="Ç§³ß´±"},
+    {path="wd",name="Çà¿ÂÆº"},
+    {path="nd",name="É¯ÂÜÆº"},
+    {path="nw",name="»ªÉ½½ÅÏÂ"},
+    {path="n",name="ÓñÈªÔº"}}
   patrol._rooms = {
-    ["ç»ƒæ­¦åœº"] = 1,
-    ["ç‰å¥³å³°"] = 1,
-    ["ç‰å¥³ç¥ "] = 1,
-    ["åå±±å°è·¯"] = 2,
-    ["å°é™¢"] = 1,
-    ["é•‡å²³å®«"] = 1,
-    ["æœé˜³å³°"] = 1,
-    ["è‹é¾™å²­"] = 1,
-    ["èˆèº«å´–"] = 1,
-    ["çŒ¢ç‹²æ„"] = 1,
-    ["è€å›æ²Ÿ"] = 1,
-    ["åå±±åˆ«é™¢"] = 1,
-    ["ç™¾å°ºå³¡"] = 1,
-    ["åƒå°ºå¹¢"] = 1,
-    ["é’æŸ¯åª"] = 1,
-    ["èèåª"] = 1,
-    ["åå±±è„šä¸‹"] = 1,
-    ["ç‰æ³‰é™¢"] = 1
+    ["Á·Îä³¡"] = 1,
+    ["ÓñÅ®·å"] = 1,
+    ["ÓñÅ®ìô"] = 1,
+    ["ºóÉ½Ğ¡Â·"] = 2,
+    ["Ğ¡Ôº"] = 1,
+    ["ÕòÔÀ¹¬"] = 1,
+    ["³¯Ñô·å"] = 1,
+    ["²ÔÁúÁë"] = 1,
+    ["ÉáÉíÑÂ"] = 1,
+    ["â©áø³î"] = 1,
+    ["ÀÏ¾ı¹µ"] = 1,
+    ["»ªÉ½±ğÔº"] = 1,
+    ["°Ù³ßÏ¿"] = 1,
+    ["Ç§³ß´±"] = 1,
+    ["Çà¿ÂÆº"] = 1,
+    ["É¯ÂÜÆº"] = 1,
+    ["»ªÉ½½ÅÏÂ"] = 1,
+    ["ÓñÈªÔº"] = 1
   }
   patrol._delay = 1
   patrol.regexp = {
-    ASK_JOB="^[ >]*ä½ å‘å²³çµçŠæ‰“å¬æœ‰å…³ã€jobã€çš„æ¶ˆæ¯ã€‚$",
-    GOT_JOB="^[ >]*å²³çµçŠæ‹¿å‡ºä¸€å¼ åœ°å›¾ï¼ŒæŠŠåå±±éœ€è¦å·¡é€»çš„åŒºåŸŸç”¨ä¸åŒé¢œè‰²æ ‡æ³¨å‡ºæ¥ï¼Œå¹¶å’Œä½ è¯´äº†ä¸€éã€‚$",
-    PATROLLING="^[ >]*ä½ åœ¨(\w+)å·¡å¼‹ï¼Œå°šæœªå‘ç°æ•Œè¸ªã€‚$",
-    GO="^[ >]*è®¾å®šç¯å¢ƒå˜é‡ï¼šhuashan_patrol = \"go\"",
+    ASK_JOB="^[ >]*ÄãÏòÔÀÁéÉº´òÌıÓĞ¹Ø¡ºjob¡»µÄÏûÏ¢¡£$",
+    GOT_JOB="^[ >]*ÔÀÁéÉºÄÃ³öÒ»ÕÅµØÍ¼£¬°Ñ»ªÉ½ĞèÒªÑ²ÂßµÄÇøÓòÓÃ²»Í¬ÑÕÉ«±ê×¢³öÀ´£¬²¢ºÍÄãËµÁËÒ»±é¡£$",
+    PATROLLING="^[ >]*ÄãÔÚ(\w+)Ñ²ß®£¬ÉĞÎ´·¢ÏÖµĞ×Ù¡£$",
+    GO="^[ >]*Éè¶¨»·¾³±äÁ¿£ºhuashan_patrol = \"go\"",
     POTENTIAL_ROOM="^[ >]*([^ ]+)$",
-    REJECT_LING="^[ >]*å²³çµçŠä¸æƒ³è¦ä»¤ç‰Œï¼Œä½ å°±è‡ªä¸ªç•™ç€å§ã€‚",
-    ACCEPT_LING="^[ >]*ä½ ç»™å²³çµçŠä¸€å—ä»¤ç‰Œã€‚$"
+    REJECT_LING="^[ >]*ÔÀÁéÉº²»ÏëÒªÁîÅÆ£¬Äã¾Í×Ô¸öÁô×Å°É¡£",
+    ACCEPT_LING="^[ >]*Äã¸øÔÀÁéÉºÒ»¿éÁîÅÆ¡£$"
   }
   patrol.currRoom = nil
 
@@ -404,20 +404,20 @@ local define_patrol = function()
             end
             wait.time(P.delay)
           end
-          print("åº”å½“å·²åˆ°è¾¾ç‰æ³‰é™¢ï¼Œè¿”å›å²³çµçŠå¤„")
+          print("Ó¦µ±ÒÑµ½´ïÓñÈªÔº£¬·µ»ØÔÀÁéÉº´¦")
           goli2yue()
-          -- æ£€æŸ¥æˆ¿é—´
+          -- ¼ì²é·¿¼ä
           local miss = false
           for room, remainCnt in pairs(P.rooms) do
             if remainCnt ~= 0 then
-              print("æœ‰æˆ¿é—´é—æ¼æœªå·¡é€»åˆ°ï¼š", room, remainCnt)
+              print("ÓĞ·¿¼äÒÅÂ©Î´Ñ²Âßµ½£º", room, remainCnt)
               miss = true
             end
           end
           if miss then
-            print("å°è¯•é‡æ–°å·¡é€»")
+            print("³¢ÊÔÖØĞÂÑ²Âß")
           else
-            print("å°è¯•æäº¤ä»»åŠ¡")
+            print("³¢ÊÔÌá½»ÈÎÎñ")
             check(EnableTriggerGroup("huashan_patrol_finish", true))
             SendNoEcho("give yue ling")
           end
@@ -430,7 +430,7 @@ local define_patrol = function()
       regexp = patrol.regexp.ACCEPT_LING,
       response = function()
         check(EnableTriggerGroup("huashan_patrol_finish", false))
-        print("ä»»åŠ¡å®Œæˆï¼")
+        print("ÈÎÎñÍê³É£¡")
       end,
       group = "huashan_patrol_finish"
     }
@@ -438,7 +438,7 @@ local define_patrol = function()
       regexp = patrol.regexp.REJECT_LING,
       response = function()
         check(EnableTriggerGroup("huashan_patrol_finish", false))
-        print("ä»»åŠ¡æœªå®Œæˆï¼è¯·æ‰‹åŠ¨å®Œæˆ")
+        print("ÈÎÎñÎ´Íê³É£¡ÇëÊÖ¶¯Íê³É")
       end,
       group = "huashan_patrol_finish"
     }
@@ -469,10 +469,10 @@ local define_patrol = function()
     }
   end
   return patrol
---  local info1 = "^[ >]*ä½ åœ¨(\w+)å·¡å¼‹ï¼Œå°šæœªå‘ç°æ•Œè¸ªã€‚$"
---  local answer2 = "ä½ ç»™å²³çµçŠä¸€å—ä»¤ç‰Œã€‚"
---  local answer3 = "å²³çµçŠä¸æƒ³è¦ä»¤ç‰Œï¼Œä½ å°±è‡ªä¸ªç•™ç€å§ã€‚"
---  local info2 = "æ³¼çš®ä¸€æŠŠæ‹¦ä½ä½ ï¼šè¦å‘ä»æ­¤è¿‡ï¼Œç•™ä¸‹ä¹°è·¯è´¢ï¼æ³¼çš®ä¸€æŠŠæ‹‰ä½äº†ä½ ã€‚"
+--  local info1 = "^[ >]*ÄãÔÚ(\w+)Ñ²ß®£¬ÉĞÎ´·¢ÏÖµĞ×Ù¡£$"
+--  local answer2 = "Äã¸øÔÀÁéÉºÒ»¿éÁîÅÆ¡£"
+--  local answer3 = "ÔÀÁéÉº²»ÏëÒªÁîÅÆ£¬Äã¾Í×Ô¸öÁô×Å°É¡£"
+--  local info2 = "ÆÃÆ¤Ò»°ÑÀ¹×¡Äã£ºÒªÏò´Ó´Ë¹ı£¬ÁôÏÂÂòÂ·²Æ£¡ÆÃÆ¤Ò»°ÑÀ­×¡ÁËÄã¡£"
 end
 huashan.patrol = define_patrol()
 huashan.patrol.init()
