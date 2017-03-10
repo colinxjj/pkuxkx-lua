@@ -181,6 +181,7 @@ local define_helper = function()
       _G.world[name] = nil
     end
     local retCode = DeleteAlias(name)
+    print("remove alias", name, retCode)
     assert(retCode == eOK or retCode == eAliasNotFound)
   end
 
@@ -1241,11 +1242,11 @@ local define_locate = function()
   prototype.regexp = {
     SET_LOCATE_START = "^[ >]*设定环境变量：locate = \"start\"",
     SET_LOCATE_STOP = "^[ >]*设定环境变量：locate = \"stop\"",
-    ROOM_NAME_WITH_AREA = "^[ >]{,8}([^ ]+) \- \[[^ ]+\]$",
-    ROOM_NAME_WITHOUT_AREA = "^[ >]{,8}([^ ]+) \- $",
+    ROOM_NAME_WITH_AREA = "^[ >]{0,8}([^ ]+) \\- \\[[^ ]+\\]$",
+    ROOM_NAME_WITHOUT_AREA = "^[ >]{0,8}([^ ]+) \\- $",
     -- a very short line also might be the room name line
-    ROOM_NAME_SINGLE = "^[ >]{,8}([^ ]{1,8}) *$",
-    ROOM_DESC = "^ {,8}(.*?) *$",
+    ROOM_NAME_SINGLE = "^[ >]{0,8}([^ ]{1,8}) *$",
+    ROOM_DESC = "^ {0,8}(.*?) *$",
     SEASON_TIME_DESC = "^    「([^」]+)」: (.*)$",
     EXITS_DESC = "^\\s*这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*"
   }
@@ -1270,14 +1271,14 @@ local define_locate = function()
     self.currExits = nil
     -- used when identify the current room
     self._roomDescInline = false
-    self._exitsInline = false
-    self._potentialRoomIds = {}
+    self._roomExitsInline = false
+    self._potentialRooms = {}
     self._locateInProcess = false
   end
 
   function prototype:initTriggers()
     -- re-initialize travel triggers
-    helper.removeTriggerGroups("locate", "locate_start")
+    helper.removeTriggerGroups("locate", "locate_start", "locate_desc")
 
     -- start trigger
     local start = function(name, line, wildcards)
@@ -1294,48 +1295,55 @@ local define_locate = function()
     local roomNameCaught = function(name, line, wildcards)
       print("locate room name triggered")
       local roomName = wildcards[1]
-      self._potentialRoomIds = dal:getRoomsByName(roomName)
-      if #(self._potentialRoomIds) == 1 then
-        self.currRoomId = self._potentialRoomIds[1]
+      self._potentialRooms = dal:getRoomsByName(roomName)
+      if #(self._potentialRooms) == 1 then
+        self.currRoomId = self._potentialRooms[1].id
         self.currRoomName = roomName
         self._locateInProcess = false
       end
+      EnableTriggerGroup("locate_desc", true)
       self._roomDescInline = true
       self._roomExitsInline = true
     end
     helper.addTrigger {
       group = "locate",
       regexp = self.regexp.ROOM_NAME_WITH_AREA,
-      response = roomNameCaught
+      response = roomNameCaught,
+      sequence = 15 -- lower than desc
     }
     helper.addTrigger {
       group = "locate",
       regexp = self.regexp.ROOM_NAME_WITHOUT_AREA,
-      response = roomNameCaught
+      response = roomNameCaught,
+      sequence = 15 -- lower than desc
     }
     -- there is also case that the mini-map is missing and no slash at end of the name line
     helper.addTrigger {
       group = "locate",
       regexp = self.regexp.ROOM_NAME_SINGLE,
-      response = roomNameCaught
+      response = roomNameCaught,
+      sequence = 15 -- lower than desc
     }
     -- room desc trigger
     local roomDescCaught = function(name, line, wildcards)
       print("locate room desc triggered")
       if self._roomDescInline then
-        local currDesc = self.roomDesc or ""
-        self.roomDesc = currDesc .. wildcards[1]
+        local currDesc = self.currRoomDesc or ""
+        self.currRoomDesc = currDesc .. wildcards[1]
       end
     end
     helper.addTrigger {
-      group = "locate",
+      group = "locate_desc",
       regexp = self.regexp.ROOM_DESC,
       response = roomDescCaught
     }
     -- season/time trigger
     local seasonCaught = function(name, line, wildcards)
       print("locate season/time triggered")
-      if self._roomDescInline then self._roomDescInline = false end
+      if self._roomDescInline then
+        self._roomDescInline = false
+        EnableTriggerGroup("locate_desc", false)
+      end
       local season = wildcards[1]
       local datetime = wildcards[2]
     end
@@ -1348,9 +1356,12 @@ local define_locate = function()
     -- exits trigger
     local exitsCaught = function(name, line, wildcards)
       print("locate exits triggered")
-      if self._roomDescInline then self._roomDescInline = false end
-      if self._exitsInline then
-        self._exitsInline = false
+      if self._roomDescInline then
+        self._roomDescInline = false
+        EnableTriggerGroup("locate_desc", false)
+      end
+      if self._roomExitsInline then
+        self._roomExitsInline = false
         local exits = wildcards[2] or "look"
         exits = string.gsub(exits,"。","")
         exits = string.gsub(exits," ","")
@@ -1361,7 +1372,8 @@ local define_locate = function()
           local t = Trim(str)
           if t ~= "" then table.insert(tb, t) end
         end
-        self.currExits = table.concat(tb, ";") .. ";"
+        self.currExits = table.concat(tb, ";")
+        print("currExits in trigger", self.currExits)
       end
     end
     helper.addTrigger {
@@ -1386,7 +1398,13 @@ local define_locate = function()
     print("Current Room Id:", self.currRoomId)
     print("Current Room Name:", self.currRoomName)
     print("Current Room Exits:", self.currExits)
-    print("Current Room Desc:", self.currRoomDesc and string.sub(self.currRoomDesc, 1, 60))
+--    print("Current Room Desc:", self.currRoomDesc and string.sub(self.currRoomDesc, 1, 60))
+    print("Current Room Desc:", self.currRoomDesc)
+    if #(self._potentialRooms) > 0 then
+      local ids = {}
+      for _, room in pairs(self._potentialRooms) do table.insert(ids, room.id) end
+      print("Potential Room Ids:", table.concat(ids, ","))
+    end
   end
 
   function prototype:locate()
@@ -1399,6 +1417,7 @@ local define_locate = function()
       wait.regexp(self.regexp.SET_LOCATE_STOP)
       EnableTriggerGroup("locate_start", false)
       EnableTriggerGroup("locate", false)
+      EnableTriggerGroup("locate_desc", false)
       self._locateInProcess = false
       self:show()
     end)
@@ -1408,169 +1427,3 @@ local define_locate = function()
   return prototype
 end
 local locate = define_locate().newInstance()
-
---
-----------------------------------------------------------------
----- travel.lua
----- Implement the walk, locate, traverse functionalities
----- in xkx world
-----------------------------------------------------------------
---local define_travel = function()
---  local prototype = {}
---  prototype.__index = prototype
---
---  prototype.roomName = nil
---  prototype.roomDescInline = false
---  prototype.roomDesc = nil
---  prototype.exitsInline = false
---  prototype.exits = nil
---
---  function prototype.clearRoomInfo()
---    travel.roomName = nil
---    travel.roomDescInline = false
---    travel.roomDesc = nil
---    travel.exitsInline = false
---    travel.exits = nil
---  end
---
---  local initRoomsAndPaths = function()
---    local rooms = dal:getAllRooms()
---    local allPaths = dal:getAllPaths()
---    for i = 1, #allPaths do
---      local path = allPaths[i]
---      local startroom = rooms[path.startid]
---      if startroom then
---        startroom:addPath(path)
---      end
---    end
---    prototype.rooms = rooms
---  end
---
---  -- bind search implementation to A* algorithm
---  -- should enhance with hypothesis functions to reduce search range
---  function prototype:search(startid, endid)
---    return Algo.astar {
---      rooms = self.rooms,
---      startid = startid,
---      targetid = endid
---    }
---  end
---
---  function prototype:locate()
---    EnableTriggerGroup("travel_locate_start", true)
---    check(SendNoEcho("set travel_locate start"))
---    check(SendNoEcho("look"))
---    check(SendNoEcho("set travel_locate stop"))
---    print("roomName:" .. self.roomName)
---    print("exits:" .. self.exits)
---    print("roomDesc:" .. self.roomDesc)
---  end
---
---  local initLocateTriggers = function()
---    -- start trigger
---    helper.addTrigger {
---      group = "travel_locate_start",
---      regexp = "^[ >]*设定环境变量：travel_locate = \"start\"",
---      response = function(name, line, wildcards)
---        print("trigger "..name.." triggered")
---        EnableTriggerGroup("travel_locate", true)
---        travel.clearRoomInfo()
---      end
---    }
---    -- room name trigger with area
---    helper.addTrigger {
---      group = "travel_locate",
---      regexp = "^[ >]*([^ ]+) \- \[[^ ]+\]$",
---      response = function(name, line, wildcards)
---        print("trigger "..name.." triggered")
---        travel.roomName = wildcards[1]
---        travel.roomDescInline = true
---        travel.roomExitsInline = true
---      end
---    }
---    -- room name trigger without area
---    helper.addTrigger {
---      group = "travel_locate",
---      regexp = "^[ >]*([^ ]+) \- $",
---      response = function(name, line, wildcards)
---        print("trigger "..name.." triggered")
---        travel.roomName = wildcards[1]
---        travel.roomDescInline = true
---      end
---    }
---
---    -- room desc
---    local roomDescCaught = function(name, line, wildcards)
---      print("trigger "..name.." triggered")
---      if travel.roomDescInline then
---        local currDesc = travel.roomDesc or ""
---        travel.roomDesc = currDesc .. wildcards[1]
---      end
---    end
---    helper.addTrigger(
---      "trigger" .. GetUniqueID(),
---      "^ *(.*?) *$",
---      "travel_locate",
---      roomDescCaught
---    )
---    -- room desc end
---    local seasonCaught = function(name, line, wildcards)
---      print("trigger "..name.." triggered")
---      if travel.roomDescInline then travel.roomDescInline = false end
---      local season = wildcards[1]
---      local datetime = wildcards[2]
---    end
---    helper.addTrigger(
---      "trigger" .. GetUniqueID(),
---      "^    「([^」]+)」: (.*)$",
---      "travel_locate",
---      seasonCaught,
---      5 -- higher than room desc
---    )
---    -- room desc end
---    local exitsCaught = function(name, line, wildcards)
---      print("trigger "..name.." triggered")
---      if travel.roomDescInline then travel.roomDescInline = false end
---      if travel.exitsInline then
---        travel.exitsInline = false
---        local exits = wildcards[2] or "look"
---        exits = string.gsub(exits,"。","")
---        exits = string.gsub(exits," ","")
---        exits = string.gsub(exits,"、", ";")
---        exits = string.gsub(exits, "和", ";")
---        local tb = {}
---        for _, str in ipairs(utils.split(exits,";")) do
---          local t = Trim(str)
---          if t ~= "" then table.insert(tb, t) end
---        end
---        travel.exits = table.concat(tb, ";") .. ";"
---      end
---
---    end
---    helper.addTrigger(
---      "trigger" .. GetUniqueID(),
---      "^\\s*这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
---      "travel_locate",
---      exitsCaught,
---      5 -- higher than room desc
---    )
---    -- stop trigger
---    local stop = function(name, line, wildcards)
---      print("trigger "..name.." triggered")
---      EnableTriggerGroup("travel_locate_start", false)
---      EnableTriggerGroup("travel_locate", false)
---      -- summary
---      print("roomName", travel.roomName)
---      print("roomDescInline", travel.roomDescInline)
---      print("roomDesc", travel.roomDesc)
---      print("exitsInline", travel.exitsInline)
---      print("exits", travel.exits)
---    end
---  end
---
---  initRoomsAndPaths()
---  if _G["world"] then initLocateTriggers() end
---
---  return prototype
---end
---local travel = define_travel()
