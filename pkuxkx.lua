@@ -514,11 +514,22 @@ local define_db = function()
     return results
   end
 
+  function prototype:executeUpdate(args)
+    assert(args.stmt, "stmt cannot be nil")
+    local stmt = assert(self.stmts[args.stmt], "stmt is not prepared")
+    local params = assert(args.params, "params in update cannot be nil")
+    assert(type(args.params) == "table", "params in update must be name table")
+    --always reset the statement
+    stmt:reset()
+    assert(stmt:bind_names(params) == sqlite3.OK, "failed to bind params with nametable")
+    assert(stmt:step() == sqlite3.DONE)
+  end
+
   return prototype
 end
 -- easy to switch to memory db
 -- local db = define_db().open_memory_copied("xxx.db")
-local db = define_db().open("data/pkuxkx.db")
+local db = define_db().open("data/pkuxkx-utf8.db")
 
 --------------------------------------------------------------
 -- minheap.lua
@@ -736,177 +747,6 @@ local define_Distance = function()
 end
 local Distance = define_Distance()
 
-local define_PlanMode = function()
-  local PlanMode = {}
-  PlanMode.Quick = 1
-  PlanMode.Delay = 2
-  PlanMode.Trigger = 3
-
-  return PlanMode
-end
-local PlanMode = define_PlanMode()
-
---------------------------------------------------------------
--- Plan.lua
--- This class handles how to walk in xkx world
--- there are three mode as below
--- Quick
--- Delay
--- Trigger
---
--- Quick mode tries to walk to target place as fast as possible
--- but still wait if needed, e.g. take on a boat,
--- blocked by someone, ...
--- Delay mode tries to walk to target with delay of given amount
--- of time on each step
--- Trigger mode has the most power. We can define actions before,
--- or after each move.
---
---
---------------------------------------------------------------
---local define_Plan = function()
---  local emptyF = function() end
---  local prototype = {}
---  prototype.__index = prototype
---  prototype.regexp = {
---    WRONG_WAY = "^[ >]*这个方向没有路。"
---  }
---  -- always be overwrite by instance variable
---  prototype.startid = -1
---  prototype.paths = {}
---  prototype.mode = nil
---
---  -- this module may offen requires debug enabled to track errors
---  prototype._DEBUG = false
---  prototype._started = false
---  prototype._finished = false
---  prototype._quickSteps = 10
---  prototype._delay = 0.2
---  prototype._mayBeLost = false
---  prototype._retries = 1
---
---  prototype.beforeStart = emptyF
---  prototype.afterFinish = emptyF
---  prototype.beforeMove = emptyF
---  prototype.afterMove = emptyF
---
---  local pathEval = function(path)
---    if path.category == PathCategory.Normal then
---      print(path.path)
---    elseif path.category == PathCategory.MultipleCmds then
---      local cmds = utils.split(path.path, ";")
---      for i= 1, #cmds do
---        print(cmds[i])
---      end
---    elseif path.category == PathCategory.Trigger then
---      SendNoEcho("set travel trigger")
---      wait.regexp("")
---    else
---      error("unexpected path category " .. path.category)
---    end
---  end
---
---  function prototype:debug(...)
---    if self._DEBUG then Note(...) end
---  end
---
---  function prototype:createWalker()
---    return coroutine.create(function()
---      local steps = self._quickSteps
---      local delay = self._delay
---      local i = 1
---      while #(self._paths) do
---        if i >= steps then
---          SendNoEcho("set travel rest")
---          wait.regexp("")
---          i = 0
---        end
---        i = i + 1
---        local next = table.remove(self._paths)
---        if self._mode == PlanMode.Delay then
---          wait.time(delay)
---        elseif self._mode == PlanMode.Trigger then
---          SendNoEcho("set travel go")
---          wait.regexp("")
---        end
---        self:beforeMove()
---        pathEval(path)
---        self:afterMove()
---      end
---    end)
---  end
---
---  function prototype:len()
---    return #(self._paths)
---  end
---
---  function prototype:isStarted()
---    return self._started
---  end
---
---  function prototype:isFinished()
---    return self._finished
---  end
---
---  function prototype:prepare()
---    -- re-initialize travel triggers
---    local triggerList = GetTriggerList()
---    for i, trigger in ipairs(triggerList) do
---      local group = GetTriggerInfo(trigger, trigger_info_flag.group)
---      if group == "travel_assist" then
---        helper.removeTrigger(trigger)
---      end
---    end
---
---    -- if the direction is wrong
---    helper.addTrigger {
---      regexp = prototype.regexp.WRONG_WAY,
---      response = function(name, line, wildcards)
---        self._mayBeLost = true
---        if self._DEBUG then Note("行走路径出现错误") end
---      end,
---      group = "travel_assist"
---    }
---  end
---
---  function prototype:start()
---    self:prepare()
---    local walker = self:createWalker()
---    self:beforeStart()
---    coroutine.resume(walker)
---    self.afterFinish()
---  end
---
---  function prototype:new(args)
---    assert(type(args.startid) == "number", "startid of args must be number")
---    assert(args.paths, "paths of args cannot be nil")
---    assert(args.mode, "mode of args cannot be nil")
---    assert(args.beforeStart == nil or type(args.beforeStart) == "function", "beforeStart must be nil or function")
---    assert(args.afterFinish == nil or type(args.afterFinish) == "function", "afterFinish must be nil or function")
---    assert(args.beforeMove == nil or type(args.beforeMove) == "function", "beforeMove must be nil or function")
---    assert(args.afterMove == nil or type(args.afterMove) == "function", "afterMove must be nil or function")
---    local obj = {}
---    obj.startid = args.startid
---    obj.paths = args.paths
---    obj.mode = args.mode
---    if args.mode == PlanMode.Quick then
---      obj._quickSteps = args.quickSteps or Plan._quickSteps
---    elseif args.mode == PlanMode.Delay then
---      obj._delay = args.delay or Plan._delay
---    elseif args.mode == PlanMode.Trigger then
---
---    end
---    if (args.beforeStart) then obj.beforeStart = args.beforeStart end
---    if (args.afterFinish) then obj.afterFinish = args.afterFinish end
---    if (args.beforeMove) then obj.beforeMove = args.beforeMove end
---    if (args.afterMove) then obj.afterMove = args.afterMove end
---    setmetatable(obj, self or prototype)
---    return obj
---  end
---  return prototype
---end
---local Plan = define_Plan()
-
 --------------------------------------------------------------
 -- dal.lua
 -- data access layer based on db module
@@ -922,9 +762,29 @@ local define_dal = function()
     GET_ROOM_BY_ID = "select * from rooms where id = ?",
     GET_ROOMS_BY_NAME = "select * from rooms where name = ?",
     GET_PATHS_BY_STARTID = "select * from paths where startid = ?",
-    GET_PINYIN_BY_CHR = "select * from pinyin2chr where pinyin = ?",
-    GET_CHR_BY_PINYIN = "select * from chr2pinyin where chr = ?"
+--    GET_PINYIN_BY_CHR = "select * from pinyin2chr where pinyin = ?",
+--    GET_CHR_BY_PINYIN = "select * from chr2pinyin where chr = ?",
+    -- current version ignores the mapinfo column
+    UPD_ROOM = [[update rooms
+    set name = :name, code = :code, description = :description, exits = :exits, zone = :zone
+    where id = :id]]
   }
+
+  local nameGetPinyinByChar = function(n)
+    return  "SQL_GET_PINYIN_BY_CHR_" .. n
+  end
+  local SQL_GET_PINYIN_BY_CHR = "select * from chr2pinyin where chr in (__REPLACEMENT__)"
+  local char2pinyinSqlGenerator = function(n)
+    local queries = {}
+    for i = 1, n do
+      local name = nameGetPinyinByChar(i)
+      local holders = string.rep("?,", i)
+      local sql = string.gsub(SQL_GET_PINYIN_BY_CHR, "__REPLACEMENT__", string.sub(holders, 1, string.len(holders) - 1))
+      queries[name] = sql
+    end
+    return queries
+  end
+
   local NoChangeConstructor = function(self, obj) return obj end
 
   function prototype.open(db)
@@ -938,6 +798,9 @@ local define_dal = function()
 
   function prototype:postConstruct()
     self.db:prepare(sql_to_prepare)
+    -- support at most 10-char word pinyin mapping query
+    local pinyinStmts = char2pinyinSqlGenerator(10)
+    self.db:prepare(pinyinStmts)
   end
 
   function prototype:dispose()
@@ -995,21 +858,74 @@ local define_dal = function()
     }
   end
 
-  -- return raw record, {chr=?,pinyin}
-  -- note single char may have multiple pinyin, delimited by comma
-  function prototype:getPinyinByChar(chr)
-    return self.db:fetchRowAs {
-      stmt = "GET_PINYIN_BY_CHR",
-      constructor = NoChangeConstructor,
-      params = chr
-    }
+  -- generate pinyinList
+  local pinyinPerm
+  pinyinPerm = function(seq, dict, n)
+
+    if n == 0 then
+      coroutine.yield(dict) -- the order in elements are switched back and forth
+    else
+      local chr = seq[n]
+      local pys = dict[chr]
+      if not pys then error("cannot find pinyin of char:" .. chr, 2) end
+      for i = 1, #pys do
+        pys[1], pys[i] = pys[i], pys[1]
+        pinyinPerm(seq, dict, n - 1)
+        pys[1], pys[i] = pys[i], pys[1]
+      end
+    end
   end
 
-  function prototype:getCharByPinyin(pinyin)
-    return self.db:fetchRowAs {
-      stmt = "GET_CHR_BY_PINYIN",
-      constructor = NoChangeConstructor,
-      params = pinyin
+  local pinyinIter = function(seq, dict)
+    local n = #seq
+    local co = coroutine.create(function() pinyinPerm(seq, dict, n) end)
+    return function()
+      local retCode, result = coroutine.resume(co)
+      if not retCode then -- error
+        error(result)
+      end
+      return result
+    end
+  end
+
+  -- input must be a utf-8 encoded string
+  function prototype:getPinyinListByWord(word)
+    local unicodes = utils.utf8decode(word)
+    local nChars = #unicodes
+    local seq = {}
+    for i = 1, nChars do
+      local chr = utils.utf8sub(word, i, i)
+      table.insert(seq, chr)
+    end
+    local dict = self.db:fetchRowsAs {
+      stmt = nameGetPinyinByChar(nChars),
+      constructor = function(self, row)
+        return {
+          chr = row.chr,
+          unpack(utils.split(row.pinyin, ","))
+        }
+      end,
+      key = function(row) return row.chr end,
+      params = seq
+    }
+    local results = {}
+    for pyDict in pinyinIter(seq, dict) do
+      -- generate result
+      local result = {}
+      for i = 1, #seq do
+        -- always get the first element in pinyin list,
+        -- because permuation already switch them inside.
+        table.insert(result, pyDict[seq[i]][1])
+      end
+      table.insert(results, table.concat(result))
+    end
+    return results
+  end
+
+  function prototype:updateRoom(room)
+    return self.db:executeUpdate {
+      stmt = "UPD_ROOM",
+      params = room
     }
   end
 
@@ -1081,12 +997,10 @@ local define_Algo = function()
           if opens:contains(endid) then
             local currDistance = opens:get(endid)
             if newDistance < currDistance then
-              --                            print("newDistance < currDistance", newDistance, currDistance)
               opens:replace(newDistance)
               prev[endid] = min.id
             end
           else
-            --                        print("put endid into queue", endid, newDistance)
             opens:insert(newDistance)
             prev[endid] = min.id
           end
@@ -1142,19 +1056,14 @@ local define_Algo = function()
     for i = 2, #dfs do
       local roomId = dfs[i]
       local prevRoomId = fullTraversal[#fullTraversal]
---      print(prevRoomId, roomId)
       if rooms[prevRoomId].paths[roomId] then
---        print("direct path")
         table.insert(fullTraversal, roomId)
       else
---        print("indirect, need search using A*")
         local astar = Algo.astar {
           rooms = rooms,
           startid = prevRoomId,
           targetid = roomId
         }
---        print("A* solution:")
---        tprint(astar)
         if not astar then error("cannot find path from " .. prevRoomId .. " to " .. roomId) end
         while #astar > 0 do
           local path = table.remove(astar)
@@ -1242,13 +1151,13 @@ local define_locate = function()
   prototype.regexp = {
     SET_LOCATE_START = "^[ >]*设定环境变量：locate = \"start\"",
     SET_LOCATE_STOP = "^[ >]*设定环境变量：locate = \"stop\"",
-    ROOM_NAME_WITH_AREA = "^[ >]{0,8}([^ ]+) \\- \\[[^ ]+\\]$",
-    ROOM_NAME_WITHOUT_AREA = "^[ >]{0,8}([^ ]+) \\- $",
+    ROOM_NAME_WITH_AREA = "^[ >]{0,12}([^ ]+) \\- \\[[^ ]+\\]$",
+    ROOM_NAME_WITHOUT_AREA = "^[ >]{0,12}([^ ]+) \\- $",
     -- a very short line also might be the room name line
-    ROOM_NAME_SINGLE = "^[ >]{0,8}([^ ]{1,8}) *$",
-    ROOM_DESC = "^ {0,8}(.*?) *$",
+    ROOM_NAME_SINGLE = "^[ >]{0,12}([^ ]{1,8}) *$",
+    ROOM_DESC = "^ {0,12}([^ ].*?) *$",
     SEASON_TIME_DESC = "^    「([^」]+)」: (.*)$",
-    EXITS_DESC = "^\\s*这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*"
+    EXITS_DESC = "^\\s{0,12}这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*"
   }
 
   function prototype.newInstance()
@@ -1259,19 +1168,27 @@ local define_locate = function()
   end
 
   function prototype:postConstruct()
+    -- by default disable debug
+    self._DEBUG = false
+    self._DESC_DISPLAY_LINE_WIDTH = 30
     self:clearRoomInfo()
     self:initTriggers()
     self:initAliases()
   end
 
+  function prototype:debug(...)
+    if self._DEBUG then print(...) end
+  end
+
   function prototype:clearRoomInfo()
     self.currRoomId = nil
     self.currRoomName = nil
-    self.currRoomDesc = nil
+    self.currRoomDesc = {}
     self.currExits = nil
     -- used when identify the current room
     self._roomDescInline = false
     self._roomExitsInline = false
+    self._potentialRoomName = nil
     self._potentialRooms = {}
     self._locateInProcess = false
   end
@@ -1282,7 +1199,7 @@ local define_locate = function()
 
     -- start trigger
     local start = function(name, line, wildcards)
-      print("locate start triggered")
+      self:debug("locate start triggered")
       EnableTriggerGroup("locate", true)
       self:clearRoomInfo()
     end
@@ -1293,9 +1210,11 @@ local define_locate = function()
     }
     -- room name trigger
     local roomNameCaught = function(name, line, wildcards)
-      print("locate room name triggered")
+      self:debug("locate room name triggered")
       local roomName = wildcards[1]
+      self._potentialRoomName = roomName
       self._potentialRooms = dal:getRoomsByName(roomName)
+      -- it is right if and only if the map is complete
       if #(self._potentialRooms) == 1 then
         self.currRoomId = self._potentialRooms[1].id
         self.currRoomName = roomName
@@ -1317,7 +1236,7 @@ local define_locate = function()
       response = roomNameCaught,
       sequence = 15 -- lower than desc
     }
-    -- there is also case that the mini-map is missing and no slash at end of the name line
+    -- there is also case that the mini-map is missing and no minus sign at end of the name line
     helper.addTrigger {
       group = "locate",
       regexp = self.regexp.ROOM_NAME_SINGLE,
@@ -1326,10 +1245,9 @@ local define_locate = function()
     }
     -- room desc trigger
     local roomDescCaught = function(name, line, wildcards)
-      print("locate room desc triggered")
+      self:debug("locate room desc triggered")
       if self._roomDescInline then
-        local currDesc = self.currRoomDesc or ""
-        self.currRoomDesc = currDesc .. wildcards[1]
+        table.insert(self.currRoomDesc, wildcards[1])
       end
     end
     helper.addTrigger {
@@ -1339,7 +1257,7 @@ local define_locate = function()
     }
     -- season/time trigger
     local seasonCaught = function(name, line, wildcards)
-      print("locate season/time triggered")
+      self:debug("locate season/time triggered")
       if self._roomDescInline then
         self._roomDescInline = false
         EnableTriggerGroup("locate_desc", false)
@@ -1355,7 +1273,7 @@ local define_locate = function()
     }
     -- exits trigger
     local exitsCaught = function(name, line, wildcards)
-      print("locate exits triggered")
+      self:debug("locate exits triggered")
       if self._roomDescInline then
         self._roomDescInline = false
         EnableTriggerGroup("locate_desc", false)
@@ -1373,7 +1291,6 @@ local define_locate = function()
           if t ~= "" then table.insert(tb, t) end
         end
         self.currExits = table.concat(tb, ";")
-        print("currExits in trigger", self.currExits)
       end
     end
     helper.addTrigger {
@@ -1388,25 +1305,90 @@ local define_locate = function()
     helper.removeAliasGroups("locate")
 
     helper.addAlias {
-      regexp = "^locatehere$",
-      response = function() self:locate() end,
-      group = "locate"
+      group = "locate",
+      regexp = "^loc\\s*$",
+      response = function()
+        print("LOC定位指令，使用方法：")
+        print("loc debug on/off", "开启/关闭调试模式，开启时将将显示所有触发器与日志信息")
+        print("loc here", "定位当前房间")
+        print("loc <number>", "显示数据库中指定编号房间的信息")
+      end
+    }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc here$",
+      response = function()
+        self:locate()
+      end
+    }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc\\s+(\\d+)$",
+      response = function(name, line, wildcards)
+        local roomId = wildcards[1]
+        local room = dal:getRoomById(roomId)
+        if room then
+          self:show(room)
+        else
+          print("无法查询到相应房间")
+        end
+      end
+    }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc\\s+debug\\s+(on|off)$",
+      response = function(name, line, wildcards)
+        local option = wildcards[1]
+        if option == "on" then
+          self._DEBUG = true
+          print("打开定位调试模式")
+        elseif option == "off" then
+          self._DEBUG = false
+          print("关闭定位调试模式")
+        end
+      end
     }
   end
 
-  function prototype:show()
-    print("Current Room Id:", self.currRoomId)
-    print("Current Room Name:", self.currRoomName)
-    print("Current Room Exits:", self.currExits)
---    print("Current Room Desc:", self.currRoomDesc and string.sub(self.currRoomDesc, 1, 60))
-    print("Current Room Desc:", self.currRoomDesc)
-    if #(self._potentialRooms) > 0 then
-      local ids = {}
-      for _, room in pairs(self._potentialRooms) do table.insert(ids, room.id) end
-      print("Potential Room Ids:", table.concat(ids, ","))
+  function prototype:showDesc(roomDesc)
+    if type(roomDesc) == "string" then
+      for i = 1, string.len(roomDesc), self._DESC_DISPLAY_LINE_WIDTH do
+        print(string.sub(roomDesc, i, i + self._DESC_DISPLAY_LINE_WIDTH - 1))
+      end
+    elseif type(roomDesc) == "table" then
+      for _, d in ipairs(roomDesc) do
+        print(d)
+      end
     end
   end
 
+  function prototype:show(room)
+    if room then
+      print("Target Room Id:", room.id)
+      print("Target Room Name:", room.name)
+      print("Target Room Code:", room.code)
+      print("Target Room Exits:", room.exits)
+      if room.description then
+        print("Target Room desc:")
+        self:showDesc(room.description)
+      else
+        print("Target Room desc:", room.description)
+      end
+    else
+      print("Current Room Id:", self.currRoomId)
+      print("Current Room Name:", self.currRoomName)
+      print("Current Room Exits:", self.currExits)
+      print("Current Room desc:")
+      self:showDesc(self.currRoomDesc)
+      if #(self._potentialRooms) > 0 then
+        local ids = {}
+        for _, room in pairs(self._potentialRooms) do table.insert(ids, room.id) end
+        print("Potential Room Ids:", table.concat(ids, ","))
+      end
+    end
+  end
+
+  -- locate current room
   function prototype:locate()
     local locater = coroutine.create(function()
       self._locateInProcess = true
@@ -1414,16 +1396,27 @@ local define_locate = function()
       check(SendNoEcho("set locate start"))
       check(SendNoEcho("look"))
       check(SendNoEcho("set locate stop"))
-      wait.regexp(self.regexp.SET_LOCATE_STOP)
+      local line = wait.regexp(self.regexp.SET_LOCATE_STOP, 5)
       EnableTriggerGroup("locate_start", false)
       EnableTriggerGroup("locate", false)
       EnableTriggerGroup("locate_desc", false)
       self._locateInProcess = false
-      self:show()
+      -- if timeout line is not matched and line will be nil
+      if not line then
+        self:debug("Timeout on re-locate!")
+      else
+        self:show()
+      end
     end)
     return coroutine.resume(locater)
   end
 
+  function prototype:guess()
+    -- after locate, we can guess which record it
+    -- belongs to according to pinyin of its room name
+
+  end
+
   return prototype
 end
-local locate = define_locate().newInstance()
+--local locate = define_locate().newInstance()

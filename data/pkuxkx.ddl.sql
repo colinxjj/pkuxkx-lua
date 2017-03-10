@@ -11,7 +11,9 @@ create table if not exists paths (
   startid integer,
   endid integer,
   path text,
-  endcode text
+  endcode text,
+  weight integer default 1,
+  enabled integer default 1
 );
 create index if not exists idx_paths on paths (startid, endid);
 
