@@ -1,38 +1,31 @@
---require "tprint"
---local iconv = require 'luaiconv'
---local toUTF16 = iconv.open("utf-16le", "utf-8")
---local utf8 = require 'utf8'
---
---local str = "hello"
---print(str)
---print(string.len(str))
---print(utf8.len(str))
---local cstr = "你好"
---print(str)
---print(string.len(cstr))
---print(utf8.len(cstr))
---print("after 1", utf8.next_raw(cstr, 1))
---local result = utf8.next_raw(cstr, 4)
---print("after 4", result)
---
---local ustr = toUTF16:iconv(cstr)
---print(string.len(ustr))
---local c = 0
---for i=1,string.len(ustr) do
---  if i - math.floor(i/2)*2 == 0 then
---    c = c * 256 + string.byte(ustr, i)
---    print(c)
---  else
---    c = string.byte(ustr, i)
---  end
---end
+require  "world"
+require "tprint"
 
-require 'world'
-local cstr = "你好，中国"
-local unicodes = utils.utf8decode(cstr)
-print(#unicodes)
-for i = 1, #unicodes do
-  local c = utils.utf8sub(cstr, i, i)
-  print(c)
+local cstr = "你好"
+
+local define_gb2312 = function()
+  local gb2312 = {}
+  gb2312.len = function(s)
+    if not s or type(s) ~= "string" then error("string required", 2) end
+    return string.len(s) / 2
+  end
+
+  gb2312.code = function(s, ci)
+    local first = ci * 2 - 1
+    return string.byte(s, first, first) * 256 + string.byte(s, first + 1, first + 1)
+  end
+
+  gb2312.char = function(chrcode)
+    local first = math.floor(chrcode / 256)
+    local second = chrcode - first * 256
+    return string.char(first) .. string.char(second)
+  end
+
+  return gb2312
 end
+local gb2312 = define_gb2312()
+
+print(cstr, string.len(cstr), gb2312.len(cstr), gb2312.code(cstr, 1), gb2312.code(cstr,2))
+
+print(gb2312.char(47811), gb2312.code(gb2312.char(47811), 1))
 

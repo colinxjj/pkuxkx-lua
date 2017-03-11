@@ -106,8 +106,31 @@ local predefines = function()
 end
 predefines()
 
+local define_gb2312 = function()
+  local gb2312 = {}
+  gb2312.len = function(s)
+    if not s or type(s) ~= "string" then error("string required", 2) end
+    return string.len(s) / 2
+  end
+
+  gb2312.code = function(s, ci)
+    local first = ci * 2 - 1
+    return string.byte(s, first, first) * 256 + string.byte(s, first + 1, first + 1)
+  end
+
+  gb2312.char = function(chrcode)
+    local first = math.floor(chrcode / 256)
+    local second = chrcode - first * 256
+    return string.char(first) .. string.char(second)
+  end
+
+  return gb2312
+end
+local gb2312 = define_gb2312()
+
 local define_helper = function()
   local helper = {}
+
   -- add trigger but disabled
   local TRIGGER_BASE_FLAG = trigger_flag.RegularExpression
     + trigger_flag.Replace + trigger_flag.KeepEvaluating
@@ -159,6 +182,18 @@ local define_helper = function()
     end
   end
 
+  helper.enableTriggerGroups = function(...)
+    for _, group in ipairs({...}) do
+      EnableTriggerGroup(group, true)
+    end
+  end
+
+  helper.disableTriggerGroups = function(...)
+    for _, group in ipairs({...}) do
+      EnableTriggerGroup(group, false)
+    end
+  end
+
   local _global_alias_callbacks = {}
   local ALIAS_BASE_FLAG = alias_flag.Enabled + alias_flag.RegularExpression + alias_flag.Replace
   helper.addAlias = function(args)
@@ -198,6 +233,18 @@ local define_helper = function()
           helper.removeAlias(alias)
         end
       end
+    end
+  end
+
+  helper.enableAliasGroups = function(...)
+    for _, group in ipairs({...}) do
+      EnableAliasGroup(group, true)
+    end
+  end
+
+  helper.disableAliasGroups = function(...)
+    for _, group in ipairs({...}) do
+      EnableAliasGroup(group, false)
     end
   end
 
@@ -529,7 +576,7 @@ local define_db = function()
 end
 -- easy to switch to memory db
 -- local db = define_db().open_memory_copied("xxx.db")
-local db = define_db().open("data/pkuxkx-utf8.db")
+local db = define_db().open("data/pkuxkx-gb2312.db")
 
 --------------------------------------------------------------
 -- minheap.lua
@@ -761,23 +808,24 @@ local define_dal = function()
     GET_ALL_PATHS = "select * from paths",
     GET_ROOM_BY_ID = "select * from rooms where id = ?",
     GET_ROOMS_BY_NAME = "select * from rooms where name = ?",
+    GET_ROOMS_LIKE_CODE = "select * from rooms where code like ?",
     GET_PATHS_BY_STARTID = "select * from paths where startid = ?",
 --    GET_PINYIN_BY_CHR = "select * from pinyin2chr where pinyin = ?",
 --    GET_CHR_BY_PINYIN = "select * from chr2pinyin where chr = ?",
-    -- current version ignores the mapinfo column
+    -- current version ignores code, zone, mapinfo columns
     UPD_ROOM = [[update rooms
-    set name = :name, code = :code, description = :description, exits = :exits, zone = :zone
+    set name = :name, description = :description, exits = :exits
     where id = :id]]
   }
 
-  local nameGetPinyinByChar = function(n)
+  local nameGetPinyinByCharCode = function(n)
     return  "SQL_GET_PINYIN_BY_CHR_" .. n
   end
-  local SQL_GET_PINYIN_BY_CHR = "select * from chr2pinyin where chr in (__REPLACEMENT__)"
+  local SQL_GET_PINYIN_BY_CHR = "select * from chr2pinyin where chrcode in (__REPLACEMENT__)"
   local char2pinyinSqlGenerator = function(n)
     local queries = {}
     for i = 1, n do
-      local name = nameGetPinyinByChar(i)
+      local name = nameGetPinyinByCharCode(i)
       local holders = string.rep("?,", i)
       local sql = string.gsub(SQL_GET_PINYIN_BY_CHR, "__REPLACEMENT__", string.sub(holders, 1, string.len(holders) - 1))
       queries[name] = sql
@@ -848,6 +896,14 @@ local define_dal = function()
     }
   end
 
+  function prototype:getRoomsLikeCode(code)
+    return self.db:fetchRowsAs {
+      stmt = "GET_ROOMS_LIKE_CODE",
+      constructor = Room.new,
+      params =  "%" .. code .. "%"
+    }
+  end
+
   -- return dict of paths(key = endid) by start id
   function prototype:getPathsByStartId(startid)
     return self.db:fetchRowsAs {
@@ -888,24 +944,23 @@ local define_dal = function()
     end
   end
 
-  -- input must be a utf-8 encoded string
+  -- input must be a gb2312 encoded string (chinese words)
   function prototype:getPinyinListByWord(word)
-    local unicodes = utils.utf8decode(word)
-    local nChars = #unicodes
+    local nChars = gb2312.len(word)
     local seq = {}
     for i = 1, nChars do
-      local chr = utils.utf8sub(word, i, i)
-      table.insert(seq, chr)
+      local code = gb2312.code(word, i)
+      table.insert(seq, code)
     end
     local dict = self.db:fetchRowsAs {
-      stmt = nameGetPinyinByChar(nChars),
+      stmt = nameGetPinyinByCharCode(nChars),
       constructor = function(self, row)
         return {
-          chr = row.chr,
+          chrcode = row.chrcode,
           unpack(utils.split(row.pinyin, ","))
         }
       end,
-      key = function(row) return row.chr end,
+      key = function(row) return row.chrcode end,
       params = seq
     }
     local results = {}
@@ -1154,9 +1209,9 @@ local define_locate = function()
     ROOM_NAME_WITH_AREA = "^[ >]{0,12}([^ ]+) \\- \\[[^ ]+\\]$",
     ROOM_NAME_WITHOUT_AREA = "^[ >]{0,12}([^ ]+) \\- $",
     -- a very short line also might be the room name line
-    ROOM_NAME_SINGLE = "^[ >]{0,12}([^ ]{1,8}) *$",
+    -- ROOM_NAME_SINGLE = "^[ >]{0,12}([^ ]{1,8}) *$",
     ROOM_DESC = "^ {0,12}([^ ].*?) *$",
-    SEASON_TIME_DESC = "^    「([^」]+)」: (.*)$",
+    SEASON_TIME_DESC = "^    「([^\\\\x00-\\\\xff]+?)」: (.*)$",
     EXITS_DESC = "^\\s{0,12}这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*"
   }
 
@@ -1195,12 +1250,12 @@ local define_locate = function()
 
   function prototype:initTriggers()
     -- re-initialize travel triggers
-    helper.removeTriggerGroups("locate", "locate_start", "locate_desc")
+    helper.removeTriggerGroups("locate", "locate_start", "locate_desc", "locate_name", "locate_other")
 
     -- start trigger
     local start = function(name, line, wildcards)
       self:debug("locate start triggered")
-      EnableTriggerGroup("locate", true)
+      helper.enableTriggerGroups("locate_name")
       self:clearRoomInfo()
     end
     helper.addTrigger {
@@ -1212,6 +1267,7 @@ local define_locate = function()
     local roomNameCaught = function(name, line, wildcards)
       self:debug("locate room name triggered")
       local roomName = wildcards[1]
+      print("room name:", roomName, string.len(roomName))
       self._potentialRoomName = roomName
       self._potentialRooms = dal:getRoomsByName(roomName)
       -- it is right if and only if the map is complete
@@ -1220,26 +1276,21 @@ local define_locate = function()
         self.currRoomName = roomName
         self._locateInProcess = false
       end
-      EnableTriggerGroup("locate_desc", true)
+      helper.disableTriggerGroups("locate_name")
+      helper.enableTriggerGroups("locate_desc")
+      helper.enableTriggerGroups("locate_other")
       self._roomDescInline = true
       self._roomExitsInline = true
     end
     helper.addTrigger {
-      group = "locate",
+      group = "locate_name",
       regexp = self.regexp.ROOM_NAME_WITH_AREA,
       response = roomNameCaught,
       sequence = 15 -- lower than desc
     }
     helper.addTrigger {
-      group = "locate",
+      group = "locate_name",
       regexp = self.regexp.ROOM_NAME_WITHOUT_AREA,
-      response = roomNameCaught,
-      sequence = 15 -- lower than desc
-    }
-    -- there is also case that the mini-map is missing and no minus sign at end of the name line
-    helper.addTrigger {
-      group = "locate",
-      regexp = self.regexp.ROOM_NAME_SINGLE,
       response = roomNameCaught,
       sequence = 15 -- lower than desc
     }
@@ -1266,7 +1317,7 @@ local define_locate = function()
       local datetime = wildcards[2]
     end
     helper.addTrigger {
-      group = "locate",
+      group = "locate_other",
       regexp = self.regexp.SEASON_TIME_DESC,
       response = seasonCaught,
       sequence = 5 -- higher than room desc
@@ -1294,7 +1345,7 @@ local define_locate = function()
       end
     end
     helper.addTrigger {
-      group = "locate",
+      group = "locate_other",
       regexp = self.regexp.EXITS_DESC,
       response = exitsCaught,
       sequence = 5 -- higher than room desc
@@ -1312,6 +1363,8 @@ local define_locate = function()
         print("loc debug on/off", "开启/关闭调试模式，开启时将将显示所有触发器与日志信息")
         print("loc here", "定位当前房间")
         print("loc <number>", "显示数据库中指定编号房间的信息")
+        print("loc match <number>", "将当前房间与目标房间进行对比，输出对比情况")
+        print("loc update <number>", "将当前房间的信息更新进数据库，请确保信息的正确性")
       end
     }
     helper.addAlias {
@@ -1325,10 +1378,16 @@ local define_locate = function()
       group = "locate",
       regexp = "^loc\\s+(\\d+)$",
       response = function(name, line, wildcards)
-        local roomId = wildcards[1]
+        local roomId = tonumber(wildcards[1])
         local room = dal:getRoomById(roomId)
         if room then
           self:show(room)
+          local paths = dal:getPathsByStartId(room.id)
+          local pathDisplay = {}
+          for _, path in pairs(paths) do
+            table.insert(pathDisplay, path.endid .. " " .. path.path)
+          end
+          print("可到达路径：", table.concat(pathDisplay, ", "))
         else
           print("无法查询到相应房间")
         end
@@ -1346,6 +1405,29 @@ local define_locate = function()
           self._DEBUG = false
           print("关闭定位调试模式")
         end
+      end
+    }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc\\s+guess\\s*$",
+      response = function()
+        self:guess()
+      end
+    }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc\\s+match\\s+(\\d+)\\s*$",
+      response = function(name, line, wildcards)
+        local targetRoomId = tonumber(wildcards[1])
+        self:match(targetRoomId)
+      end
+    }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc\\s+update\\s+(\\d+)\\s*$",
+      response = function(name, line, wildcards)
+        local targetRoomId = tonumber(wildcards[1])
+        self:update(targetRoomId)
       end
     }
   end
@@ -1392,20 +1474,24 @@ local define_locate = function()
   function prototype:locate()
     local locater = coroutine.create(function()
       self._locateInProcess = true
-      EnableTriggerGroup("locate_start", true)
+      helper.enableTriggerGroups("locate_start")
       check(SendNoEcho("set locate start"))
       check(SendNoEcho("look"))
       check(SendNoEcho("set locate stop"))
       local line = wait.regexp(self.regexp.SET_LOCATE_STOP, 5)
-      EnableTriggerGroup("locate_start", false)
-      EnableTriggerGroup("locate", false)
-      EnableTriggerGroup("locate_desc", false)
+      helper.disableTriggerGroups("locate_start", "locate_desc", "locate_name", "locate_other")
       self._locateInProcess = false
       -- if timeout line is not matched and line will be nil
       if not line then
         self:debug("Timeout on re-locate!")
       else
         self:show()
+        if self.currRoomId then
+          local room = dal:getRoomById(self.currRoomId)
+          if room.description ~= table.concat(self.currRoomDesc) then
+            print("注意：房间描述与数据库中不符，存在错配的可能！")
+          end
+        end
       end
     end)
     return coroutine.resume(locater)
@@ -1414,9 +1500,149 @@ local define_locate = function()
   function prototype:guess()
     -- after locate, we can guess which record it
     -- belongs to according to pinyin of its room name
+    local roomName = self._potentialRoomName
+    print(roomName, string.len(roomName))
+    if not roomName then
+      print("当前房间名称为空，请先使用LOC定位命令")
+      return
+    end
+    self:debug("当前房间名称：", roomName, "长度：", string.len(roomName))
+    if gb2312.len(roomName) > 10 then
+      print("当前版本仅支持10个汉字长度内的名称查询")
+    end
+    local pinyins = dal:getPinyinListByWord(roomName)
+    self:debug("尝试拼音列表：", pinyins and table.concat(pinyins, ", "))
+    local candidates = {}
+    for _, pinyin in ipairs(pinyins) do
+      local results = dal:getRoomsLikeCode(pinyin)
+      for id, room in pairs(results) do
+        candidates[id] = room
+      end
+    end
+    print("通过房间名拼音匹配得到候选列表：")
+    print("----------------------------")
+    for _, c in pairs(candidates) do
+      print("Room Id:", c.id)
+      print("Room Code:", c.code)
+      print("Room Name:", c.name)
+      print("Room exits:", c.exits)
+      print("Room Desc:", string.sub(c.description, 1, 30))
+      print("----------------------------")
+    end
+  end
 
+  local directions = {
+    s="south",
+    n="north",
+    w="west",
+    e="east",
+    ne="northeast",
+    se="southeast",
+    sw="southwest",
+    nw="northwest",
+    su="southup",
+    nu="northup",
+    eu="eastup",
+    wu="westup",
+    u="up",
+    d="down"
+  }
+  local expandDirection = function(path)
+    return directions[path] or path
+  end
+
+  function prototype:match(roomId)
+    local room = dal:getRoomById(roomId)
+    if not room then
+      print("查询不到指定编号的房间：" .. roomId)
+      return
+    end
+    -- 比较房间名称
+    if not self._potentialRoomName then
+      print("当前房间无可确定的名称，请先使用LOC定位命令捕捉")
+      return
+    end
+    if self._potentialRoomName == room.name then
+      self:debug("名称匹配")
+    else
+      print("名称不匹配：", "当前", self._potentialRoomName, "目标", room.name)
+    end
+    local currRoomDesc = table.concat(self.currRoomDesc)
+    if currRoomDesc == room.description then
+      self:debug("描述匹配")
+    else
+      print("描述不匹配：")
+      print("当前", currRoomDesc)
+      print("目标", room.description)
+    end
+    local currExits = {}
+    local currExitCnt = 0
+    if self.currExits and self.currExits ~= "" then
+      for _, e in ipairs(utils.split(self.currExits, ";")) do
+        currExits[e] = true
+        currExitCnt = currExitCnt + 1
+      end
+    end
+    local tgtExits = {}
+    local tgtExitCnt = 0
+    if room.exits and room.exits ~= "" then
+      for _, e in ipairs(utils.split(room.exits, ";")) do
+        tgtExits[e] = true
+        tgtExitCnt = tgtExitCnt + 1
+      end
+    end
+    local exitsIdentical = true
+    if currExitCnt ~= tgtExitCnt then
+      exitsIdentical = false
+    else
+      for curr in pairs(currExits) do
+        if not tgtExits[curr] then
+          exitsIdentical = false
+          break
+        end
+      end
+    end
+    -- furthur check on paths
+    local pathIdentical = true
+    local tgtPaths = dal:getPathsByStartId(roomId)
+    local tgtPathCnt = 0
+    for _, tgtPath in pairs(tgtPaths) do
+      tgtPathCnt = tgtPathCnt + 1
+      if not currExits[expandDirection(tgtPath.path)] then
+        pathIdentical = false
+        break
+      end
+    end
+    if tgtPathCnt ~= currExitCnt then
+      pathIdentical = false
+    end
+    local pathDisplay = {}
+    for _, tgtPath in pairs(tgtPaths) do
+      table.insert(pathDisplay, tgtPath.endid .. " " .. tgtPath.path)
+    end
+    if exitsIdentical and pathIdentical then
+      print("出口与路径均匹配")
+    elseif exitsIdentical and not pathIdentical then
+      print("出口匹配但路径不匹配")
+    elseif pathIdentical then
+      print("出口不匹配但路径匹配")
+    else
+      print("出口与路径都不匹配")
+    end
+    print(table.concat(pathDisplay, ", "))
+  end
+
+  function prototype:update(roomId)
+    local room = Room:new {
+      id = roomId,
+      name = self._potentialRoomName,
+      code = "",
+      description = table.concat(self.currRoomDesc),
+      exits = self.currExits
+    }
+    dal:updateRoom(room)
   end
 
   return prototype
 end
---local locate = define_locate().newInstance()
+local locate = define_locate().newInstance()
