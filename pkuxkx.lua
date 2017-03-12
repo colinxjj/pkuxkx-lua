@@ -746,11 +746,10 @@ local define_Room = function()
   function prototype:new(args)
     assert(args.id, "id can not be nil")
     assert(args.code, "code can not be nil")
-    assert(args.name, "name can not be nil")
     local obj = {}
     obj.id = args.id
     obj.code = args.code
-    obj.name = args.name
+    obj.name = args.name or ""
     obj.description = args.description
     obj.exits = args.exits
     obj.zone = args.zone
@@ -1430,6 +1429,15 @@ local define_locate = function()
         self:update(targetRoomId)
       end
     }
+    -- match and update
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc\\s+mu\\s+(\\d+)\\s*$",
+      response = function(name, line, wildcards)
+        local targetRoomId = tonumber(wildcards[1])
+        self:match(targetRoomId, true)
+      end
+    }
   end
 
   function prototype:showDesc(roomDesc)
@@ -1526,7 +1534,7 @@ local define_locate = function()
       print("Room Code:", c.code)
       print("Room Name:", c.name)
       print("Room exits:", c.exits)
-      print("Room Desc:", string.sub(c.description, 1, 30))
+      print("Room Desc:", c.description and string.sub(c.description, 1, 30))
       print("----------------------------")
     end
   end
@@ -1544,6 +1552,10 @@ local define_locate = function()
     nu="northup",
     eu="eastup",
     wu="westup",
+    sd="southdown",
+    nd="northdown",
+    wd="westdown",
+    ed="eastdown",
     u="up",
     d="down"
   }
@@ -1551,7 +1563,8 @@ local define_locate = function()
     return directions[path] or path
   end
 
-  function prototype:match(roomId)
+  function prototype:match(roomId, performUpdate)
+    local performUpdate = performUpdate or false
     local room = dal:getRoomById(roomId)
     if not room then
       print("查询不到指定编号的房间：" .. roomId)
@@ -1621,13 +1634,31 @@ local define_locate = function()
       table.insert(pathDisplay, tgtPath.endid .. " " .. tgtPath.path)
     end
     if exitsIdentical and pathIdentical then
-      print("出口与路径均匹配")
+      if performUpdate then
+        self:update(roomId)
+        print("出口与路径均匹配，数据库记录已更新")
+      else
+        print("出口与路径均匹配")
+      end
     elseif exitsIdentical and not pathIdentical then
-      print("出口匹配但路径不匹配")
+      if performUpdate then
+        print("出口匹配但路径不匹配，不建议更新数据库，如需要请手动update")
+      else
+        print("出口匹配但路径不匹配")
+      end
     elseif pathIdentical then
-      print("出口不匹配但路径匹配")
+      if performUpdate then
+        self:update(roomId)
+        print("出口不匹配但路径匹配，数据库记录已更新")
+      else
+        print("出口不匹配但路径匹配")
+      end
     else
-      print("出口与路径都不匹配")
+      if performUpdate then
+        print("出口与路径都不匹配，不建议更新数据库，如需要请手动update")
+      else
+        print("出口与路径都不匹配")
+      end
     end
     print(table.concat(pathDisplay, ", "))
   end
