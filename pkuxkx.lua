@@ -1211,7 +1211,8 @@ local define_locate = function()
     -- ROOM_NAME_SINGLE = "^[ >]{0,12}([^ ]{1,8}) *$",
     ROOM_DESC = "^ {0,12}([^ ].*?) *$",
     SEASON_TIME_DESC = "^    「([^\\\\x00-\\\\xff]+?)」: (.*)$",
-    EXITS_DESC = "^\\s{0,12}这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*"
+    EXITS_DESC = "^\\s{0,12}这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
+    BUSY_LOOK = "^[> ]*风景要慢慢的看。$"
   }
 
   function prototype.newInstance()
@@ -1245,6 +1246,18 @@ local define_locate = function()
     self._potentialRoomName = nil
     self._potentialRooms = {}
     self._locateInProcess = false
+    self._busyLook = false
+  end
+
+  local matchPotentialRooms = function(currRoomDesc, currRoomExits, potentialRooms)
+    local matched = {}
+    for i = 1, #potentialRooms do
+      local room = potentialRooms[i]
+      if room.exits == currRoomExits and room.description == currROomDesc then
+        table.insert(matched, room.id)
+      end
+    end
+    return matched
   end
 
   function prototype:initTriggers()
@@ -1292,6 +1305,16 @@ local define_locate = function()
       regexp = self.regexp.ROOM_NAME_WITHOUT_AREA,
       response = roomNameCaught,
       sequence = 15 -- lower than desc
+    }
+    -- room name trigger when busy look
+    local busyLook = function()
+      self:debug("系统禁止频繁使用look命令")
+      self._busyLook = true
+    end
+    helper.addTrigger {
+      group = "locate_name",
+      regexp = self.regexp.BUSY_LOOK,
+      response = busyLook
     }
     -- room desc trigger
     local roomDescCaught = function(name, line, wildcards)
@@ -1364,6 +1387,7 @@ local define_locate = function()
         print("loc <number>", "显示数据库中指定编号房间的信息")
         print("loc match <number>", "将当前房间与目标房间进行对比，输出对比情况")
         print("loc update <number>", "将当前房间的信息更新进数据库，请确保信息的正确性")
+        print("reloc", "重新定位直到当前房间可唯一确定")
       end
     }
     helper.addAlias {
@@ -1438,6 +1462,13 @@ local define_locate = function()
         self:match(targetRoomId, true)
       end
     }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^reloc\\s*$",
+      response = function()
+        self:relocate()
+      end
+    }
   end
 
   function prototype:showDesc(roomDesc)
@@ -1491,7 +1522,11 @@ local define_locate = function()
       self._locateInProcess = false
       -- if timeout line is not matched and line will be nil
       if not line then
-        self:debug("Timeout on re-locate!")
+        self:debug("Timeout on locate!")
+      elseif self._busyLook then
+        --retry with 1 second delay
+        wait.time(1)
+        return self:locate()
       else
         self:show()
         if self.currRoomId then
@@ -1503,6 +1538,80 @@ local define_locate = function()
       end
     end)
     return coroutine.resume(locater)
+  end
+
+  local randomPickExits = function(currExits)
+    if not currExits or currExits == "" then return nil end
+    local exits = utils.split(currExits, ";")
+    return exits[math.random(#(exits))]
+  end
+
+  -- relocate current room, and will move to next room
+  -- if current room cannot be identified,
+  -- until reaching the first room that can be identified
+  function prototype:relocate()
+    local relocater = coroutine.create(function()
+      local retries = 0
+      repeat
+        self._locateInprocess = true
+        helper.enableTriggerGroups("locate_start")
+        check(SendNoEcho("set locate start"))
+        check(SendNoEcho("look"))
+        check(SendNoEcho("set locate stop"))
+        local line = wait.regexp(self.regexp.SET_LOCATE_STOP, 5)
+        helper.disableTriggerGroups("locate_start", "locate_desc", "locate_name", "locate_other")
+        self._locateInProcess = false
+        if not line then
+          self:debug("Timeout on re-locate!")
+        elseif self._busyLook then
+          self:debug("系统禁止频繁look请求，1秒后重试")
+          wait.time(1)
+          return self:relocate()
+        else
+          if self.currRoomId then
+            print("重新定位成功", self.currRoomId, self.currRoomName)
+            return true
+          elseif #(self._potentialRooms) > 0 then
+            local matched = matchPotentialRooms(table.concat(self.currRoomDesc), self.currExits, self._potentialRooms)
+            if #matched == 1 then
+              self:debug("成功匹配仅1个房间", matched[1])
+              self.currRoomId = matched[1]
+              self.currRoomName = self._potentialRoomName
+              print("重新定位成功", self.currRoomId, self.currRoomName)
+              return true
+            elseif #matched == 0 then
+              self:debug("没有可匹配的房间", self._potentialRoomName)
+            elseif #matched > 1 then
+              self:debug("查找到多个匹配成功的房间", table.concat(matched, ","))
+            end
+            local exit = randomPickExits(self.currExits)
+            if exit then
+              self:debug("随机选择出口并执行重新定位", exit)
+              check(SendNoEcho("halt"))
+              check(SendNoEcho(exit))
+            else
+              print("没有出口可供选择，重新定位失败")
+              return false
+            end
+          else
+            print("没有可供匹配的同名房间")
+            local exit = randomPickExits(self.currExits)
+            if exit then
+              self:debug("随机选择出口并重新定位", exit)
+              check(SendNoEcho("halt"))
+              check(SendNoEcho(exit))
+            else
+              print("没有出口可供选择，重新定位失败")
+              return false
+            end
+          end
+        end
+        wait.time(0.3)
+      until self.currRoomId ~= nil
+      print("程序有错误，无法判断")
+      return false
+    end)
+    return coroutine.resume(relocater)
   end
 
   function prototype:guess()
@@ -1677,3 +1786,5 @@ local define_locate = function()
   return prototype
 end
 local locate = define_locate().newInstance()
+
+
