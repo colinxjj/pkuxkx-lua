@@ -1508,11 +1508,11 @@ local define_locate = function()
     self._busyLook = false
   end
 
-  local matchPotentialRooms = function(currRoomDesc, currRoomExits, potentialRooms)
+  function prototype:matchPotentialRooms(currRoomDesc, currRoomExits, potentialRooms)
     local matched = {}
     for i = 1, #potentialRooms do
       local room = potentialRooms[i]
-      if room.exits == currRoomExits and room.description == currROomDesc then
+      if room.exits == currRoomExits and room.description == currRoomDesc then
         table.insert(matched, room.id)
       end
     end
@@ -1646,6 +1646,7 @@ local define_locate = function()
         print("loc <number>", "显示数据库中指定编号房间的信息")
         print("loc match <number>", "将当前房间与目标房间进行对比，输出对比情况")
         print("loc update <number>", "将当前房间的信息更新进数据库，请确保信息的正确性")
+        print("loc show", "仅显示当前房间信息，不做look定位")
         print("reloc", "重新定位直到当前房间可唯一确定")
       end
     }
@@ -1732,6 +1733,13 @@ local define_locate = function()
         coroutine.resume(relocator)
       end
     }
+    helper.addAlias {
+      group = "locate",
+      regexp = "^loc\\s+show\\s*$",
+      response = function()
+        self:show()
+      end
+    }
   end
 
   function prototype:showDesc(roomDesc)
@@ -1772,10 +1780,15 @@ local define_locate = function()
     end
   end
 
+  -- used for other module to update the current room
+  function prototype:notify(roomId)
+    self.currRoomId = roomId
+  end
+
   function prototype:locator(action)
     local action = action or function() end
     return coroutine.create(function()
-      local additionalInfo = nil
+      local additionalInfo
       local retries = 5
       repeat
         self._locateInProcess = true
@@ -1841,7 +1854,7 @@ local define_locate = function()
         elseif self.currRoomId then
           break
         elseif #(self._potentialRooms) > 0 then
-          local matched = matchPotentialRooms(table.concat(self.currRoomDesc), self.currExits, self._potentialRooms)
+          local matched = self:matchPotentialRooms(table.concat(self.currRoomDesc), self.currExits, self._potentialRooms)
           if #matched == 1 then
             self:debug("成功匹配仅1个房间", matched[1])
             self.currRoomId = matched[1]
@@ -2067,8 +2080,11 @@ local define_walkto = function()
   local prototype = {}
   prototype.__index = prototype
   prototype.regexp = {
-    BLOCKING1 = "你一不小心脚下踏了个空，... 啊...！",
-    BLOCKING2 = "这个方向没有出路。"
+    WALKTO_REST = "^[ >]*设定环境变量：walkto = \"rest\"",
+    WALKTO_FINISH = "^[ >]*设定环境变量：walkto = \"finish\"",
+    WALKTO_MOUNTAIN = "你一不小心脚下踏了个空，... 啊...！",
+    WALKTO_NOWAY = "这个方向没有出路。",
+    WALKTO_NOWAY2 = "哎哟，你一头撞在墙上，才发现这个方向没有出路。"
   }
   prototype.DEBUG = true
   prototype.zonesearch = Algo.dijkstra
@@ -2086,7 +2102,8 @@ local define_walkto = function()
 
   function prototype:postConstruct()
     self:initZonesAndRooms()
-
+    self:initTriggers()
+    self:initAliases()
   end
 
   function prototype:initZonesAndRooms()
@@ -2157,8 +2174,10 @@ local define_walkto = function()
         local option = wildcards[1]
         if option == "on" then
           self.DEBUG = true
+          print("开启自动行走调试模式")
         elseif option == "off" then
           self.DEBUG = false
+          print("关闭自动行走调试模式")
         end
       end
     }
@@ -2214,12 +2233,7 @@ local define_walkto = function()
   end
 
   local evaluateEachMove = function(path)
-    print(path.path)
-  end
-
-  function prototype:restPerInterval()
-    -- wait.time(1)
-    self:debug("wait 1 second")
+    SendNoEcho(path.path)
   end
 
   function prototype:debug(...)
@@ -2231,16 +2245,34 @@ local define_walkto = function()
     local restTime = self.restTime or 1
     local action = action or function() end
     return coroutine.create(function()
+      -- before move, clear room info
+      print("start1")
+      self.locate:clearRoomInfo()
+      print("here")
+      local targetRoomId
       local steps = 0
       repeat
         local move = table.remove(pathStack)
+        --always update target room id
+        targetRoomId = move.endid
         evaluateEachMove(move)
         steps = steps + 1
         if steps >= interval then
           steps = 0
-          self:restPerInterval()
+          SendNoEcho("set walkto rest")
+          local line = wait.regexp(prototype.regexp.WALKTO_REST, 5)
+          if not line then
+            print("中途休息系统反应超时，自动行走失败")
+            return false
+          else
+            wait.time(1)
+          end
         end
       until #pathStack == 0
+      SendNoEcho("set walkto finish")
+      wait.regexp(prototype.regexp.WALKTO_FINISH, 5)
+      self.locate:notify(targetRoomId)
+      self:debug("更新房间编号为", targetRoomId)
       action()
     end)
   end
@@ -2251,13 +2283,14 @@ local define_walkto = function()
       startid = startid,
       targetid = targetid
     }
+    self:debug("行走路径共经过" .. #pathStack .. "个房间")
     if not pathStack then
       print("计算路径失败，房间" .. startid .. "至房间" .. targetid .. "不可达")
     elseif #pathStack == 0 then
       print("正在当前房间")
       if action then action() end
     else
-      local walker = prototype:walker(pathStack, action)
+      local walker = self:walker(pathStack, action)
       coroutine.resume(walker)
     end
   end
@@ -2333,61 +2366,61 @@ end
 local walkto = define_walkto():newInstance {locate = locate}
 
 -- simple test case
-local rooms = {
-  [1] = Room:new {
-    id=1, code="r1", name="room1",
-    paths = {
-      [7] = RoomPath:new {startid=1, endid=7, path="n"},
-      [2] = RoomPath:new {startid=1, endid=2, path="ne"},
-      [5] = RoomPath:new {startid=1, endid=5, path="se"}
-    }
-  },
-  [2] = Room:new {
-    id=2, code="r2", name="room2",
-    paths = {
-      [7] = RoomPath:new {startid=2, endid=7, path="w"},
-      [1] = RoomPath:new {startid=2, endid=1, path="sw"},
-      [3] = RoomPath:new {startid=2, endid=3, path="e"},
-      [4] = RoomPath:new {startid=2, endid=4, path="se"}
-    }
-  },
-  [3] = Room:new {
-    id=3, code="r3", name="room3",
-    paths = {
-      [2] = RoomPath:new {startid=3, endid=2, path="w"},
-      [4] = RoomPath:new {startid=3, endid=4, path="s"},
-      [6] = RoomPath:new {startid=3, endid=6, path="ne"}
-    }
-  },
-  [4] = Room:new {
-    id=4, code="r4", name="room4",
-    paths = {
-      [2] = RoomPath:new {startid=4, endid=2, path="nw"},
-      [3] = RoomPath:new {startid=4, endid=3, path="n"},
-      [5] = RoomPath:new {startid=4, endid=5, path="w"}
-    }
-  },
-  [5] = Room:new {
-    id=5, code="r5", name="room5",
-    paths = {
-      [1] = RoomPath:new {startid=5, endid=1, path="nw"},
-      [4] = RoomPath:new {startid=5, endid=4, path="e"}
-    }
-  },
-  [6] = Room:new {
-    id=6, code="r6", name="room6",
-    paths = {
-      [3] = RoomPath:new {startid=6, endid=3, path="sw"}
-    }
-  },
-  [7] = Room:new {
-    id=7, code="r7", name="room7",
-    paths = {
-      [1] = RoomPath:new {startid=7, endid=1, path="s"},
-      [2] = RoomPath:new {startid=7, endid=2, path="e"}
-    }
-  }
-}
+--local rooms = {
+--  [1] = Room:new {
+--    id=1, code="r1", name="room1",
+--    paths = {
+--      [7] = RoomPath:new {startid=1, endid=7, path="n"},
+--      [2] = RoomPath:new {startid=1, endid=2, path="ne"},
+--      [5] = RoomPath:new {startid=1, endid=5, path="se"}
+--    }
+--  },
+--  [2] = Room:new {
+--    id=2, code="r2", name="room2",
+--    paths = {
+--      [7] = RoomPath:new {startid=2, endid=7, path="w"},
+--      [1] = RoomPath:new {startid=2, endid=1, path="sw"},
+--      [3] = RoomPath:new {startid=2, endid=3, path="e"},
+--      [4] = RoomPath:new {startid=2, endid=4, path="se"}
+--    }
+--  },
+--  [3] = Room:new {
+--    id=3, code="r3", name="room3",
+--    paths = {
+--      [2] = RoomPath:new {startid=3, endid=2, path="w"},
+--      [4] = RoomPath:new {startid=3, endid=4, path="s"},
+--      [6] = RoomPath:new {startid=3, endid=6, path="ne"}
+--    }
+--  },
+--  [4] = Room:new {
+--    id=4, code="r4", name="room4",
+--    paths = {
+--      [2] = RoomPath:new {startid=4, endid=2, path="nw"},
+--      [3] = RoomPath:new {startid=4, endid=3, path="n"},
+--      [5] = RoomPath:new {startid=4, endid=5, path="w"}
+--    }
+--  },
+--  [5] = Room:new {
+--    id=5, code="r5", name="room5",
+--    paths = {
+--      [1] = RoomPath:new {startid=5, endid=1, path="nw"},
+--      [4] = RoomPath:new {startid=5, endid=4, path="e"}
+--    }
+--  },
+--  [6] = Room:new {
+--    id=6, code="r6", name="room6",
+--    paths = {
+--      [3] = RoomPath:new {startid=6, endid=3, path="sw"}
+--    }
+--  },
+--  [7] = Room:new {
+--    id=7, code="r7", name="room7",
+--    paths = {
+--      [1] = RoomPath:new {startid=7, endid=1, path="s"},
+--      [2] = RoomPath:new {startid=7, endid=2, path="e"}
+--    }
+--  }
+--}
 
 --local solution = Algo.dijkstra {
 --  rooms = rooms,
