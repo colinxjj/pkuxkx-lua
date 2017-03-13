@@ -1,6 +1,7 @@
 --
 -- Simulating MushClient world
 --
+world = {}
 
 trigger_flag = {}
 trigger_flag.Enabled = 1

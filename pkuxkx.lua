@@ -12,7 +12,10 @@
 -- defines dependencies
 --------------------------------------------------------------
 local predefines = function()
-  if not _G["world"] then require "world" end
+  if not _G["world"] then
+    require "world"
+    require "lsqlite3"
+  end
   if not _G["world"] then require "socket.core" end
   local sleep = function(n)
     socket.select(nil, nil, n)
@@ -105,6 +108,33 @@ local predefines = function()
   eBrushStyleNotValid = 30074;     -- Invalid settings for brush parameter
 end
 predefines()
+
+local inheritMetaTable = function(Cls)
+  return {
+    -- special keys
+    __index = Cls.__index,
+    __newindex = Cls.__newindex,
+    __mode = Cls.__mode,
+    __call = Cls.__callm,
+    __metatable = Cls.__metatable,
+    __tostring = Cls.__tostring,
+    __len = Cls.__len,
+    __gc = Cls.__gc,
+    -- equivalence comparison operators
+    __eq = Cls.__eq,
+    __lt = Cls.__lt,
+    __le = Cls.__le,
+    -- mathematic operators
+    __unm = Cls.__unm,
+    __add = Cls.__add,
+    __sub = Cls.__sub,
+    __mul = Cls.__mul,
+    __div = Cls.__div,
+    __mod = Cls.__mod,
+    __pow = Cls.__pow,
+    __concat = Cls.__concat
+  }
+end
 
 local define_gb2312 = function()
   local gb2312 = {}
@@ -424,7 +454,6 @@ local helper = define_helper()
 -- handle db operations
 --------------------------------------------------------------
 local define_db = function()
-  if not _G["world"] then require "lsqlite3" end
 
   local prototype = {}
   prototype.__index = prototype
@@ -707,6 +736,8 @@ local PathCategory = define_PathCategory()
 --------------------------------------------------------------
 -- Path.lua
 -- data structure of Path
+-- Path is an abstraction of a relationship between two points
+-- in mud map
 --------------------------------------------------------------
 local define_Path = function()
   local prototype = {
@@ -719,14 +750,18 @@ local define_Path = function()
   function prototype:new(args)
     assert(args.startid, "startid can not be nil")
     assert(args.endid, "endid can not be nil")
-    assert(args.path, "path can not be nil")
     local obj = {}
     obj.startid = args.startid
     obj.endid = args.endid
-    obj.path = args.path
-    obj.endcode = args.endcode
     obj.weight = args.weight or 1
-    obj.category = args.category or PathCategory.Normal
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:decorate(obj)
+    assert(obj.startid, "startid cannot be nil")
+    assert(obj.endid, "endid cannot be nil")
+    obj.weight = obj.weight or 1
     setmetatable(obj, self or prototype)
     return obj
   end
@@ -736,8 +771,50 @@ end
 local Path = define_Path()
 
 --------------------------------------------------------------
+-- RoomPath.lua
+-- data structure of RoomPath, inherit from Path
+-- add concrete fields
+--------------------------------------------------------------
+local define_RoomPath = function()
+  local prototype = inheritMetaTable(Path)
+  prototype.__index = prototype
+  setmetatable(prototype, {__index = Path})
+
+  function prototype:new(args)
+    local obj = Path:new(args)
+--    assert(obj.endcode, "endcode cannot be nil")
+    assert(args.path, "path can not be nil")
+    obj.path = args.path
+    obj.endcode = args.endcode
+    obj.category = args.category or PathCategory.Normal
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:decorate(obj)
+    local obj = Path:decorate(obj)
+--    assert(obj.endcode, "endcode cannot be nil")
+    assert(obj.path, "path cannot be nil")
+    obj.category = obj.category or PathCategory.Normal
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  return prototype
+end
+local RoomPath = define_RoomPath()
+
+--------------------------------------------------------------
+-- ZonePath.lua
+-- alias to Path
+--------------------------------------------------------------
+local ZonePath = Path
+
+--------------------------------------------------------------
 -- Room.lua
 -- data structure of Room
+-- room is an abstraction of a point that player can
+-- move from or go to in a mud map
 --------------------------------------------------------------
 local define_Room = function()
   local prototype = {}
@@ -758,6 +835,18 @@ local define_Room = function()
     return obj
   end
 
+  function prototype:decorate(obj)
+    assert(obj.id, "id can not be nil")
+    assert(obj.code, "code cannot be nil")
+    obj.name = obj.name or ""
+    obj.description = obj.description or ""
+    obj.exits = obj.exits or ""
+    obj.zone = obj.zone or ""
+    obj.paths = obj.paths or {}
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
   function prototype:addPath(path)
     self.paths[path.endid] = path
   end
@@ -767,10 +856,92 @@ end
 local Room = define_Room()
 
 --------------------------------------------------------------
+-- Zone.lua
+-- data structure of Zone
+-- similar to Room, with no exits, description, mapinfo and list of ZonePath
+--------------------------------------------------------------
+local define_Zone = function()
+  local prototype = {}
+  prototype.__index = prototype
+
+  function prototype:new(args)
+    assert(args.id, "id can not be nil")
+    assert(args.code, "code can not be nil")
+    assert(args.name, "id can not be nil")
+    assert(args.centercode, "code can not be nil")
+    local obj = {}
+    obj.id = args.id
+    obj.code = args.code
+    obj.name = args.name
+    obj.centercode = args.centercode
+    obj.paths = args.paths or {}
+    obj.rooms = args.rooms or {}
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:decorate(obj)
+    assert(obj.id, "id can not be nil")
+    assert(obj.code, "code cannot be nil")
+    assert(obj.name, "id can not be nil")
+    assert(obj.centercode, "code can not be nil")
+    obj.paths = obj.paths or {}
+    obj.rooms = obj.rooms or {}
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:addPath(path)
+    self.paths[path.endid] = path
+  end
+
+  function prototype:addRoom(room)
+    self.rooms[room.id] = room
+  end
+
+  return prototype
+end
+local Zone = define_Zone()
+
+--------------------------------------------------------------
 -- Distance.lua
 -- data structure of Distance
 --------------------------------------------------------------
 local define_Distance = function()
+  local prototype = {
+    __eq = function(a, b) return a.weight == b.weight end,
+    __lt = function(a, b) return a.weight < b.weight end,
+    __le = function(a, b) return a.weight <= b.weight end
+  }
+  prototype.__index = prototype
+
+  function prototype:new(args)
+    assert(args.id, "id cannot be nil")
+    assert(args.weight, "weight cannot be nil")
+    local obj = {}
+    obj.id = args.id
+    obj.weight = args.weight
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:decorate(obj)
+    assert(obj.id, "id cannot be nil")
+    assert(obj.weight, "weight cannot be nil")
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  return prototype
+end
+local Distance = define_Distance()
+
+--------------------------------------------------------------
+-- HypoDistance.lua
+-- data structure of HypoDistance
+-- used in A* algorithm
+--------------------------------------------------------------
+local define_HypoDistance = function()
   local prototype = {
     __eq = function(a, b) return a.real + a.hypo == b.real + b.hypo end,
     __lt = function(a, b) return a.real + a.hypo < b.real + b.hypo end,
@@ -779,8 +950,8 @@ local define_Distance = function()
   prototype.__index = prototype
 
   function prototype:new(args)
-    assert(args.id, "args of Distance must have valid id field")
-    assert(args.real, "args of Distance must have valid real field")
+    assert(args.id, "args of HypoDistance must have valid id field")
+    assert(args.real, "args of HypoDistance must have valid real field")
     local obj = {}
     obj.id = args.id
     obj.real = args.real
@@ -789,9 +960,17 @@ local define_Distance = function()
     return obj
   end
 
+  function prototype:decorate(obj)
+    assert(obj.id, "id cannot be nil")
+    assert(obj.real, "real cannot be nil")
+    obj.hypo = obj.hypo or 0
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
   return prototype
 end
-local Distance = define_Distance()
+local HypoDistance = define_HypoDistance()
 
 --------------------------------------------------------------
 -- dal.lua
@@ -814,7 +993,14 @@ local define_dal = function()
     -- current version ignores code, zone, mapinfo columns
     UPD_ROOM = [[update rooms
     set name = :name, description = :description, exits = :exits
-    where id = :id]]
+    where id = :id]],
+    GET_ALL_ZONES = "select * from zones",
+    GET_ALL_ZONE_PATHS = [[select sz.id as startid, ez.id as endid, zc.weight as weight
+    from zone_connectivity zc, zones sz, zones ez
+    where zc.startcode = sz.code
+    and zc.endcode = ez.code]],
+    GET_ALL_AVAILABLE_ROOMS = "select * from rooms where name <> '' and zone <> ''",
+    GET_ALL_AVAILABLE_PATHS = "select * from paths where enabled = 1"
   }
 
   local nameGetPinyinByCharCode = function(n)
@@ -864,7 +1050,15 @@ local define_dal = function()
   function prototype:getAllRooms()
     return self.db:fetchRowsAs {
       stmt = "GET_ALL_ROOMS",
-      constructor = Room.new,
+      constructor = Room.decorate,
+      key = function(room) return room.id end
+    }
+  end
+
+  function prototype:getAllAvailableRooms()
+    return self.db:fetchRowsAs {
+      stmt = "GET_ALL_AVAILABLE_ROOMS",
+      constructor = Room.decorate,
       key = function(room) return room.id end
     }
   end
@@ -873,7 +1067,14 @@ local define_dal = function()
   function prototype:getAllPaths()
     return self.db:fetchRowsAs {
       stmt = "GET_ALL_PATHS",
-      constructor = Path.new
+      constructor = RoomPath.decorate
+    }
+  end
+
+  function prototype:getAllAvailablePaths()
+    return self.db:fetchRowsAs {
+      stmt = "GET_ALL_AVAILABLE_PATHS",
+      constructor = RoomPath.decorate
     }
   end
 
@@ -881,7 +1082,7 @@ local define_dal = function()
   function prototype:getRoomById(id)
     return self.db:fetchRowAs {
       stmt = "GET_ROOM_BY_ID",
-      constructor = Room.new,
+      constructor = Room.decorate,
       params = id
     }
   end
@@ -890,7 +1091,7 @@ local define_dal = function()
   function prototype:getRoomsByName(name)
     return self.db:fetchRowsAs {
       stmt = "GET_ROOMS_BY_NAME",
-      constructor = Room.new,
+      constructor = Room.decorate,
       params = name
     }
   end
@@ -898,7 +1099,7 @@ local define_dal = function()
   function prototype:getRoomsLikeCode(code)
     return self.db:fetchRowsAs {
       stmt = "GET_ROOMS_LIKE_CODE",
-      constructor = Room.new,
+      constructor = Room.decorate,
       params =  "%" .. code .. "%"
     }
   end
@@ -907,7 +1108,7 @@ local define_dal = function()
   function prototype:getPathsByStartId(startid)
     return self.db:fetchRowsAs {
       stmt = "GET_PATHS_BY_STARTID",
-      constructor = Path.new,
+      constructor = RoomPath.decorate,
       params = startid,
       key = function(path) return path.endid end
     }
@@ -983,6 +1184,23 @@ local define_dal = function()
     }
   end
 
+  -- return zone table
+  function prototype:getAllZones()
+    return self.db:fetchRowsAs {
+      stmt = "GET_ALL_ZONES",
+      constructor = Zone.decorate,
+      key = function(zone) return zone.id end
+    }
+  end
+
+  -- return array of zone path
+  function prototype:getAllZonePaths()
+    return self.db:fetchRowsAs {
+      stmt = "GET_ALL_ZONE_PATHS",
+      constructor = ZonePath.decorate
+    }
+  end
+
   return prototype
 end
 local dal = define_dal().open(db)
@@ -1033,7 +1251,7 @@ local define_Algo = function()
     local closes = {}
     local prev = {}
 
-    opens:insert(Distance:new {id=startid, real=0, hypo=0})
+    opens:insert(HypoDistance:new {id=startid, real=0, hypo=0})
 
     while true do
       if opens.size == 0 then break end
@@ -1044,10 +1262,14 @@ local define_Algo = function()
         local endid = path.endid
         if endid == targetid then
           prev[endid] = min.id
-          return finalizePathStack(rooms, prev, endid)
+          return finalizePathStack(rooms, prev, targetid)
         end
         if not closes[endid] then
-          local newDistance = Distance:new {id=endid, real=min.real + path.weight, hypo=hypo(endid, targetid)}
+          local newDistance = HypoDistance:decorate {
+            id=endid,
+            real=min.real + path.weight,
+            hypo=hypo(endid, targetid)
+          }
           if opens:contains(endid) then
             local currDistance = opens:get(endid)
             if newDistance < currDistance then
@@ -1062,6 +1284,43 @@ local define_Algo = function()
       end
       closes[min.id] = true
     end
+  end
+
+  Algo.dijkstra = function(args)
+    local rooms = assert(args.rooms, "rooms cannot be nil")
+    local startid = assert(args.startid, "startid cannot be nil")
+    local targetid = assert(args.targetid, "targetid cannot be nil")
+    local opens = minheap:new()
+    local closes = {}
+    local prev = {}
+
+    opens:insert(Distance:decorate {id=startid, weight=0})
+
+    while true do
+      if opens.size == 0 then break end
+      local min = opens:removeMin()
+      local minRoom = rooms[min.id]
+      local paths = minRoom and minRoom.paths or {}
+      for _, path in pairs(paths) do
+        local endid = path.endid
+      -- dijkstra algorithm must traverse all nodes
+        if not closes[endid] then
+          local newDistance = Distance:decorate { id=endid, weight=min.weight + path.weight }
+          if opens:contains(endid) then
+            local currDistance = opens:get(endid)
+            if newDistance < currDistance then
+              opens:replace(newDistance)
+              prev[endid] = min.id
+            end
+          else
+            opens:insert(newDistance)
+            prev[endid] = min.id
+          end
+        end
+      end
+      closes[min.id] = true
+    end
+    if prev[targetid] then return finalizePathStack(rooms, prev, targetid) end
   end
 
   Algo.dfs = function(args)
@@ -1224,15 +1483,15 @@ local define_locate = function()
 
   function prototype:postConstruct()
     -- by default disable debug
-    self._DEBUG = false
-    self._DESC_DISPLAY_LINE_WIDTH = 30
+    self.DEBUG = false
+    self.DESC_DISPLAY_LINE_WIDTH = 30
     self:clearRoomInfo()
     self:initTriggers()
     self:initAliases()
   end
 
   function prototype:debug(...)
-    if self._DEBUG then print(...) end
+    if self.DEBUG then print(...) end
   end
 
   function prototype:clearRoomInfo()
@@ -1423,10 +1682,10 @@ local define_locate = function()
       response = function(name, line, wildcards)
         local option = wildcards[1]
         if option == "on" then
-          self._DEBUG = true
+          self.DEBUG = true
           print("打开定位调试模式")
         elseif option == "off" then
-          self._DEBUG = false
+          self.DEBUG = false
           print("关闭定位调试模式")
         end
       end
@@ -1477,8 +1736,8 @@ local define_locate = function()
 
   function prototype:showDesc(roomDesc)
     if type(roomDesc) == "string" then
-      for i = 1, string.len(roomDesc), self._DESC_DISPLAY_LINE_WIDTH do
-        print(string.sub(roomDesc, i, i + self._DESC_DISPLAY_LINE_WIDTH - 1))
+      for i = 1, string.len(roomDesc), self.DESC_DISPLAY_LINE_WIDTH do
+        print(string.sub(roomDesc, i, i + self.DESC_DISPLAY_LINE_WIDTH - 1))
       end
     elseif type(roomDesc) == "table" then
       for _, d in ipairs(roomDesc) do
@@ -1516,6 +1775,7 @@ local define_locate = function()
   function prototype:locator(action)
     local action = action or function() end
     return coroutine.create(function()
+      local additionalInfo = nil
       local retries = 5
       repeat
         self._locateInProcess = true
@@ -1534,17 +1794,19 @@ local define_locate = function()
           --retry with 1 second delay
           wait.time(1)
         else
-          self:show()
           if self.currRoomId then
             local room = dal:getRoomById(self.currRoomId)
             if room.description ~= table.concat(self.currRoomDesc) then
-              print("注意：房间描述与数据库中不符，存在错配的可能！")
+              additionalInfo = "注意：房间描述与数据库中不符，存在错配的可能！"
             end
             break
           end
         end
       until not self._busyLook
       action(self.currRoomId)
+      if additionalInfo then
+        print(additionalInfo)
+      end
     end)
   end
 
@@ -1576,7 +1838,6 @@ local define_locate = function()
         elseif self._busyLook then
           self:debug("系统禁止频繁look请求，1秒后重试")
           wait.time(1)
-          break
         elseif self.currRoomId then
           break
         elseif #(self._potentialRooms) > 0 then
@@ -1797,4 +2058,353 @@ local define_locate = function()
 end
 local locate = define_locate().newInstance()
 
+--------------------------------------------------------------
+-- walkto.lua
+-- walk from one room to another room
+-- depends on locate
+--------------------------------------------------------------
+local define_walkto = function()
+  local prototype = {}
+  prototype.__index = prototype
+  prototype.regexp = {
+    BLOCKING1 = "你一不小心脚下踏了个空，... 啊...！",
+    BLOCKING2 = "这个方向没有出路。"
+  }
+  prototype.DEBUG = true
+  prototype.zonesearch = Algo.dijkstra
+  prototype.roomsearch = Algo.astar
+  prototype.traverse = Algo.traversal
 
+  function prototype:newInstance(args)
+    assert(args.locate, "locate cannot be nil")
+    local obj = {}
+    obj.locate = args.locate
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
+  end
+
+  function prototype:postConstruct()
+    self:initZonesAndRooms()
+
+  end
+
+  function prototype:initZonesAndRooms()
+    -- initialize zones
+    local zonesById = dal:getAllZones()
+    local zonePaths = dal:getAllZonePaths()
+    for i = 1, #zonePaths do
+      local zonePath = zonePaths[i]
+      local zone = zonesById[zonePath.startid]
+      if zone then
+        zone:addPath(zonePath)
+      end
+    end
+    -- create code map
+    local zonesByCode = {}
+    for _, zone in pairs(zonesById) do
+      zonesByCode[zone.code] = zone
+    end
+    -- initialize rooms
+    local roomsById = dal:getAllAvailableRooms()
+    local roomsByCode = {}
+    local paths = dal:getAllAvailablePaths()
+    for i = 1, #paths do
+      local path = paths[i]
+      local room = roomsById[path.startid]
+      if room then
+        room:addPath(path)
+      end
+    end
+    -- add rooms to zones
+    for _, room in pairs(roomsById) do
+      roomsByCode[room.code] = room
+      local zone = zonesByCode[room.zone]
+      if zone then
+        zone.rooms[room.id] = room
+      end
+    end
+    -- assign to prototype
+    self.zonesById = zonesById
+    self.zonesByCode = zonesByCode
+    self.roomsById = roomsById
+    self.roomsByCode = roomsByCode
+  end
+
+  function prototype:initTriggers()
+
+  end
+
+  function prototype:initAliases()
+    helper.removeAliasGroups("walkto")
+
+    helper.addAlias {
+      group = "walkto",
+      regexp = "^walkto\\s*$",
+      response = function()
+        print("WALK自动行走指令，使用方法：")
+        print("walkto debug on/off", "开启/关闭调试模式，开启时将将显示所有触发器与日志信息")
+        print("walkto <number>", "根据目标房间编号进行自动行走，如果当前房间未知将先进行重新定位")
+        print("walkto <room_code>", "根据目标房间代号进行自动行走，代号如果为区域名，将行走到区域的中心节点")
+        print("walkto showzone", "显示自动行走支持的区域列表")
+        print("walkto listzone <zone_code>", "显示相应区域所有可达的房间")
+      end
+    }
+    helper.addAlias {
+      group = "walkto",
+      regexp = "^walkto\\s+debug\\s+(on|off)$",
+      response = function(name, line, wildcards)
+        local option = wildcards[1]
+        if option == "on" then
+          self.DEBUG = true
+        elseif option == "off" then
+          self.DEBUG = false
+        end
+      end
+    }
+    helper.addAlias {
+      group = "walkto",
+      regexp = "^walkto\\s+(\\d+)$",
+      response = function(name, line, wildcards)
+        local targetRoomId = tonumber(wildcards[1])
+        self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+      end
+    }
+    helper.addAlias {
+      group = "walkto",
+      regexp = "^walkto\\s+([a-z]+)\\s*$",
+      response = function(name, line, wildcards)
+        local target = wildcards[1]
+        if target == "showzone" then
+          print(string.format("%16s%16s%16s", "区域代码", "区域名称", "区域中心"))
+          for _, zone in pairs(self.zonesById) do
+            print(string.format("%16s%16s%16s", zone.code, zone.name, zone.centercode))
+          end
+        elseif self.zonesByCode[target] then
+          local targetRoomCode = self.zonesByCode[target].centercode
+          local targetRoomId = self.roomsByCode[targetRoomCode]
+          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+        elseif self.roomsByCode[target] then
+          local targetRoomId = self.roomsByCode[target].id
+          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+        else
+          print("查询不到相应房间")
+          return false
+        end
+      end
+    }
+    helper.addAlias {
+      group = "walkto",
+      regexp = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
+      response = function(name, line, wildcards)
+        local zoneCode = wildcards[1]
+        if self.zoneByCode[zoneCode] then
+          local zone = self.zonesByCode[zoneCode]
+          print(string.format("%s(%s)房间列表：", zone.name, zone.code))
+          print(string.format("%4s%20s%40s", "编号", "名称", "代码"))
+          for _, room in pairs(zone.rooms) do
+            print(string.format("%4d%20s%40s", room.id, room.name, room.code))
+          end
+        else
+          print("查询不到相应区域")
+        end
+      end
+    }
+
+  end
+
+  local evaluateEachMove = function(path)
+    print(path.path)
+  end
+
+  function prototype:restPerInterval()
+    -- wait.time(1)
+    self:debug("wait 1 second")
+  end
+
+  function prototype:debug(...)
+    if (self.DEBUG) then print(...) end
+  end
+
+  function prototype:walker(pathStack, action)
+    local interval = self.interval or 12
+    local restTime = self.restTime or 1
+    local action = action or function() end
+    return coroutine.create(function()
+      local steps = 0
+      repeat
+        local move = table.remove(pathStack)
+        evaluateEachMove(move)
+        steps = steps + 1
+        if steps >= interval then
+          steps = 0
+          self:restPerInterval()
+        end
+      until #pathStack == 0
+      action()
+    end)
+  end
+
+  function prototype:walkWithinRooms(rooms, startid, targetid, action)
+    local pathStack = self.roomsearch {
+      rooms = rooms,
+      startid = startid,
+      targetid = targetid
+    }
+    if not pathStack then
+      print("计算路径失败，房间" .. startid .. "至房间" .. targetid .. "不可达")
+    elseif #pathStack == 0 then
+      print("正在当前房间")
+      if action then action() end
+    else
+      local walker = prototype:walker(pathStack, action)
+      coroutine.resume(walker)
+    end
+  end
+
+  function prototype:walkFromTo(fromid, toid, action)
+    local startRoom = self.roomsById[fromid]
+    local endRoom = self.roomsById[toid]
+    if not startRoom then
+      print("当前房间不在自动行走列表中")
+      return false
+    elseif not endRoom then
+      print("目标房间不在自动行走列表中")
+      return false
+    else
+      local startZone = self.zonesByCode[startRoom.zone]
+      local endZone = self.zonesByCode[endRoom.zone]
+      if not startZone then
+        print("当前区域不在自动行走列表中")
+        return false
+      elseif not endZone then
+        print("目标区域不在自动行走列表中")
+        return false
+      elseif startZone == endZone then
+        if self.DEBUG then
+          local roomCnt = 0
+          for _, room in pairs(startZone.rooms) do
+            roomCnt = roomCnt + 1
+          end
+          print("出发地与目的地处于同一区域，共" .. roomCnt .. "个房间")
+        end
+        self:walkWithinRooms(startZone.rooms, fromid, toid, action)
+      else
+        -- zone search for shortest path
+        local zoneStack = self.zonesearch {
+          rooms = self.zonesById,
+          startid = startZone.id,
+          targetid = endZone.id
+        }
+        if not zoneStack then
+          print("计算区域路径失败，区域 " .. startZone.name .. " 至区域 " .. endZone.name .. " 不可达")
+          return false
+        else
+          table.insert(zoneStack, ZonePath:decorate {startid=startZone.id, endid=startZone.id, weight=0})
+          local zoneCnt = #zoneStack
+          local rooms = {}
+          local roomCnt = 0
+          while #zoneStack > 0 do
+            local zonePath = table.remove(zoneStack)
+            for _, room in pairs(self.zonesById[zonePath.endid].rooms) do
+              rooms[room.id] = room
+              roomCnt = roomCnt + 1
+            end
+          end
+          self:debug("本次路径计算跨" .. zoneCnt .. "个区域，共" .. roomCnt .. "个房间")
+          self:walkWithinRooms(rooms, fromid, toid, action)
+        end
+      end
+    end
+  end
+
+  function prototype:walkto(toid, action)
+    if not self.locate.currRoomId then
+      self.locate:relocate(function(roomId)
+        self:walkFromTo(roomId, toid, action)
+      end)
+    else
+      self:walkFromTo(self.locate.currRoomId, toid, action)
+    end
+  end
+
+  return prototype
+end
+local walkto = define_walkto():newInstance {locate = locate}
+
+-- simple test case
+local rooms = {
+  [1] = Room:new {
+    id=1, code="r1", name="room1",
+    paths = {
+      [7] = RoomPath:new {startid=1, endid=7, path="n"},
+      [2] = RoomPath:new {startid=1, endid=2, path="ne"},
+      [5] = RoomPath:new {startid=1, endid=5, path="se"}
+    }
+  },
+  [2] = Room:new {
+    id=2, code="r2", name="room2",
+    paths = {
+      [7] = RoomPath:new {startid=2, endid=7, path="w"},
+      [1] = RoomPath:new {startid=2, endid=1, path="sw"},
+      [3] = RoomPath:new {startid=2, endid=3, path="e"},
+      [4] = RoomPath:new {startid=2, endid=4, path="se"}
+    }
+  },
+  [3] = Room:new {
+    id=3, code="r3", name="room3",
+    paths = {
+      [2] = RoomPath:new {startid=3, endid=2, path="w"},
+      [4] = RoomPath:new {startid=3, endid=4, path="s"},
+      [6] = RoomPath:new {startid=3, endid=6, path="ne"}
+    }
+  },
+  [4] = Room:new {
+    id=4, code="r4", name="room4",
+    paths = {
+      [2] = RoomPath:new {startid=4, endid=2, path="nw"},
+      [3] = RoomPath:new {startid=4, endid=3, path="n"},
+      [5] = RoomPath:new {startid=4, endid=5, path="w"}
+    }
+  },
+  [5] = Room:new {
+    id=5, code="r5", name="room5",
+    paths = {
+      [1] = RoomPath:new {startid=5, endid=1, path="nw"},
+      [4] = RoomPath:new {startid=5, endid=4, path="e"}
+    }
+  },
+  [6] = Room:new {
+    id=6, code="r6", name="room6",
+    paths = {
+      [3] = RoomPath:new {startid=6, endid=3, path="sw"}
+    }
+  },
+  [7] = Room:new {
+    id=7, code="r7", name="room7",
+    paths = {
+      [1] = RoomPath:new {startid=7, endid=1, path="s"},
+      [2] = RoomPath:new {startid=7, endid=2, path="e"}
+    }
+  }
+}
+
+--local solution = Algo.dijkstra {
+--  rooms = rooms,
+--  startid = 1,
+--  targetid = 6
+--}
+--while #solution > 0 do
+--  local move = table.remove(solution)
+--  print(move.endid, move.path)
+--end
+
+--walkto:walkFromTo(1, 1638, function() print("finish walking") end)
+
+--local zoneCode = "yangzhou"
+--local zone = walkto.zonesByCode[zoneCode]
+--print(string.format("%s(%s)房间列表：", zone.name, zone.code))
+--print(string.format("%4s%20s%40s", "编号", "名称", "代码"))
+--for _, room in pairs(zone.rooms) do
+--  print(string.format("%4d%20s%40s", room.id, room.name, room.code))
+--end
