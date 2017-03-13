@@ -1394,7 +1394,8 @@ local define_locate = function()
       group = "locate",
       regexp = "^loc here$",
       response = function()
-        self:locate()
+        local locator = self:locator(function() self:show() end)
+        coroutine.resume(locator)
       end
     }
     helper.addAlias {
@@ -1466,7 +1467,10 @@ local define_locate = function()
       group = "locate",
       regexp = "^reloc\\s*$",
       response = function()
-        self:relocate()
+        local relocator = self:relocator(function()
+          print("重新定位成功：", self.currRoomId, self.currRoomName)
+        end)
+        coroutine.resume(relocator)
       end
     }
   end
@@ -1509,35 +1513,39 @@ local define_locate = function()
     end
   end
 
-  -- locate current room
-  function prototype:locate()
-    local locater = coroutine.create(function()
-      self._locateInProcess = true
-      helper.enableTriggerGroups("locate_start")
-      check(SendNoEcho("set locate start"))
-      check(SendNoEcho("look"))
-      check(SendNoEcho("set locate stop"))
-      local line = wait.regexp(self.regexp.SET_LOCATE_STOP, 5)
-      helper.disableTriggerGroups("locate_start", "locate_desc", "locate_name", "locate_other")
-      self._locateInProcess = false
-      -- if timeout line is not matched and line will be nil
-      if not line then
-        self:debug("Timeout on locate!")
-      elseif self._busyLook then
-        --retry with 1 second delay
-        wait.time(1)
-        return self:locate()
-      else
-        self:show()
-        if self.currRoomId then
-          local room = dal:getRoomById(self.currRoomId)
-          if room.description ~= table.concat(self.currRoomDesc) then
-            print("注意：房间描述与数据库中不符，存在错配的可能！")
+  function prototype:locator(action)
+    local action = action or function() end
+    return coroutine.create(function()
+      local retries = 5
+      repeat
+        self._locateInProcess = true
+        helper.enableTriggerGroups("locate_start")
+        check(SendNoEcho("set locate start"))
+        check(SendNoEcho("look"))
+        check(SendNoEcho("set locate stop"))
+        local line = wait.regexp(self.regexp.SET_LOCATE_STOP, 5)
+        helper.disableTriggerGroups("locate_start", "locate_desc", "locate_name", "locate_other")
+        self._locateInProcess = false
+        -- if timeout line is not matched and line will be nil
+        if not line then
+          self:debug("Timeout on locate!")
+          break
+        elseif self._busyLook then
+          --retry with 1 second delay
+          wait.time(1)
+        else
+          self:show()
+          if self.currRoomId then
+            local room = dal:getRoomById(self.currRoomId)
+            if room.description ~= table.concat(self.currRoomDesc) then
+              print("注意：房间描述与数据库中不符，存在错配的可能！")
+            end
+            break
           end
         end
-      end
+      until not self._busyLook
+      action(self.currRoomId)
     end)
-    return coroutine.resume(locater)
   end
 
   local randomPickExits = function(currExits)
@@ -1546,12 +1554,12 @@ local define_locate = function()
     return exits[math.random(#(exits))]
   end
 
-  -- relocate current room, and will move to next room
-  -- if current room cannot be identified,
-  -- until reaching the first room that can be identified
-  function prototype:relocate()
-    local relocater = coroutine.create(function()
-      local retries = 0
+  -- relocate current room, when action associated after the relocating
+  -- action callback can receive the current room id as its input
+  function prototype:relocator(action)
+    local action = action or function() end
+    return coroutine.create(function()
+      local retries = 15
       repeat
         self._locateInprocess = true
         helper.enableTriggerGroups("locate_start")
@@ -1562,56 +1570,58 @@ local define_locate = function()
         helper.disableTriggerGroups("locate_start", "locate_desc", "locate_name", "locate_other")
         self._locateInProcess = false
         if not line then
-          self:debug("Timeout on re-locate!")
+          print("重新定位超时失败！")
+          -- no action performed
+          return false
         elseif self._busyLook then
           self:debug("系统禁止频繁look请求，1秒后重试")
           wait.time(1)
-          return self:relocate()
-        else
-          if self.currRoomId then
-            print("重新定位成功", self.currRoomId, self.currRoomName)
-            return true
-          elseif #(self._potentialRooms) > 0 then
-            local matched = matchPotentialRooms(table.concat(self.currRoomDesc), self.currExits, self._potentialRooms)
-            if #matched == 1 then
-              self:debug("成功匹配仅1个房间", matched[1])
-              self.currRoomId = matched[1]
-              self.currRoomName = self._potentialRoomName
-              print("重新定位成功", self.currRoomId, self.currRoomName)
-              return true
-            elseif #matched == 0 then
-              self:debug("没有可匹配的房间", self._potentialRoomName)
-            elseif #matched > 1 then
-              self:debug("查找到多个匹配成功的房间", table.concat(matched, ","))
-            end
-            local exit = randomPickExits(self.currExits)
-            if exit then
-              self:debug("随机选择出口并执行重新定位", exit)
-              check(SendNoEcho("halt"))
-              check(SendNoEcho(exit))
-            else
-              print("没有出口可供选择，重新定位失败")
-              return false
-            end
+          break
+        elseif self.currRoomId then
+          break
+        elseif #(self._potentialRooms) > 0 then
+          local matched = matchPotentialRooms(table.concat(self.currRoomDesc), self.currExits, self._potentialRooms)
+          if #matched == 1 then
+            self:debug("成功匹配仅1个房间", matched[1])
+            self.currRoomId = matched[1]
+            self.currRoomName = self._potentialRoomName
+            break
+          elseif #matched == 0 then
+            self:debug("没有可匹配的房间", self._potentialRoomName)
+          elseif #matched > 1 then
+            self:debug("查找到多个匹配成功的房间", table.concat(matched, ","))
+          end
+          local exit = randomPickExits(self.currExits)
+          if exit then
+            self:debug("随机选择出口并执行重新定位", exit)
+            check(SendNoEcho("halt"))
+            check(SendNoEcho(exit))
           else
-            print("没有可供匹配的同名房间")
-            local exit = randomPickExits(self.currExits)
-            if exit then
-              self:debug("随机选择出口并重新定位", exit)
-              check(SendNoEcho("halt"))
-              check(SendNoEcho(exit))
-            else
-              print("没有出口可供选择，重新定位失败")
-              return false
-            end
+            print("没有出口可供选择，重新定位失败")
+            return false
+          end
+        else
+          print("没有可供匹配的同名房间")
+          local exit = randomPickExits(self.currExits)
+          if exit then
+            self:debug("随机选择出口并重新定位", exit)
+            check(SendNoEcho("halt"))
+            check(SendNoEcho(exit))
+          else
+            print("没有出口可供选择，重新定位失败")
+            return false
           end
         end
         wait.time(0.3)
-      until self.currRoomId ~= nil
-      print("程序有错误，无法判断")
-      return false
+        retries = retries - 1
+      until self.currRoomId ~= nil or retries <= 0
+      -- 执行后续行动
+      if self.currRoomId then
+        action(self.currRoomId)
+      else
+        print("重新定位失败，到达重试最大次数")
+      end
     end)
-    return coroutine.resume(relocater)
   end
 
   function prototype:guess()
