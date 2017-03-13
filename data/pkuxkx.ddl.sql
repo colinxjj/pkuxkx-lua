@@ -51,7 +51,10 @@ values
   ('zhongyuan', '中原', 'zhongyuanxuchang'),
   ('xiaoshancun', '小山村', 'xiaoshancundaguchang'),
   ('huashan', '华山', 'huashanshufang'),
-  ('qufu', '曲阜', 'qufukongmiao');
+  ('qufu', '曲阜', 'qufukongmiao'),
+  --
+  ('quanzhen', '全真', 'quanzhenchongxuantai')
+;
 --   ('taishan', '泰山');
 
 create table if not exists zone_connectivity (
@@ -72,7 +75,11 @@ values
   ('yangzhou', 'qufu', 10),
   ('qufu', 'yangzhou', 10),
   ('qufu', 'zhongyuan', 12),
-  ('zhongyuan', 'qufu', 12);
+  ('zhongyuan', 'qufu', 12),
+  --
+  ('xiaoshancun', 'quanzhen', 13),
+  ('quanzhen', 'xiaoshancun', 13)
+;
 
 
 --.separator ':'
