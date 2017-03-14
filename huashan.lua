@@ -3,250 +3,27 @@
 -- User: Administrator
 -- Date: 2017/3/7
 -- Time: 19:59
--- To change this template use File | Settings | File Templates.
+--
+-- try to use FSM to rewrite the job logic
 --
 
 require "wait"
 
-local define_helper = function()
-  local helper = {}
-  -- add trigger but disabled
-  local TRIGGER_BASE_FLAG = trigger_flag.RegularExpression
-    + trigger_flag.Replace + trigger_flag.KeepEvaluating
-  local COPY_WILDCARDS_NONE = 0
-  local SOUND_FILE_NONE = ""
-  -- make sure the name is unique
-  local _global_trigger_callbacks = {}
-  helper.addTrigger = function(args)
-    local regexp = assert(type(args.regexp) == "string" and args.regexp, "regexp in trigger must be string")
-    local group = assert(args.group, "group in trigger cannot be empty")
-    local response = assert(args.response, "response in trigger cannot be empty")
-    local name = args.name or "auto_added_trigger_" .. GetUniqueID()
-    local sequence = args.sequence or 10
-    if type(args.response) == "string" then
-      check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, response, sendto.world, sequence))
-    elseif type(response) == "function" then
-      _G[name] = response
-      _global_trigger_callbacks[name] = true
-      check(AddTriggerEx(name, regexp, "", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, name, sendto.script, sequence))
-    else
-      error("response type is unexpected " .. type(response))
-    end
-    check(SetTriggerOption(name, "group", group))
-  end
-
-  helper.removeTrigger = function(name)
-    if _global_trigger_callbacks[name] then
-      _global_trigger_callbacks[name] = nil
-      _G[name] = nil
-    end
-    check(DeleteTrigger(name))
-  end
-
-  local _global_alias_callbacks = {}
-  local ALIAS_BASE_FLAG = alias_flag.Enabled + alias_flag.RegularExpression + alias_flag.Replace
-  helper.addAlias = function(args)
-    local regexp = assert(args.regexp, "regexp of alias cannot be empty")
-    local response = assert(args.response, "response of alias cannot be empty")
-    local group = assert(args.group, "group of alias cannot be empty")
-    local name = args.name or "auto_added_alias_" .. GetUniqueID()
-    if type(response) == "function" then
-      _G[name] = response
-      _global_alias_callbacks[name] = true
-      check(AddAlias(name, regexp, name, ALIAS_BASE_FLAG, ""))
-      check(SetAliasOption(name, "send_to", sendto.script))
-      check(SetAliasOption(name, "group", group))
-    end
-  end
-
-  helper.removeAlias = function(name)
-    if _global_alias_callbacks[name] then
-      _global_alias_callbacks[name] = nil
-      _G[name] = nil
-    end
-    check(DeleteAlias(name))
-  end
-
-  -- convert chinese string to number
-  local _nums = {
-    ["一"] = 1,
-    ["二"] = 2,
-    ["三"] = 3,
-    ["四"] = 4,
-    ["五"] = 5,
-    ["六"] = 6,
-    ["七"] = 7,
-    ["八"] = 8,
-    ["九"] = 9
-  }
-  helper.ch2number = function (str)
-    if (#str % 2) == 1 then
-      return 0
-    end
-    local result = 0
-    local _10k = 1
-    local unit = 1
-    for i = #str - 2, 0, -2 do
-      local char = string.sub(str, i + 1, i + 2)
-      if char == "十" then
-        unit = 10 * _10k
-        if i == 0 then
-          result = result + unit
-        elseif _nums[string.sub(str, i - 1, i)] == nil then
-          result = result + unit
-        end
-      elseif char == "百" then
-        unit = 100 * _10k
-      elseif char == "千" then
-        unit = 1000 * _10k
-      elseif char == "万" then
-        unit = 10000 * _10k
-        _10k = 10000
-      else
-        if _nums[char] ~= nil then
-          result = result + _nums[char] * unit
-        end
-      end
-    end
-    return result
-  end
-
-  -- convert chinese directions
-  local _dirs = {
-    ["上"] = "up",
-    ["下"] = "down",
-    ["南"] = "south",
-    ["东"] = "east",
-    ["西"] = "west",
-    ["北"] = "north",
-    ["南上"] = "southup",
-    ["南下"] = "southdown",
-    ["西上"] = "westup",
-    ["西下"] = "westdown",
-    ["东上"] = "eastup",
-    ["东下"] = "eastdown",
-    ["北上"] = "northup",
-    ["北下"] = "northdown",
-    ["西北"] = "northwest",
-    ["东北"] = "northeast",
-    ["西南"] = "southwest",
-    ["东南"] = "southeast",
-    ["小道"] = "xiaodao",
-    ["小路"] = "xiaolu"
-  }
-  helper.ch2direction = function (str) return _dirs(str) end
-
-  -- convert chinese areas
-  local areas = {
-    {
-    },
-    {
-      ["中原"] = true,
-      ["曲阜"] = true,
-      ["信阳"] = true,
-      ["泰山"] = true,
-      ["长江"] = true,
-      ["嘉兴"] = true,
-      ["泉州"] = true,
-      ["江州"] = true,
-      ["牙山"] = true,
-      ["西湖"] = true,
-      ["福州"] = true,
-      ["南昌"] = true,
-      ["镇江"] = true,
-      ["苏州"] = true,
-      ["昆明"] = true,
-      ["桃源"] = true,
-      ["岳阳"] = true,
-      ["成都"] = true,
-      ["北京"] = true,
-      ["天坛"] = true,
-      ["洛阳"] = true,
-      ["灵州"] = true,
-      ["晋阳"] = true,
-      ["襄阳"] = true,
-      ["长安"] = true,
-      ["扬州"] = true,
-      ["丐帮"] = true,
-      ["峨嵋"] = true,
-      ["华山"] = true,
-      ["全真"] = true,
-      ["古墓"] = true,
-      ["星宿"] = true,
-      ["明教"] = true,
-      ["灵鹫"] = true,
-      ["兰州"] = true
-    },
-    {
-      ["临安府"] = true,
-      ["归云庄"] = true,
-      ["小山村"] = true,
-      ["张家口"] = true,
-      ["麒麟村"] = true,
-      ["紫禁城"] = true,
-      ["神龙岛"] = true,
-      ["杀手帮"] = true,
-      ["岳王墓"] = true,
-      ["桃花岛"] = true,
-      ["天龙寺"] = true,
-      ["武当山"] = true,
-      ["少林寺"] = true,
-      ["白驼山"] = true,
-      ["凌霄城"] = true,
-      ["大轮寺"] = true,
-      ["无量山"] = true,
-      ["天地会"] = true
-    },
-    {
-      ["西湖梅庄"] = true,
-      ["长江南岸"] = true,
-      ["长江北岸"] = true,
-      ["黄河南岸"] = true,
-      ["黄河北岸"] = true,
-      ["大理城中"] = true,
-      ["平西王府"] = true,
-      ["康亲王府"] = true,
-      ["日月神教"] = true,
-      ["丝绸之路"] = true,
-      ["姑苏慕容"] = true,
-      ["峨眉后山"] = true
-    },
-    {
-      ["建康府南城"] = true,
-      ["建康府北城"] = true,
-      ["杭州提督府"] = true
-    }
-  }
-  helper.ch2place = function(str)
-    local place = {}
-    for i = 5, 2, -1 do
-      if string.len(str) >= i then
-        local prefix = string.sub(str, 1, i)
-        if areas[i][prefix] then
-          place.area = prefix
-          place.room = string.sub(str, i + 1, string.len(str))
-          break
-        end
-      end
-    end
-    return place
-  end
-
-  -- convenient way to add trigger
-
-  return helper
-end
-local helper = define_helper()
+-- import modules from pkuxkx
+local pkuxkx = require "pkuxkx"
+local helper = pkuxkx.helper
+local locate = pkuxkx.locate
+local walkto = pkuxkx.walkto
 
 local huashan = {}
 
-huashan.li2yue = {"s", "se", "su", "eu", "su", "eu", "su", "su", "sd", "su", "s", "s" }
-huashan.yue2li = {"n", "n", "nd", "nu", "nd", "nd", "wd", "nd", "wd", "nd", "nw", "n"}
+--huashan.li2yue = {"s", "se", "su", "eu", "su", "eu", "su", "su", "sd", "su", "s", "s" }
+--huashan.yue2li = {"n", "n", "nd", "nu", "nd", "nd", "wd", "nd", "wd", "nd", "nw", "n"}
 
 local define_patrol = function()
-  local patrol = {}
-  patrol.__index = patrol
-  patrol._paths = {
+  local prototype = {}
+  prototype.__index = prototype
+  prototype._paths = {
     {path="n",name="练武场"},
     {path="n",name="玉女峰"},
     {path="e",name="玉女祠"},
@@ -273,7 +50,7 @@ local define_patrol = function()
     {path="nd",name="莎萝坪"},
     {path="nw",name="华山脚下"},
     {path="n",name="玉泉院"}}
-  patrol._rooms = {
+  prototype._rooms = {
     ["练武场"] = 1,
     ["玉女峰"] = 1,
     ["玉女祠"] = 1,
@@ -293,189 +70,275 @@ local define_patrol = function()
     ["华山脚下"] = 1,
     ["玉泉院"] = 1
   }
-  patrol._delay = 1
-  patrol.regexp = {
-    ASK_JOB="^[ >]*你向岳灵珊打听有关『job』的消息。$",
+  prototype._delay = 1
+  prototype.regexp = {
+    ASK_YUE = "^[ >]*你向岳灵珊打听有关『job』的消息。$",
     GOT_JOB="^[ >]*岳灵珊拿出一张地图，把华山需要巡逻的区域用不同颜色标注出来，并和你说了一遍。$",
-    PATROLLING="^[ >]*你在(\w+)巡弋，尚未发现敌踪。$",
+    PREV_JOB_REMAINED = "^[ >]*岳灵珊说道：「你上次任务还没有完成呢！」$",
+    NEXT_JOB_WAIT = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
+    PATROLLING="^[ >]*你在(.+?)巡弋，尚未发现敌踪。$",
     GO="^[ >]*设定环境变量：huashan_patrol = \"go\"",
     POTENTIAL_ROOM="^[ >]*([^ ]+)$",
     REJECT_LING="^[ >]*岳灵珊不想要令牌，你就自个留着吧。",
-    ACCEPT_LING="^[ >]*你给岳灵珊一块令牌。$"
+    ACCEPT_LING="^[ >]*你给岳灵珊一块令牌。$",
+    SUBMIT_END = "^[ >]*设定环境变量：huashan_patrol = \"submit_end\"",
+    BUSY_CHECK = "^[ >]*你现在不忙。$",
+    DZ_FINISH = "^[ >]*你感觉内力充盈，显然内功又有进境。$",
+    DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$"
   }
-  patrol.currRoom = nil
 
-  local goli2yue = function()
-    for i = 1,#(huashan.li2yue) do
-      check(SendNoEcho(huashan.li2yue[i]))
-    end
-  end
-
-  local goyue2li = function()
-    for i = 1,#(huashan.yue2li) do
-      check(SendNoEcho(huashan.yue2li[i]))
-    end
-  end
-
-  function patrol:new()
+  function prototype:newInstance()
     local obj = {}
-    setmetatable(obj, self)
-    -- copy rooms
-    obj.rooms = {}
-    for k, v in pairs(patrol.rooms) do
-      obj.rooms[k] = v
-    end
-    -- copy and reverse paths
-    obj.paths = {}
-    for i = #(patrol._paths),1,-1 do
-      table.insert(obj.paths, patrol._paths[i])
-    end
-    obj.delay = patrol._delay
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
     return obj
   end
 
-  function patrol.start()
-    check(EnableTriggerGroup("huashan_patrol", true))
+  function prototype:postConstruct()
+    self.DEBUG = false
+    self.continuous = true
+    self.currRoom = nil
+    self:initTriggers()
+    self:initAliases()
+  end
+
+  function prototype:debug(...)
+    if (self.DEBUG) then print(...) end
+  end
+
+  function prototype:stop()
+    self.continuous = false
+    self.currRoom = nil
+  end
+
+  -- before ask job, prepare the rooms and paths for patrol
+  function prototype:reloadRooms()
+    self.rooms = {}
+    for k, v in pairs(prototype._rooms) do
+      self.rooms[k] = v
+    end
+  end
+
+  function prototype:reloadPaths()
+    -- copy and reverse paths
+    self.paths = {}
+    for i = #(prototype._paths),1,-1 do
+      table.insert(self.paths, prototype._paths[i])
+    end
+  end
+
+  function prototype:startAsk()
+    helper.enableTriggerGroups("huashan_patrol_ask")
     SendNoEcho("ask yue about job")
+    SendNoEcho("set huashan_patrol ask_end")
   end
 
-  function patrol.init()
-    local triggerList = GetTriggerList()
-    if triggerList then
-      for i, trigger in ipairs(triggerList) do
-        local groupName = GetTriggerInfo(trigger, 26) -- group name
-        if groupName == "huashan_patrol"
-          or groupName == "huashan_patrol_ask"
-          or groupName == "huashan_patrol_move"
-          or groupName == "huashan_patrol_finish" then
-          check(helper.removeTrigger(trigger))
-        end
-      end
-    end
-    helper.addTrigger {
-      regexp = patrol.regexp.ASK_JOB,
-      response = function() check(EnableTriggerGroup("huashan_patrol_ask", true)) end,
-      group = "huashan_patrol"
-    }
-    helper.addTrigger {
-      regexp = patrol.regexp.POTENTIAL_ROOM,
-      response = function(name, line, wildcards)
-        local potentialRoom = wildcards[1]
-        if string.len(potentialRoom) < 14 then
-          if patrol._rooms[potentialRoom] then
-            patrol.currRoom = potentialRoom
-          end
-        end
-      end,
-      group = "huashan_patrol_move"
-    }
-    helper.addTrigger {
-      regexp = patrol.regexp.GOT_JOB,
-      response = function()
-        check(EnableTriggerGroup("huashan_patrol_ask", false))
-        print("start patrol job")
-        SendNoEcho("set brief 1")
-        local co = coroutine.create(function()
-          local P = patrol:new()
-          while #(P.paths) > 0 do
-            local next = table.remove(P.paths)
-            local retries = 0
-            repeat
-              -- do not busy retry
-              if retries > 0 then
-                wait.time(1)
-              end
-              patrol.currRoom = nil
-              check(EnableTriggerGroup("huashan_patrol_move", true))
-              SendNoEcho(next.path)
-              SendNoEcho("set huashan_patrol go")
-              wait.regexp(patrol.regexp.GO)
-              check(EnableTriggerGroup("huashan_patrol_move", false))
-              retries = retries + 1
-            until patrol.currRoom ~= nil and patrol.currRoom == next.name
+  function prototype:start()
+    self.continuous = true
+    locate:clearRoomInfo()
+    self:reloadRooms()
+    -- 岳灵珊在华山客厅2916
+    walkto:walkto(2916, function()
+      self:startAsk()
+    end)
+  end
 
-            -- first time reach this room, we need to wait until the notion of patrol occurs
-            if P.rooms[next.name] and P.rooms[next.name] > 0 then
-              local line, wildcards = wait.regexp(patrol.regexp.PATROLLING, 10)
-              local currRoom = wildcards[1]
-              if P.rooms[currRoom] and P.rooms[currRoom] > 0 then
-                P.rooms[currRoom] = P.rooms[currRoom] - 1
-              end
+  function prototype:prepareWork()
+    helper.disableTriggerGroups("huashan_patrol_ask", "huashan_patrol_ask_result")
+    self:reloadRooms()
+  end
+
+  function prototype:assureNotBusy()
+    while true do
+      SendNoEcho("halt")
+      -- busy or wait for 3 seconds to resend
+      local line = wait.regexp("^[ >]*你现在不忙。$", 3)
+      if line then break end
+    end
+  end
+
+  function prototype:worker()
+    return coroutine.create(function()
+      self:debug("加载巡逻路径")
+      self:reloadPaths()
+      self:debug("开始巡逻")
+      while #(self.paths) > 0 do
+        local next = table.remove(self.paths)
+        -- 到达下一个房间，此处有强假设，到达下一个房间不会失败
+        self:assureNotBusy()
+        SendNoEcho(next.path)
+        if self.rooms[next.name] and self.rooms[next.name] > 0 then
+          self:debug("首次进入巡逻房间，等待巡逻命令")
+          -- wait at most 10 seconds for the notion
+          local _, wildcards = wait.regexp(self.regexp.PATROLLING, 6)
+          if wildcards and wildcards[1] then
+            local currRoom = wildcards[1]
+            if self.rooms[currRoom] and self.rooms[currRoom] > 0 then
+              self.rooms[currRoom] = self.rooms[currRoom] - 1
             end
-            wait.time(P.delay)
-          end
-          print("应当已到达玉泉院，返回岳灵珊处")
-          goli2yue()
-          -- 检查房间
-          local miss = false
-          for room, remainCnt in pairs(P.rooms) do
-            if remainCnt ~= 0 then
-              print("有房间遗漏未巡逻到：", room, remainCnt)
-              miss = true
-            end
-          end
-          if miss then
-            print("尝试重新巡逻")
           else
-            print("尝试提交任务")
-            check(EnableTriggerGroup("huashan_patrol_finish", true))
-            SendNoEcho("give yue ling")
+            print("该地区应当显示巡逻提示但没有显示！")
           end
-        end)
-        coroutine.resume(co)
-      end,
-      group = "huashan_patrol_ask"
-    }
-    helper.addTrigger {
-      regexp = patrol.regexp.ACCEPT_LING,
-      response = function()
-        check(EnableTriggerGroup("huashan_patrol_finish", false))
-        print("任务完成！")
-      end,
-      group = "huashan_patrol_finish"
-    }
-    helper.addTrigger {
-      regexp = patrol.regexp.REJECT_LING,
-      response = function()
-        check(EnableTriggerGroup("huashan_patrol_finish", false))
-        print("任务未完成！请手动完成")
-      end,
-      group = "huashan_patrol_finish"
-    }
-
-    local aliasList = GetAliasList()
-    if aliasList then
-      for i, alias in ipairs(aliasList) do
-        local groupName = GetAliasInfo(alias, 16) -- group name
-        if groupName == "huashan_patrol" then
-          check(helper.removeAlias(alias))
         end
       end
-    end
+      -- 完成巡逻
+      locate:clearRoomInfo()
+      walkto:walkto(2916, function()
+        helper.enableTriggerGroups("huashan_patrol_submit")
+        SendNoEcho("give yue ling")
+        SendNoEcho("set huashan_patrol submit_end")
+      end)
+    end)
+  end
+
+  function prototype:initTriggers()
+    helper.removeTriggerGroups("huashan_patrol_ask", "huashan_patrol_ask_result", "huashan_patrol_submit")
+
+    helper.addTrigger {
+      group = "huashan_patrol_ask",
+      regexp = self.regexp.ASK_YUE,
+      response = function()
+        helper.enableTriggerGroups("huashan_patrol_ask_result")
+      end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_ask_result",
+      regexp = self.regexp.GOT_JOB,
+      response = function()
+        self:prepareWork()
+        local worker = self:worker()
+        local ok, error = coroutine.resume(worker)
+        if not ok then
+          print(error)
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_ask_result",
+      regexp = self.regexp.PREV_JOB_REMAINED,
+      response = function()
+        if self.continuous then
+          print("之前任务没有完成，尝试完成")
+          self:prepareWork()
+          local worker = self:worker()
+          coroutine.resume(worker)
+        else
+          helper.disableTriggerGroups("huashan_patrol_ask", "huashan_patrol_ask_result")
+          print("停止巡逻")
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_ask_result",
+      regexp = self.regexp.NEXT_JOB_WAIT,
+      response = function()
+        if self.continuous then
+          self:debug("等待5秒后继续询问")
+          wait.time(5)
+          self:startAsk()
+        end
+      end
+    }
+
+    helper.addTrigger {
+      group = "huashan_patrol_submit",
+      regexp = self.regexp.SUBMIT_END,
+      response = function() helper.disableTriggerGroups("huashan_patrol_submit") end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_submit",
+      regexp = self.regexp.REJECT_LING,
+      response = function()
+        -- check if rooms are all patrolled
+        local allPatrolled = true
+        for room, cnt in pairs(self.rooms) do
+          if cnt > 0 then
+            print("发现有房间未巡逻到", room)
+            allPatrolled = false
+            break
+          end
+        end
+        if not allPatrolled then
+          print("有部分区域没有巡逻到，重新巡逻")
+          if self.continuous then
+            coroutine.resume(self:worker())
+          end
+        else
+          print("巡逻时间太快，尝试打坐等待")
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_submit",
+      regexp = self.regexp.ACCEPT_LING,
+      response = function()
+        if self.continuous then
+          self:start()
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_dz",
+      regexp = self.regexp.DZ_FINISH,
+      response = function()
+        if self.keepDZ then
+          SendNoEcho("dz max")
+        elseif self.needSubmit then
+          helper.disableTriggerGroups("huashan_patrol_dz")
+        end
+      end
+    }
+    helper.addTrgger {
+      group = "huashan_patrol_dz",
+      regexp = self.regexp.DZ_NEILI_ADDED,
+      response = function()
+
+      end
+    }
+
+  end
+
+  function prototype:initAliases()
+    helper.removeAliasGroups("huashan_patrol")
+
     helper.addAlias {
-      regexp = "^startpatrol$",
-      response = patrol.start,
-      group = "huashan_patrol"
+      group = "huashan_patrol",
+      regexp = "^patrol$",
+      response = function()
+        print("PATROL华山新手巡逻任务，用法如下：")
+        print("patrol start", "开始巡逻")
+        print("patrol stop", "完成当前任务后，停止巡逻")
+        print("patrol debug on/off", "开启/关闭巡逻调试模式")
+      end
+    }
+
+    helper.addAlias {
+      group = "huashan_patrol",
+      regexp = "^patrol\\s+start\\s*",
+      response = function() self:start() end
     }
     helper.addAlias {
-      regexp = "^li2yue$",
-      response = goli2yue,
-      group = "huashan_patrol"
+      group = "huashan_patrol",
+      regexp = "^patrol\\s+stop\\s*$",
+      response = function() self:stop() end
     }
     helper.addAlias {
-      regexp = "^yue2li$",
-      response = goyue2li,
-      group = "huashan_patrol"
+      group = "huashan_patrol",
+      regexp = "^patrol\\s+debug\\s+(on|off)\\s*$",
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self.DEBUG = true
+        elseif cmd == "off" then
+          self.DEBUG = false
+        end
+      end
     }
   end
-  return patrol
---  local info1 = "^[ >]*你在(\w+)巡弋，尚未发现敌踪。$"
---  local answer2 = "你给岳灵珊一块令牌。"
---  local answer3 = "岳灵珊不想要令牌，你就自个留着吧。"
---  local info2 = "泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。"
+
+  return prototype
 end
-huashan.patrol = define_patrol()
-huashan.patrol.init()
+huashan.patrol = define_patrol().newInstance()
 
 return huashan
 

@@ -1247,6 +1247,8 @@ local define_Algo = function()
     local targetid = assert(args.targetid, "targetid cannot be nil")
     local hypo = args.hf or defaultHypothesis
 
+    if startid == targetid then return {} end
+
     local opens = minheap:new()
     local closes = {}
     local prev = {}
@@ -1290,6 +1292,9 @@ local define_Algo = function()
     local rooms = assert(args.rooms, "rooms cannot be nil")
     local startid = assert(args.startid, "startid cannot be nil")
     local targetid = assert(args.targetid, "targetid cannot be nil")
+
+    if startid == targetid then return {} end
+
     local opens = minheap:new()
     local closes = {}
     local prev = {}
@@ -1513,6 +1518,7 @@ local define_locate = function()
     for i = 1, #potentialRooms do
       local room = potentialRooms[i]
       if room.exits == currRoomExits and room.description == currRoomDesc then
+        print("room.id", room.id)
         table.insert(matched, room.id)
       end
     end
@@ -1540,6 +1546,7 @@ local define_locate = function()
       local roomName = wildcards[1]
       print("room name:", roomName, string.len(roomName))
       self._potentialRoomName = roomName
+      self:debug("可能的房间名称：", self._potentialRoomName)
       self._potentialRooms = dal:getRoomsByName(roomName)
       -- it is right if and only if the map is complete
       if #(self._potentialRooms) == 1 then
@@ -1852,6 +1859,7 @@ local define_locate = function()
           self:debug("系统禁止频繁look请求，1秒后重试")
           wait.time(1)
         elseif self.currRoomId then
+          self:debug("获取到当前房间编号", self.currRoomId)
           break
         elseif #(self._potentialRooms) > 0 then
           local matched = self:matchPotentialRooms(table.concat(self.currRoomDesc), self.currExits, self._potentialRooms)
@@ -2080,11 +2088,25 @@ local define_walkto = function()
   local prototype = {}
   prototype.__index = prototype
   prototype.regexp = {
-    WALKTO_REST = "^[ >]*设定环境变量：walkto = \"rest\"",
-    WALKTO_FINISH = "^[ >]*设定环境变量：walkto = \"finish\"",
-    WALKTO_MOUNTAIN = "你一不小心脚下踏了个空，... 啊...！",
-    WALKTO_NOWAY = "这个方向没有出路。",
-    WALKTO_NOWAY2 = "哎哟，你一头撞在墙上，才发现这个方向没有出路。"
+    TRIGGER_WALKTO_REST = "^[ >]*设定环境变量：walkto = \"rest\"",
+    TRIGGER_WALKTO_STEP = "^[ >]*设定环境变量：walkto = \"step\"",
+    TRIGGER_WALKTO_FINISH = "^[ >]*设定环境变量：walkto = \"finish\"",
+    TRIGGER_WALKTO_LOST_WAY = "^[> ]*(这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*)$",
+    TRIGGER_WALKTO_LOST_WAY_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
+    TRIGGER_WALKTO_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
+    TRIGGER_WALKTO_PAUSE_START = "^[ >]*(你踩上铁索，向山涧的对面飘然而去.*|你一咬牙，扳住崖上的岩石.*|你扶着铁索，踏上桥板.*)",
+    TRIGGER_WALKTO_PAUSE_END = "^[> ]*(你整了整衣服，走了进去。|你定了定神，走了出来。|你从下面爬了上来，衣服都烂了，看起来十分狼狈。|你从上面爬了下来，衣服都烂了，看起来十分狼狈。|六名雪山弟子一齐转动机关，吊桥便又升了起来。|大车停稳了下来，你可以下车\\(xia\\)了。|你身在半空，双手乱挥，只盼能抓到什么东西，这么乱挥一阵，又下堕下百馀丈。|你终于一步步的终于挨到了桥头.*|你终于来到了对面，心里的石头终于落地。|你听到声音的来源好象是从左侧\\(left\\)的墙壁\\(wall\\)中发出的。|你在左侧墙上的一块石缝中摸到了一处开关\\(button\\)。)$",
+    TRIGGER_WALKTO_BOAT_START = "^[ >]*一叶扁舟缓缓地驶了过来，艄公将一块踏脚板.*|岸边一只渡船上的老艄公说道：正等着你.*)$",
+    TRIGGER_WALKTO_BOAT_END = "^[ >]*(艄公说“到啦，上岸吧”.*|船夫对你说道：“到了.*|你朝船夫挥了挥手.*|小舟终于划到近岸.*|.*你跨上岸去。.*|不知过了多久，船终于靠岸了，你累得满头大汗。.*)$",
+    TRIGGER_WALKTO_BOAT_YELL = "^[ >]*(你吸了口气，一声“船家”.*|你使出吃奶的力气.*|你没事不要乱往别人船上钻!.*)$",
+    TRIGGER_WALKTO_BOAT_IN = "^[ >]*(艄公把踏脚板收起来.*|船夫把踏脚板收起来.*|小舟在湖中藕菱之间的水路.*|你跃上小舟，船就划了起来。.*|你拿起船桨用力划了起来。.*)",
+    --TRIGGER_WALKTO_IN_COMBAT = "^[ >]*你身行向后一跃，跳出战圈不打了。$",
+    ALIAS_WALKTO = "^walkto\\s*$",
+    ALIAS_WALKTO_DEBUG = "^walkto\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_WALKTO_ID = "^walkto\\s+(\\d+)\\s*$",
+    ALIAS_WALKTO_CODE = "^walkto\\s+([a-z][a-z0-9]+)\\s*$",
+    ALIAS_WALKTO_LIST = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
+    ALIAS_WALKTO_MODE = "^walkto\\s+mode\\s+(quick|normal|slow)$"
   }
   prototype.DEBUG = true
   prototype.zonesearch = Algo.dijkstra
@@ -2101,9 +2123,20 @@ local define_walkto = function()
   end
 
   function prototype:postConstruct()
+    self.lostWay = false
     self:initZonesAndRooms()
     self:initTriggers()
     self:initAliases()
+  end
+
+  function prototype:prepareWalk()
+    EnableTriggerGroup("walkto", true)
+    self.lostWay = false
+    self.locate:clearRoomInfo()
+  end
+
+  function prototype:stopWalk()
+    EnableTriggerGroup("walkto", false)
   end
 
   function prototype:initZonesAndRooms()
@@ -2149,7 +2182,38 @@ local define_walkto = function()
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("walkto")
+    local lostWay = function()
+      if not self.lostWay then
+        self.lostWay = true
+        print("行走路径出错！")
+      end
+    end
+    helper.addTrigger {
+      group = "walkto",
+      regexp = self.regexp.TRIGGER_WALKTO_LOST_WAY,
+      response = lostWay
+    }
+    helper.addTrigger {
+      group = "walkto",
+      regexp = self.regexp.TRIGGER_WALKTO_LOST_WAY_SPECIAL,
+      response = lostWay
+    }
+    helper.addTrigger {
+      group = "walkto",
+      regexp = self.regexp.TRIGGER_WALKTO_BLOCK,
+      response = lostWay
+    }
+--    helper.addTrigger {
+--      group = "walkto",
+--      regexp = self.regexp.TRIGGER_WALKTO_IN_COMBAT,
+--      response = function()
+--        self.inCombat = true
+--        -- make 3 seconds to be in-combat status
+--        wait.time(3)
+--        self.inCombat = false
+--      end
+--    }
   end
 
   function prototype:initAliases()
@@ -2157,10 +2221,11 @@ local define_walkto = function()
 
     helper.addAlias {
       group = "walkto",
-      regexp = "^walkto\\s*$",
+      regexp = self.regexp.ALIAS_WALKTO,
       response = function()
         print("WALK自动行走指令，使用方法：")
         print("walkto debug on/off", "开启/关闭调试模式，开启时将将显示所有触发器与日志信息")
+        print("walkto mode quick/normal/slow", "调整自动行走模式，quick：快速行走，每12步休息1秒；normal：每步短暂停顿；slow：每步停顿1秒")
         print("walkto <number>", "根据目标房间编号进行自动行走，如果当前房间未知将先进行重新定位")
         print("walkto <room_code>", "根据目标房间代号进行自动行走，代号如果为区域名，将行走到区域的中心节点")
         print("walkto showzone", "显示自动行走支持的区域列表")
@@ -2169,7 +2234,7 @@ local define_walkto = function()
     }
     helper.addAlias {
       group = "walkto",
-      regexp = "^walkto\\s+debug\\s+(on|off)$",
+      regexp = self.regexp.ALIAS_WALKTO_DEBUG,
       response = function(name, line, wildcards)
         local option = wildcards[1]
         if option == "on" then
@@ -2183,7 +2248,7 @@ local define_walkto = function()
     }
     helper.addAlias {
       group = "walkto",
-      regexp = "^walkto\\s+(\\d+)$",
+      regexp = self.regexp.ALIAS_WALKTO_ID,
       response = function(name, line, wildcards)
         local targetRoomId = tonumber(wildcards[1])
         self:walkto(targetRoomId, function() self:debug("到达目的地") end)
@@ -2191,7 +2256,7 @@ local define_walkto = function()
     }
     helper.addAlias {
       group = "walkto",
-      regexp = "^walkto\\s+([a-z]+)\\s*$",
+      regexp = self.regexp.ALIAS_WALKTO_CODE,
       response = function(name, line, wildcards)
         local target = wildcards[1]
         if target == "showzone" then
@@ -2214,10 +2279,10 @@ local define_walkto = function()
     }
     helper.addAlias {
       group = "walkto",
-      regexp = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
+      regexp = self.regexp.ALIAS_WALKTO_LIST,
       response = function(name, line, wildcards)
         local zoneCode = wildcards[1]
-        if self.zoneByCode[zoneCode] then
+        if self.zonesByCode[zoneCode] then
           local zone = self.zonesByCode[zoneCode]
           print(string.format("%s(%s)房间列表：", zone.name, zone.code))
           print(string.format("%4s%20s%40s", "编号", "名称", "代码"))
@@ -2229,11 +2294,47 @@ local define_walkto = function()
         end
       end
     }
-
+    helper.addAlias {
+      group = "walkto",
+      regexp = self.regexp.ALIAS_WALKTO_MODE,
+      response = function(name, line, wildcards)
+        local mode = wildcards[1]
+        self:mode(mode)
+      end
+    }
   end
 
-  local evaluateEachMove = function(path)
-    SendNoEcho(path.path)
+  function prototype:mode(mode)
+    if mode then
+      self._mode = mode
+    else
+      return self._mode
+    end
+  end
+
+  -- this function is very important and should be refined
+  function prototype:evaluateEachMove(move, mode)
+    if mode == "quick" then
+      SendNoEcho(move.path)
+    else
+--      while true do
+--        SendNoEcho("halt")
+--        local line = wait.regexp("^[ >]*(你现在不忙。|你身行向后一跃，跳出战圈不打了。)$", 3)
+--        if line then
+--          if string.find(line, "跳出站圈") then
+--            -- in combat, leave fast
+--            SendNoEcho("halt")
+--            SendNOEcho(move.path)
+--            break
+--          else
+--            SendNoEcho(move.path)
+--            break
+--          end
+--        end
+--      end
+      SendNoEcho("halt")
+      SendNoEcho(move.path)
+    end
   end
 
   function prototype:debug(...)
@@ -2243,35 +2344,75 @@ local define_walkto = function()
   function prototype:walker(pathStack, action)
     local interval = self.interval or 12
     local restTime = self.restTime or 1
+    local mode = self:mode() or "quick"    -- the default walkto mode
+    print("mode", mode)
+    local delay = self.delay or 1    -- the default walkto delay in slow mode
     local action = action or function() end
     return coroutine.create(function()
       -- before move, clear room info
-      print("start1")
-      self.locate:clearRoomInfo()
-      print("here")
+      self:prepareWalk()
       local targetRoomId
       local steps = 0
       repeat
         local move = table.remove(pathStack)
         --always update target room id
         targetRoomId = move.endid
-        evaluateEachMove(move)
+        self:evaluateEachMove(move, mode)
         steps = steps + 1
-        if steps >= interval then
+        if mode == "quick" and steps >= interval then
           steps = 0
           SendNoEcho("set walkto rest")
-          local line = wait.regexp(prototype.regexp.WALKTO_REST, 5)
-          if not line then
-            print("中途休息系统反应超时，自动行走失败")
+          local line = wait.regexp(self.regexp.TRIGGER_WALKTO_REST, 5)
+          -- in quick mode, we can only check if lost way when rest
+          if self.lostWay then
+            print("路线出现错误，自动行走失败")
+            self:stopWalk()
+            return false
+          elseif not line then
+            print("系统反应超时，自动行走失败")
+            self:stopWalk()
             return false
           else
             wait.time(1)
+            SendNoEcho("halt")
+          end
+        end
+        -- for normal
+        if mode == "normal" then
+          SendNoEcho("set walkto step")
+          local line = wait.regexp(self.regexp.TRIGGER_WALKTO_STEP, 5)
+          if self.lostWay then
+            print("路线出现错误，自动行走失败")
+            self:stopWalk()
+            return false
+          elseif not line then
+            print("系统反应超时，自动行走失败")
+            self:stopWalk()
+            return false
+          else
+            SendNoEcho("halt")
+          end
+        elseif mode == "slow" then
+          SendNoEcho("set walkto step")
+          local line = wait.regexp(self.regexp.TRIGGER_WALKTO_STEP, 5)
+          if self.lostWay then
+            print("路线出现错误，自动行走失败")
+            self:stopWalk()
+            return false
+          elseif not line then
+            print("系统反应超时，自动行走失败")
+            self:stopWalk()
+            return false
+          else
+            wait.time(self.delay)
+            SendNoEcho("halt")
           end
         end
       until #pathStack == 0
       SendNoEcho("set walkto finish")
-      wait.regexp(prototype.regexp.WALKTO_FINISH, 5)
+      wait.regexp(self.regexp.TRIGGER_WALKTO_FINISH, 5)
       self.locate:notify(targetRoomId)
+      self:stopWalk()
       self:debug("更新房间编号为", targetRoomId)
       action()
     end)
@@ -2296,6 +2437,7 @@ local define_walkto = function()
   end
 
   function prototype:walkFromTo(fromid, toid, action)
+    self:debug("检验起始房间和目标房间", fromid, toid)
     local startRoom = self.roomsById[fromid]
     local endRoom = self.roomsById[toid]
     if not startRoom then
@@ -2308,10 +2450,10 @@ local define_walkto = function()
       local startZone = self.zonesByCode[startRoom.zone]
       local endZone = self.zonesByCode[endRoom.zone]
       if not startZone then
-        print("当前区域不在自动行走列表中")
+        print("当前区域不在自动行走列表中", startRoom.zone)
         return false
       elseif not endZone then
-        print("目标区域不在自动行走列表中")
+        print("目标区域不在自动行走列表中", endRoom.zone)
         return false
       elseif startZone == endZone then
         if self.DEBUG then
@@ -2353,9 +2495,10 @@ local define_walkto = function()
 
   function prototype:walkto(toid, action)
     if not self.locate.currRoomId then
-      self.locate:relocate(function(roomId)
+      local walker = self.locate:relocator(function(roomId)
         self:walkFromTo(roomId, toid, action)
       end)
+      coroutine.resume(walker)
     else
       self:walkFromTo(self.locate.currRoomId, toid, action)
     end
@@ -2364,5 +2507,22 @@ local define_walkto = function()
   return prototype
 end
 local walkto = define_walkto():newInstance {locate = locate}
+
+local define_traverse = function()
+  local prototype = {}
+  prototype.__index = prototype
+
+
+
+  return prototype
+end
+local traverse = define_traverse
+
+-- expose modules
+return {
+  helper = helper,
+  locate = locate,
+  walkto = walkto
+}
 
 
