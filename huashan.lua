@@ -23,6 +23,27 @@ local huashan = {}
 local define_patrol = function()
   local prototype = {}
   prototype.__index = prototype
+  -- implement FSM
+  local State = {
+    stop = "stop",
+    ask = "ask",
+    work = "work",
+    submit = "submit",
+    wait_ask = "wait_ask",
+    wait_submit = "wait_submit"
+  }
+  local Event = {
+    START = "start",
+    NO_JOB_AVAILABLE = "no_job_available",
+    GOT_JOB = "got_job",
+    PREV_JOB_NOT_FINISH = "prev_job_not_finish",
+    WORK_DONE = "work_done",
+    SUBMIT_ACCEPT = "submit_ok",
+    WORK_MISS = "work_miss",
+    WORK_TOO_FAST = "work_too_fast",
+    STOP = "stop"
+  }
+
   prototype._paths = {
     {path="n",name="练武场"},
     {path="n",name="玉女峰"},
@@ -86,6 +107,76 @@ local define_patrol = function()
     DZ_FINISH = "^[ >]*你感觉内力充盈，显然内功又有进境。$",
     DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$"
   }
+
+  function prototype:FSM()
+    local obj = {}
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
+  end
+
+  function prototype:postConstruct()
+    self.DEBUG = false
+    self.currState = self.state.stop
+    self.eventToSend = nil
+    self.transitions = {}
+    for _, state in State do self.transitions[state] = {} end
+    -- transitions start from stop
+    self:addTransition {
+      oldState = State.stop,
+      newState = State.ask,
+      event = Event.START,
+      action = function()
+        self:reloadRooms()
+        self:doAsk()
+      end
+    }
+    -- transitions start from ask
+    self:addTransition {
+      oldState = State.ask,
+      newState = State.ask,
+      event = Event.NO_JOB_AVAILABLE,
+      action = coroutine.create(function()
+        wait.time(5)
+
+      end)
+    }
+  end
+
+  function prototype:set(state) self.currState = state end
+
+  function prototype:get() return self.currState end
+
+  function prototype:fire(event)
+
+  end
+
+  function prototype:addTransition(args)
+    local oldState = assert(args.oldState, "oldState cannot be nil")
+    local newState = assert(args.newState, "newState cannot be nil")
+    local event = assert(args.event, "event cannot be nil")
+    local action = assert(args.action, "action cannot be nil")
+    -- by default action is executed after state change
+    local transition = {
+      newState = newState
+    }
+    if type(action) == "function" then
+      transition.after = action
+    elseif type(action) == "thread" then
+      transition.after = function()
+        local ok, ret = coroutine.resume(action)
+        return ret
+      end
+    elseif type(action) == "table" then
+      transition.before = action.before
+      transition.after = action.after
+    else
+      error("action can only be function or table" ,2)
+    end
+    self.transitions[oldState][event] = transition
+  end
+
+
 
   function prototype:newInstance()
     local obj = {}
