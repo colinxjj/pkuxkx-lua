@@ -25,24 +25,24 @@ local define_patrol = function()
   local prototype = FSM.inheritedMeta()
   -- define own states and events
   local States = {
-    stop = "stop",
-    ask = "ask",
-    work = "work",
-    submit = "submit",
-    wait_ask = "wait_ask",
-    wait_submit = "wait_submit"
+    stop = "stop",    -- 停止状态
+    ask = "ask",    -- 请求任务
+    work = "work",    -- 执行巡逻
+    submit = "submit",    -- 提交任务
+    wait_ask = "wait_ask",    -- 等待再次询问
+    wait_submit = "wait_submit"    -- 等待再次提交
   }
   local Events = {
-    START = "start",
-    NO_JOB_AVAILABLE = "no_job_available",
-    NEW_JOB = "new_job",
-    PREV_JOB_NOT_FINISH = "prev_job_not_finish",
-    WORK_DONE = "work_done",
-    SUBMIT_ACCEPT = "submit_ok",
-    WORK_MISS = "work_miss",
-    WORK_TOO_FAST = "work_too_fast",
-    PAUSE_WAIT = "pause_wait",
-    STOP = "stop"
+    START = "start",    -- 开始信号
+    NO_JOB_AVAILABLE = "no_job_available",    -- 目前没有任务（完成的太快）
+    NEW_JOB = "new_job",    -- 得到一个新的任务
+    PREV_JOB_NOT_FINISH = "prev_job_not_finish",    -- 之前的任务没有完成
+    WORK_DONE = "work_done",    -- 巡逻完成
+    SUBMIT_ACCEPT = "submit_ok",    -- 提交任务成功
+    WORK_MISS = "work_miss",    -- 有房间遗漏没有巡逻到
+    WORK_TOO_FAST = "work_too_fast",    -- 巡逻太快无法提交
+    PAUSE_WAIT = "pause_wait",    -- 停止等待
+    STOP = "stop"    -- 停止做任务
   }
   local Paths = {
     {path="n",name="练武场"},
@@ -107,7 +107,7 @@ local define_patrol = function()
     SUBMIT_START = "^[ >]*设定环境变量：huashan_patrol = \"submit_start\"$",
     SUBMIT_DONE = "^[ >]*设定环境变量：huashan_patrol = \"submit_done\"$",
     NOT_BUSY = "^[ >]*你现在不忙。$",
-    DZ_FINISH = "^[ >]*(你感觉内力充盈，显然内功又有进境。|你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。)$",
+    DZ_FINISH = "^[ >]*你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。$",
     DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$"
   }
 
@@ -119,7 +119,6 @@ local define_patrol = function()
   end
 
   function prototype:postConstruct()
-    self.DEBUG = false
     self:initStates()
     self:initTransitions()
     self:initTriggers()
@@ -260,10 +259,16 @@ local define_patrol = function()
       event = Events.WORK_DONE,
       action = function()
         locate:clearRoomInfo()
-        -- 前往客厅交任务
-        walkto:walkto(2916, function()
-          self:doSubmit()
+        -- 前往客厅交任务 --在2910有可能busy
+        walkto:walkto(2910, function()
+          self:assureNotBusy()
+          walkto:walkto(2916, function()
+            self:doSubmit()
+          end)
         end)
+--        walkto:walkto(2916, function()
+--          self:doSubmit()
+--        end)
       end
     }
     addTransitionToStop(self, States.work)
@@ -430,7 +435,7 @@ local define_patrol = function()
       regexp = self.regexp.NEXT_JOB_WAIT,
       response = function()
         self:debug("NEXT_JOB_WAIT triggered")
-        self.eventToSend = Events.NEXT_JOB_WAIT
+        self.eventToSend = Events.NO_JOB_AVAILABLE
       end
     }
     helper.addTrigger {

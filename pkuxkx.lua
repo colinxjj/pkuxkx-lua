@@ -166,10 +166,12 @@ local define_FSM = function()
   end
 
   function prototype:debugOn()
+    print("开启调试模式")
     self.DEBUG = true
   end
 
   function prototype:debugOff()
+    print("关闭调试模式")
     self.DEBUG = false
   end
 
@@ -1572,6 +1574,203 @@ end
 local Algo = define_Algo()
 
 --------------------------------------------------------------
+-- travel.lua
+-- combine locating and walking functions
+-- use FSM design pattern
+--------------------------------------------------------------
+local define_travel = function()
+  local prototype = FSM.inheritedMeta()
+
+  local States = {
+    stop = "stop",  -- 停止状态
+    walk = "walk",  -- 行走中
+    lost = "lost",  -- 迷路了
+    locating = "locating",  -- 定位中
+    located = "located" -- 已定位
+  }
+
+  local Events = {
+    START_LOCATE = "start",    -- 开始定位信号
+    FINISHI_LOCATE = "finish_locate",    -- 结束定位信号
+    START_WALK = "start_walk",    -- 开始行走信号
+    FINISH_WALK = "finish_walk",    -- 结束行走信号
+    GET_LOST = "get_lost",    -- 迷路信号
+    START_RELOCATE = "start_relocate",    -- 重新定位信号
+    FAIL_RELOCATE = "fail_relocate",    -- 重新定位失败
+  }
+
+  prototype.regexp = {
+    SET_LOCATE_START = "^[ >]*设定环境变量：locate = \"start\"$",
+    SET_LOCATE_STOP = "^[ >]*设定环境变量：locate = \"stop\"$",
+    ROOM_NAME_WITH_AREA = "^[ >]{0,12}([^ ]+) \\- \\[[^ ]+\\]$",
+    ROOM_NAME_WITHOUT_AREA = "^[ >]{0,12}([^ ]+) \\- $",
+    ROOM_DESC = "^ {0,12}([^ ].*?) *$",
+    SEASON_TIME_DESC = "^    「([^\\\\x00-\\\\xff]+?)」: (.*)$",
+    EXITS_DESC = "^\\s{0,12}这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
+    BUSY_LOOK = "^[> ]*风景要慢慢的看。$",
+    NOT_BUSY = "^[ >]*你现在不忙。$",
+  }
+
+  prototype.zonesearch = Algo.dijkstra
+  prototype.roomsearch = Algo.astar
+  prototype.traverse = Algo.traversal
+
+  function prototype:FSM()
+    local obj = FSM:new()
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
+  end
+
+  function prototype:postConstruct()
+    self:initStates()
+    self:initTransitions()
+    self:initZonesAndRooms()
+    self:initTriggers()
+    self:initAliases()
+    self:setState(States.stop)
+    self.startRoomId = nil
+    self.targetRoomId = nil
+    self.currRoomId = nil
+    self.currRoomName = nil
+
+
+  end
+
+  function prototype:initStates()
+    self:addState {
+      state = States.stop,
+      enter = function()
+
+      end,
+      exit = function()
+
+      end
+    }
+    self:addState {
+      state = States.locate,
+      enter = function()
+
+      end,
+      exit = function()
+
+      end
+    }
+    self:addState {
+      state = States.walk,
+      enter = function()
+
+      end,
+      exit = function()
+
+      end
+    }
+    self:addState {
+      state = States.lost,
+      enter = function()
+
+      end,
+      exit = function()
+
+      end
+    }
+  end
+
+  local addTransitionToStop = function(self, fromState)
+    self:addTransition {
+      oldState = fromState,
+      newState = States.stop,
+      event = Events.STOP,
+      action = function()
+        print("停止巡逻任务 - 当前状态", self.currState)
+      end
+    }
+  end
+
+  function prototype:initTransitions()
+    -- transtions from state<stop>
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.locate,
+      event = Events.START_LOCATE,
+      action = function()
+        self:relocate()
+      end
+    }
+    self:addTransition {
+      oldState = States.locate,
+      newState = States.walk,
+      event = Events.START
+    }
+  end
+
+  -- 加载区域列表和房间列表
+  function prototype:initZonesAndRooms()
+    -- initialize zones
+    local zonesById = dal:getAllZones()
+    local zonePaths = dal:getAllZonePaths()
+    for i = 1, #zonePaths do
+      local zonePath = zonePaths[i]
+      local zone = zonesById[zonePath.startid]
+      if zone then
+        zone:addPath(zonePath)
+      end
+    end
+    -- create code map
+    local zonesByCode = {}
+    for _, zone in pairs(zonesById) do
+      zonesByCode[zone.code] = zone
+    end
+    -- initialize rooms
+    local roomsById = dal:getAllAvailableRooms()
+    local roomsByCode = {}
+    local paths = dal:getAllAvailablePaths()
+    for i = 1, #paths do
+      local path = paths[i]
+      local room = roomsById[path.startid]
+      if room then
+        room:addPath(path)
+      end
+    end
+    -- add rooms to zones
+    for _, room in pairs(roomsById) do
+      roomsByCode[room.code] = room
+      local zone = zonesByCode[room.zone]
+      if zone then
+        zone.rooms[room.id] = room
+      end
+    end
+    -- assign to prototype
+    self.zonesById = zonesById
+    self.zonesByCode = zonesByCode
+    self.roomsById = roomsById
+    self.roomsByCode = roomsByCode
+  end
+
+  function prototype:initTriggers()
+
+  end
+
+  function prototype:initAliases()
+
+  end
+
+
+  function prototype:relocate()
+
+  end
+
+  return prototype
+end
+-- 这个功能需要等到地图完善后再开放
+-- local travel = define_travel().FSM()
+
+
+
+
+
+
+--------------------------------------------------------------
 -- locate.lua
 -- identify the room in world
 -- should not be singleton
@@ -1580,8 +1779,8 @@ local define_locate = function()
   local prototype = {}
   prototype.__index = prototype
   prototype.regexp = {
-    SET_LOCATE_START = "^[ >]*设定环境变量：locate = \"start\"",
-    SET_LOCATE_STOP = "^[ >]*设定环境变量：locate = \"stop\"",
+    SET_LOCATE_START = "^[ >]*设定环境变量：locate = \"start\"$",
+    SET_LOCATE_STOP = "^[ >]*设定环境变量：locate = \"stop\"$",
     ROOM_NAME_WITH_AREA = "^[ >]{0,12}([^ ]+) \\- \\[[^ ]+\\]$",
     ROOM_NAME_WITHOUT_AREA = "^[ >]{0,12}([^ ]+) \\- $",
     -- a very short line also might be the room name line
@@ -2317,16 +2516,6 @@ local define_walkto = function()
       regexp = self.regexp.TRIGGER_WALKTO_BLOCK,
       response = lostWay
     }
---    helper.addTrigger {
---      group = "walkto",
---      regexp = self.regexp.TRIGGER_WALKTO_IN_COMBAT,
---      response = function()
---        self.inCombat = true
---        -- make 3 seconds to be in-combat status
---        wait.time(3)
---        self.inCombat = false
---      end
---    }
   end
 
   function prototype:initAliases()
@@ -2430,21 +2619,6 @@ local define_walkto = function()
     if mode == "quick" then
       SendNoEcho(move.path)
     else
---      while true do
---        SendNoEcho("halt")
---        local line = wait.regexp("^[ >]*(你现在不忙。|你身行向后一跃，跳出战圈不打了。)$", 3)
---        if line then
---          if string.find(line, "跳出站圈") then
---            -- in combat, leave fast
---            SendNoEcho("halt")
---            SendNOEcho(move.path)
---            break
---          else
---            SendNoEcho(move.path)
---            break
---          end
---        end
---      end
       SendNoEcho("halt")
       SendNoEcho(move.path)
     end
