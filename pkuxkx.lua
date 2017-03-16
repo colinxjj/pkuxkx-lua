@@ -872,20 +872,6 @@ end
 local minheap = define_minheap()
 
 --------------------------------------------------------------
--- PathCategory.lua
--- define PathCategory
---------------------------------------------------------------
-local define_PathCategory = function()
-  local PathCategory = {}
-  PathCategory.Normal = 1
-  PathCategory.MultipleCmds = 2
-  PathCategory.Trigger = 3
-
-  return PathCategory
-end
-local PathCategory = define_PathCategory()
-
---------------------------------------------------------------
 -- Path.lua
 -- data structure of Path
 -- Path is an abstraction of a relationship between two points
@@ -938,7 +924,7 @@ local define_RoomPath = function()
     assert(args.path, "path can not be nil")
     obj.path = args.path
     obj.endcode = args.endcode
-    obj.category = args.category or PathCategory.Normal
+    obj.category = args.category or "normal"
     setmetatable(obj, self or prototype)
     return obj
   end
@@ -947,7 +933,7 @@ local define_RoomPath = function()
     local obj = Path:decorate(obj)
 --    assert(obj.endcode, "endcode cannot be nil")
     assert(obj.path, "path cannot be nil")
-    obj.category = obj.category or PathCategory.Normal
+    obj.category = obj.category or "normal"
     setmetatable(obj, self or prototype)
     return obj
   end

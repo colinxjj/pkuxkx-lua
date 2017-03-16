@@ -8,13 +8,9 @@
 --
 
 require "wait"
-
--- import modules from pkuxkx
-local pkuxkx = require "pkuxkx"
-local FSM = pkuxkx.FSM
-local helper = pkuxkx.helper
-local locate = pkuxkx.locate
-local walkto = pkuxkx.walkto
+local helper = require "pkuxkx.helper"
+local FSM = require "pkuxkx.FSM"
+local travel = require "pkuxkx.travel"
 
 local huashan = {}
 
@@ -218,9 +214,9 @@ local define_patrol = function()
       newState = States.ask,
       event = Events.START,
       action = function()
-        locate:clearRoomInfo()
+        travel:reset()
         -- 岳灵珊在华山客厅2916
-        walkto:walkto(2916, function()
+        travel:walkto(2916, function()
           self:doAsk()
         end)
       end
@@ -241,9 +237,9 @@ local define_patrol = function()
       newState = States.wait_ask,
       event = Events.NO_JOB_AVAILABLE,
       action = function()
-        locate:clearRoomInfo()
+        travel:reset()
         -- 在练功室2921打坐等待ask
-        walkto:walkto(2921, function()
+        travel:walkto(2921, function()
           SendNoEcho("dz max")
         end)
       end
@@ -261,17 +257,14 @@ local define_patrol = function()
       newState = States.submit,
       event = Events.WORK_DONE,
       action = function()
-        locate:clearRoomInfo()
+        travel:reset()
         -- 前往客厅交任务 --在2910有可能busy
-        walkto:walkto(2910, function()
+        travel:walkto(2910, function()
           self:assureNotBusy()
-          walkto:walkto(2916, function()
+          travel:walkto(2916, function()
             self:doSubmit()
           end)
         end)
---        walkto:walkto(2916, function()
---          self:doSubmit()
---        end)
       end
     }
     addTransitionToStop(self, States.work)
@@ -298,9 +291,8 @@ local define_patrol = function()
       newState = States.wait_submit,
       event = Events.WORK_TOO_FAST,
       action = function()
-        locate:clearRoomInfo()
         -- 在练功室2921打坐等待submit
-        walkto:walkto(2921, function()
+        travel:walkto(2921, function()
           SendNoEcho("dz max")
         end)
       end
@@ -312,9 +304,8 @@ local define_patrol = function()
       newState = States.ask,
       event = Events.PAUSE_WAIT,
       action = function()
-        locate:clearRoomInfo()
         -- 尝试再次询问
-        walkto:walkto(2916, function()
+        travel:walkto(2916, function()
           self:doAsk()
         end)
       end
@@ -326,9 +317,8 @@ local define_patrol = function()
       newState = States.submit,
       event = Events.PAUSE_WAIT,
       action = function()
-        locate:clearRoomInfo()
         -- 尝试再次提交
-        walkto:walkto(2916, function()
+        travel:walkto(2916, function()
           self:doSubmit()
         end)
       end
