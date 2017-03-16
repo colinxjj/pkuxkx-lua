@@ -99,8 +99,14 @@ local define_travel = function()
 
 
   prototype.regexp = {
-    --SET_LOCATE_START = "^[ >]*设定环境变量：locate = \"start\"$",
-    --SET_LOCATE_STOP = "^[ >]*设定环境变量：locate = \"stop\"$",
+    -- aliases
+    ALIAS_DEBUG = "^travel\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_WALKTO = "^walkto\\s*$",
+    ALIAS_WALKTO_ID = "^walkto\\s+(\\d+)\\s*$",
+    ALIAS_WALKTO_CODE = "^walkto\\s+([a-z][a-z0-9]+)\\s*$",
+    ALIAS_WALKTO_LIST = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
+    ALIAS_WALKTO_MODE = "^walkto\\s+mode\\s+(quick|normal|slow)$",
+    -- triggers
     ROOM_NAME_WITH_AREA = "^[ >]{0,12}([^ ]+) \\- \\[[^ ]+\\]$",
     ROOM_NAME_WITHOUT_AREA = "^[ >]{0,12}([^ ]+) \\- $",
     ROOM_DESC = "^ {0,12}([^ ].*?) *$",
@@ -136,7 +142,7 @@ local define_travel = function()
     self.delay = delay
   end
 
-  function prototype:reset()
+  function prototype:resetOnStop()
     -- locating
     self.currRoomId = nil
     self.currRoomName = nil
@@ -150,6 +156,11 @@ local define_travel = function()
     self.walkLost = false
   end
 
+  -- if you want to sync, call it in coroutine
+  function prototype:reset()
+    self:fire(Events.STOP)
+  end
+
   function prototype:walkto(targetRoomId, action)
     assert(type(targetRoomId) == "number", "target room id must be number")
     assert(not action or type(action) == "function", "action must be function or nil")
@@ -158,10 +169,14 @@ local define_travel = function()
     self:fire(Events.START)
   end
 
+  -- for alias
   function prototype:reloc()
     -- 强制重定位
-    self:reset()
-    self:fire(Events.START)
+    local co = coroutine.create(function()
+      self:reset()
+      self:fire(Events.START)
+    end)
+    coroutine.resume(co)
   end
 
   function prototype:postConstruct()
@@ -171,7 +186,7 @@ local define_travel = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self:reset()
+    self:resetOnStop()
   end
 
   function prototype:disableAllTriggers()
@@ -181,7 +196,8 @@ local define_travel = function()
       "travel_look_name",
       "travel_look_desc",
       "travel_look_season",
-      "travel_look_exits"
+      "travel_look_exits",
+      "travel_walk"
     )
   end
 
@@ -192,9 +208,9 @@ local define_travel = function()
         -- must clean the user defined triggers
         helper.removeTriggerGroups("travel_one_shot")
         self:disableAllTriggers()
+        self:resetOnStop()
       end,
       exit = function()
-
       end
     }
     self:addState {
@@ -331,6 +347,7 @@ local define_travel = function()
         self:relocate()
       end
     }
+    addTransitionToStop(self, States.stop)
     -- transitions from state<locating>
     self:addTransition {
       oldState = States.locating,
@@ -652,14 +669,16 @@ local define_travel = function()
 
     helper.addAlias {
       group = "travel",
-      regexp = "^loc\\s*$",
+      regexp = "^travel\\s*$",
       response = function()
         print("TRAVEL自动行走指令，使用方法：")
         print("travel debug on/off", "开启/关闭调试模式，开启时将将显示所有触发器与日志信息")
         print("reloc", "重新定位直到当前房间可唯一确定")
-
-
-
+        print("walkto mode quick/normal/slow", "调整自动行走模式，quick：快速行走，每12步休息1秒；normal：每步短暂停顿；slow：每步停顿1秒")
+        print("walkto <number>", "根据目标房间编号进行自动行走，如果当前房间未知将先进行重新定位")
+        print("walkto <room_code>", "根据目标房间代号进行自动行走，代号如果为区域名，将行走到区域的中心节点")
+        print("walkto showzone", "显示自动行走支持的区域列表")
+        print("walkto listzone <zone_code>", "显示相应区域所有可达的房间")
         print("同时提供地图录入功能：")
         print("loc here", "尝试定位当前房间，捕捉当前房间信息并显示")
         print("loc <number>", "显示数据库中指定编号房间的信息")
@@ -671,17 +690,104 @@ local define_travel = function()
       end
     }
     helper.addAlias {
-      group = "locate",
+      group = "travel",
+      regexp = "^travel\\s+debug\\s+(on|off)$",
+      response = function(name, line, wildcards)
+        local option = wildcards[1]
+        if option == "on" then
+          self:debugOn()
+        elseif option == "off" then
+          self:debugOff()
+        end
+      end
+    }
+    -- 重定位
+    helper.addAlias {
+      group = "travel",
+      regexp = "^reloc\\s*$",
+      response = function()
+        self:reloc()
+      end
+    }
+    -- 自动行走
+    helper.addAlias {
+      group = "travel",
+      regexp = self.regexp.ALIAS_WALKTO_ID,
+      response = function(name, line, wildcards)
+        local targetRoomId = tonumber(wildcards[1])
+        self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+      end
+    }
+    helper.addAlias {
+      group = "travel",
+      regexp = self.regexp.ALIAS_WALKTO_CODE,
+      response = function(name, line, wildcards)
+        local target = wildcards[1]
+        if target == "showzone" then
+          print(string.format("%16s%16s%16s", "区域代码", "区域名称", "区域中心"))
+          for _, zone in pairs(self.zonesById) do
+            print(string.format("%12s%16s%20s", zone.code, zone.name, zone.centercode))
+          end
+        elseif self.zonesByCode[target] then
+          local targetRoomCode = self.zonesByCode[target].centercode
+          local targetRoomId = self.roomsByCode[targetRoomCode]
+          local co = coroutine.create(function()
+            self:reset()
+            self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+          end)
+          coroutine.resume(co)
+        elseif self.roomsByCode[target] then
+          local targetRoomId = self.roomsByCode[target].id
+          local co = coroutine.create(function()
+            self:reset()
+            self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+          end)
+          coroutine.resume(co)
+        else
+          print("查询不到相应房间")
+          return false
+        end
+      end
+    }
+    helper.addAlias {
+      group = "travel",
+      regexp = self.regexp.ALIAS_WALKTO_LIST,
+      response = function(name, line, wildcards)
+        local zoneCode = wildcards[1]
+        if self.zonesByCode[zoneCode] then
+          local zone = self.zonesByCode[zoneCode]
+          print(string.format("%s(%s)房间列表：", zone.name, zone.code))
+          print(string.format("%4s%20s%40s", "编号", "名称", "代码"))
+          for _, room in pairs(zone.rooms) do
+            print(string.format("%4d%20s%40s", room.id, room.name, room.code))
+          end
+        else
+          print("查询不到相应区域")
+        end
+      end
+    }
+    helper.addAlias {
+      group = "travel",
+      regexp = self.regexp.ALIAS_WALKTO_MODE,
+      response = function(name, line, wildcards)
+        local mode = wildcards[1]
+        self:setMode(mode)
+      end
+    }
+    -- 更新地图与查看功能
+    helper.addAlias {
+      group = "travel",
       regexp = "^loc here$",
       response = function()
         local co = coroutine.create(function()
           self:lookUntilNotBusy()
           self:show()
         end)
+        coroutine.resume(co)
       end
     }
     helper.addAlias {
-      group = "locate",
+      group = "travel",
       regexp = "^loc\\s+(\\d+)$",
       response = function(name, line, wildcards)
         local roomId = tonumber(wildcards[1])
@@ -700,28 +806,14 @@ local define_travel = function()
       end
     }
     helper.addAlias {
-      group = "locate",
-      regexp = "^loc\\s+debug\\s+(on|off)$",
-      response = function(name, line, wildcards)
-        local option = wildcards[1]
-        if option == "on" then
-          self:debugOn()
-          print("打开定位调试模式")
-        elseif option == "off" then
-          self:debugOff()
-          print("关闭定位调试模式")
-        end
-      end
-    }
-    helper.addAlias {
-      group = "locate",
+      group = "travel",
       regexp = "^loc\\s+guess\\s*$",
       response = function()
         self:guess()
       end
     }
     helper.addAlias {
-      group = "locate",
+      group = "travel",
       regexp = "^loc\\s+match\\s+(\\d+)\\s*$",
       response = function(name, line, wildcards)
         local targetRoomId = tonumber(wildcards[1])
@@ -729,16 +821,15 @@ local define_travel = function()
       end
     }
     helper.addAlias {
-      group = "locate",
+      group = "travel",
       regexp = "^loc\\s+update\\s+(\\d+)\\s*$",
       response = function(name, line, wildcards)
         local targetRoomId = tonumber(wildcards[1])
         self:update(targetRoomId)
       end
     }
-    -- match and update
     helper.addAlias {
-      group = "locate",
+      group = "travel",
       regexp = "^loc\\s+mu\\s+(\\d+)\\s*$",
       response = function(name, line, wildcards)
         local targetRoomId = tonumber(wildcards[1])
@@ -746,14 +837,7 @@ local define_travel = function()
       end
     }
     helper.addAlias {
-      group = "locate",
-      regexp = "^reloc\\s*$",
-      response = function()
-        self:reloc()
-      end
-    }
-    helper.addAlias {
-      group = "locate",
+      group = "travel",
       regexp = "^loc\\s+show\\s*$",
       response = function()
         self:show()
@@ -801,8 +885,10 @@ local define_travel = function()
       local potentialRooms = dal:getRoomsByName(self.currRoomName)
       if #(potentialRooms) > 1 then
         local ids = {}
-        for _, room in pairs(potentialRooms) do table.insert(ids, room) end
-        print("同名房间：", table.concat(room.id, ","))
+        for _, room in pairs(potentialRooms) do
+          table.insert(ids, room.id)
+        end
+        print("同名房间：", table.concat(ids, ","))
       else
         print("无同名房间")
       end
@@ -877,7 +963,6 @@ local define_travel = function()
   local expandDirection = function(path)
     return directions[path] or path
   end
-
 
   function prototype:match(roomId, performUpdate)
     local performUpdate = performUpdate or false
@@ -1005,7 +1090,7 @@ local define_travel = function()
         end
       else
         local potentialRooms = dal:getRoomsByName(self.currRoomName)
-        local matched = self:matchPotentialRooms(table.concat(self.currRoomDesc), self.currRoomExits, self._potentialRooms)
+        local matched = self:matchPotentialRooms(table.concat(self.currRoomDesc), self.currRoomExits, potentialRooms)
         if #matched == 1 then
           self:debug("成功匹配唯一房间", matched[1])
           self.currRoomId = matched[1]
@@ -1149,9 +1234,13 @@ local define_travel = function()
 
   function prototype:matchPotentialRooms(currRoomDesc, currRoomExits, potentialRooms)
     local matched = {}
+    print(currRoomDesc)
     for i = 1, #potentialRooms do
       local room = potentialRooms[i]
-      if room.exits == currRoomExits and room.description == currRoomDesc then
+      local exitsMatched = room.exits == currRoomExits
+      local descMatched = room.description == currRoomDesc
+      self:debug("房间编号", room.id, "出口匹配：", exitsMatched, "描述匹配：", descMatched)
+      if exitsMatched and descMatched then
         table.insert(matched, room.id)
       end
     end

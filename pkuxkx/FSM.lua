@@ -90,6 +90,12 @@ local define_FSM = function()
       print(string.format("当前状态[%s]不接受事件[%s]", self.currState or "nil", event or "nil"))
     else
       self:debug("当前状态", self.currState, "事件", event)
+      local currCo = coroutine.running
+      if currCo then
+        self:debug("触发事件正在coroutine中，异步等待")
+      else
+        self:debug("触发事件不在coroutine中，异步调用")
+      end
       -- using coroutine instead of function so that inside we can
       -- make use of wait functionalities
       local transitioner = coroutine.create(function()
@@ -109,8 +115,15 @@ local define_FSM = function()
           self:debug("执行进入后转换")
           transition.afterEnter()
         end
+
+        if currCo then
+          return coroutine.resume(currCo)
+        end
       end)
       coroutine.resume(transitioner)
+      if currCo then
+        return coroutine.yield()
+      end
     end
   end
 
