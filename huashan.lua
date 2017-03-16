@@ -20,6 +20,8 @@ local huashan = {}
 
 --huashan.li2yue = {"s", "se", "su", "eu", "su", "eu", "su", "su", "sd", "su", "s", "s" }
 --huashan.yue2li = {"n", "n", "nd", "nu", "nd", "nd", "wd", "nd", "wd", "nd", "nw", "n"}
+local p1 = "侯护一招一式有板有眼，你可以回去和宁中则复命了。"
+
 
 local define_patrol = function()
   local prototype = FSM.inheritedMeta()
@@ -98,6 +100,7 @@ local define_patrol = function()
     PREV_JOB_NOT_FINISH = "^[ >]*岳灵珊说道：「你上次任务还没有完成呢！」$",
     NEXT_JOB_WAIT = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
     NEXT_JOB_TOO_FAST = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
+    EXP_TOO_HIGH = "^[ >]*岳灵珊说道：「你的功夫不错了，找我娘看看有什么任务交给你。」$",
     ASK_START = "^[ >]*设定环境变量：huashan_patrol = \"ask_start\"$",
     ASK_DONE = "^[ >]*设定环境变量：huashan_patrol = \"ask_done\"$",
     PATROLLING="^[ >]*你在(.+?)巡弋，尚未发现敌踪。$",    -- used in wait.regexp
@@ -413,7 +416,7 @@ local define_patrol = function()
         helper.enableTriggerGroups("huashan_patrol_ask_done")
       end
     }
-    -- ask result can be 3 types, so store the
+    -- ask result can be 4 types, so store the
     helper.addTrigger {
       group = "huashan_patrol_ask_done",
       regexp = self.regexp.NEW_JOB,
@@ -436,6 +439,14 @@ local define_patrol = function()
       response = function()
         self:debug("NEXT_JOB_WAIT triggered")
         self.eventToSend = Events.NO_JOB_AVAILABLE
+      end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_ask_done",
+      regexp = self.regexp.EXP_TOO_HIGH,
+      response = function()
+        self:debug("EXP_TOO_HIGH triggered")
+        self.eventToSend = Events.STOP
       end
     }
     helper.addTrigger {

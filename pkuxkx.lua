@@ -1577,6 +1577,7 @@ local Algo = define_Algo()
 -- travel.lua
 -- combine locating and walking functions
 -- use FSM design pattern
+-- also provide non-FSM aliases to assist map generation
 --------------------------------------------------------------
 local define_travel = function()
   local prototype = FSM.inheritedMeta()
@@ -1590,13 +1591,18 @@ local define_travel = function()
   }
 
   local Events = {
-    START_LOCATE = "start",    -- 开始定位信号
-    FINISHI_LOCATE = "finish_locate",    -- 结束定位信号
+    START = "start",    -- 开始信号，从停止状态开始将进入重定位，从已定位状态开始将进入行走
+    LOCATION_CONFIRM = "location_confirm",    -- 确定定位信息
     START_WALK = "start_walk",    -- 开始行走信号
     FINISH_WALK = "finish_walk",    -- 结束行走信号
     GET_LOST = "get_lost",    -- 迷路信号
     START_RELOCATE = "start_relocate",    -- 重新定位信号
-    FAIL_RELOCATE = "fail_relocate",    -- 重新定位失败
+    -- FAIL_RELOCATE = "fail_relocate",    -- 重新定位失败
+    MAX_RELOC_RETRIES = "max_reloc_retries",    -- 到达重定位重试最大次数
+    MAX_WALK_RETRIES = "max_walk_retries",    -- 到达行走重试最大次数
+    ROOM_NO_EXITS = "room_no_exits",    -- 房间没有出口
+    WALK_PLAN_NOT_EXISTS = "walk_plan_not_exists",    -- 行走计划无法生成
+    WALK_PLAN_GENERATED = "walk_plan_generated",    -- 行走计划生成
   }
 
   prototype.regexp = {
@@ -1633,8 +1639,6 @@ local define_travel = function()
     self.targetRoomId = nil
     self.currRoomId = nil
     self.currRoomName = nil
-
-
   end
 
   function prototype:initStates()
@@ -1648,7 +1652,7 @@ local define_travel = function()
       end
     }
     self:addState {
-      state = States.locate,
+      state = States.locating,
       enter = function()
 
       end,
@@ -1691,17 +1695,24 @@ local define_travel = function()
     -- transtions from state<stop>
     self:addTransition {
       oldState = States.stop,
-      newState = States.locate,
+      newState = States.locating,
       event = Events.START_LOCATE,
       action = function()
         self:relocate()
       end
     }
+    -- transitions from state<locating>
     self:addTransition {
-      oldState = States.locate,
-      newState = States.walk,
-      event = Events.START
+      oldState = States.locating,
+      newState = States.located,
+      event = Events.START,
+      action = function() end
     }
+    -- TODO
+--    self:addTransition {
+--      oldState = States.locating,
+--      newState = States.
+--    }
   end
 
   -- 加载区域列表和房间列表
