@@ -141,7 +141,7 @@ local define_Algo = function()
       totalRooms = totalRooms + 1
     end
     assert(totalRooms > 0, "rooms for traveral cannot be empty")
-    if not rooms[startid] then error("cannot find start in rooms") end
+    if not rooms[startid] then error("cannot find start in rooms", 2) end
     -- depth first search
     local queue = {}
     local reached = {}
@@ -153,7 +153,8 @@ local define_Algo = function()
         reached[c] = true
         table.insert(queue, c)
         for endid, path in pairs(rooms[c].paths) do
-          if not reached[endid] then
+          -- 增加一个判断，path的endid必须也在rooms列表中
+          if rooms[endid] and not reached[endid] then
             table.insert(candidates, endid)
           end
         end

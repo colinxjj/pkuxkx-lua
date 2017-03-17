@@ -16,7 +16,7 @@ local huashan = {}
 
 --huashan.li2yue = {"s", "se", "su", "eu", "su", "eu", "su", "su", "sd", "su", "s", "s" }
 --huashan.yue2li = {"n", "n", "nd", "nu", "nd", "nd", "wd", "nd", "wd", "nd", "nw", "n"}
-local p1 = "侯护一招一式有板有眼，你可以回去和宁中则复命了。"
+local p1 = "一招一式有板有眼，你可以回去和宁中则复命了。"
 
 
 local define_patrol = function()
@@ -89,8 +89,7 @@ local define_patrol = function()
     ["华山脚下"] = 1,
     ["玉泉院"] = 1
   }
-
-  prototype.regexp = {
+  local REGEXP = {
     --ASK_YUE = "^[ >]*你向岳灵珊打听有关『job』的消息。$",
     NEW_JOB="^[ >]*岳灵珊拿出一张地图，把华山需要巡逻的区域用不同颜色标注出来，并和你说了一遍。$",
     PREV_JOB_NOT_FINISH = "^[ >]*岳灵珊说道：「你上次任务还没有完成呢！」$",
@@ -196,7 +195,7 @@ local define_patrol = function()
     }
   end
 
-  local addTransitionToStop = function(self, fromState)
+  function prototype:addTransitionToStop(fromState)
     self:addTransition {
       oldState = fromState,
       newState = States.stop,
@@ -214,7 +213,7 @@ local define_patrol = function()
       newState = States.ask,
       event = Events.START,
       action = function()
-        travel:reset()
+        travel:stop()
         -- 岳灵珊在华山客厅2916
         travel:walkto(2916, function()
           self:doAsk()
@@ -237,7 +236,7 @@ local define_patrol = function()
       newState = States.wait_ask,
       event = Events.NO_JOB_AVAILABLE,
       action = function()
-        travel:reset()
+        travel:stop()
         -- 在练功室2921打坐等待ask
         travel:walkto(2921, function()
           SendNoEcho("dz max")
@@ -250,14 +249,14 @@ local define_patrol = function()
       event = Events.PREV_JOB_NOT_FINISH,
       action = function() self:doWork() end
     }
-    addTransitionToStop(self, States.ask)
+    self:addTransitionToStop(States.ask)
     -- transitions from state<work>
     self:addTransition {
       oldState = States.work,
       newState = States.submit,
       event = Events.WORK_DONE,
       action = function()
-        travel:reset()
+        travel:stop()
         -- 前往客厅交任务 --在2910有可能busy
         travel:walkto(2910, function()
           self:assureNotBusy()
@@ -267,7 +266,7 @@ local define_patrol = function()
         end)
       end
     }
-    addTransitionToStop(self, States.work)
+    self:addTransitionToStop(States.work)
     -- transitions from state<submit>
     self:addTransition {
       oldState = States.submit,
@@ -297,7 +296,7 @@ local define_patrol = function()
         end)
       end
     }
-    addTransitionToStop(self, States.submit)
+    self:addTransitionToStop(States.submit)
     -- transitions from state<wait_ask>
     self:addTransition {
       oldState = States.wait_ask,
@@ -310,7 +309,7 @@ local define_patrol = function()
         end)
       end
     }
-    addTransitionToStop(self, States.wait_ask)
+    self:addTransitionToStop(States.wait_ask)
     -- transitions from state<wait_submit>
     self:addTransition {
       oldState = States.wait_submit,
@@ -323,14 +322,14 @@ local define_patrol = function()
         end)
       end
     }
-    addTransitionToStop(self, States.wait_submit)
+    self:addTransitionToStop(States.wait_submit)
   end
 
   function prototype:assureNotBusy()
     while true do
       SendNoEcho("halt")
       -- busy or wait for 3 seconds to resend
-      local line = wait.regexp(self.regexp.NOT_BUSY, 3)
+      local line = wait.regexp(REGEXP.NOT_BUSY, 3)
       if line then break end
     end
   end
@@ -359,7 +358,7 @@ local define_patrol = function()
       if self.rooms[next.name] and self.rooms[next.name] > 0 then
         self:debug("首次进入巡逻房间，等待巡逻命令")
         -- wait at most 10 seconds for the notion
-        local _, wildcards = wait.regexp(self.regexp.PATROLLING, 8)
+        local _, wildcards = wait.regexp(REGEXP.PATROLLING, 8)
         if wildcards and wildcards[1] then
           local currRoom = wildcards[1]
           if self.rooms[currRoom] and self.rooms[currRoom] > 0 then
@@ -400,7 +399,7 @@ local define_patrol = function()
 
     helper.addTrigger {
       group = "huashan_patrol_ask_start",
-      regexp = self.regexp.ASK_START,
+      regexp = REGEXP.ASK_START,
       response = function()
         self:debug("ASK_START triggered")
         helper.enableTriggerGroups("huashan_patrol_ask_done")
@@ -409,7 +408,7 @@ local define_patrol = function()
     -- ask result can be 4 types, so store the
     helper.addTrigger {
       group = "huashan_patrol_ask_done",
-      regexp = self.regexp.NEW_JOB,
+      regexp = REGEXP.NEW_JOB,
       response = function()
         self:debug("NEW_JOB triggered")
         self.eventToSend = Events.NEW_JOB
@@ -417,7 +416,7 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_ask_done",
-      regexp = self.regexp.PREV_JOB_NOT_FINISH,
+      regexp = REGEXP.PREV_JOB_NOT_FINISH,
       response = function()
         self:debug("PREV_JOB_NOT_FINISH triggered")
         self.eventToSend = Events.PREV_JOB_NOT_FINISH
@@ -425,7 +424,7 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_ask_done",
-      regexp = self.regexp.NEXT_JOB_WAIT,
+      regexp = REGEXP.NEXT_JOB_WAIT,
       response = function()
         self:debug("NEXT_JOB_WAIT triggered")
         self.eventToSend = Events.NO_JOB_AVAILABLE
@@ -433,7 +432,7 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_ask_done",
-      regexp = self.regexp.EXP_TOO_HIGH,
+      regexp = REGEXP.EXP_TOO_HIGH,
       response = function()
         self:debug("EXP_TOO_HIGH triggered")
         self.eventToSend = Events.STOP
@@ -441,7 +440,7 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_ask_done",
-      regexp = self.regexp.ASK_DONE,
+      regexp = REGEXP.ASK_DONE,
       response = function()
         self:debug("ASK_DONE triggered")
         if not self.eventToSend then
@@ -456,7 +455,7 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_work",
-      regexp = self.regexp.WORK_DONE,
+      regexp = REGEXP.WORK_DONE,
       response = function()
         self:debug("WORK_DONE triggered")
         self:fire(Events.WORK_DONE)
@@ -464,7 +463,7 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_submit_start",
-      regexp = self.regexp.SUBMIT_START,
+      regexp = REGEXP.SUBMIT_START,
       response = function()
         self:debug("SUBMIT_START triggered")
         helper.enableTriggerGroups("huashan_patrol_submit_done")
@@ -472,7 +471,7 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_submit_done",
-      regexp = self.regexp.REJECT_LING,
+      regexp = REGEXP.REJECT_LING,
       response = function()
         local allPatrolled = true
         for room, cnt in pairs(self.rooms) do
@@ -493,14 +492,14 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_submit_done",
-      regexp = self.regexp.ACCEPT_LING,
+      regexp = REGEXP.ACCEPT_LING,
       response = function()
         self:fire(Events.SUBMIT_ACCEPT)
       end
     }
     helper.addTrigger {
       group = "huashan_patrol_submit_done",
-      regexp = self.regexp.SUBMIT_DONE,
+      regexp = REGEXP.SUBMIT_DONE,
       response = function()
         if not self.eventToSend then
           print("出错，没有获取到任务提交结果")
@@ -514,28 +513,28 @@ local define_patrol = function()
     }
     helper.addTrigger {
       group = "huashan_patrol_wait_ask",
-      regexp = self.regexp.DZ_FINISH,
+      regexp = REGEXP.DZ_FINISH,
       response = function()
         SendNoEcho("dz max")
       end
     }
     helper.addTrigger {
       group = "huashan_patrol_wait_ask",
-      regexp = self.regexp.DZ_NEILI_ADDED,
+      regexp = REGEXP.DZ_NEILI_ADDED,
       response = function()
         self:fire(Events.PAUSE_WAIT)
       end
     }
     helper.addTrigger {
       group = "huashan_patrol_wait_submit",
-      regexp = self.regexp.DZ_FINISH,
+      regexp = REGEXP.DZ_FINISH,
       response = function()
         SendNoEcho("dz max")
       end
     }
     helper.addTrigger {
       group = "huashan_patrol_wait_submit",
-      regexp = self.regexp.DZ_NEILI_ADDED,
+      regexp = REGEXP.DZ_NEILI_ADDED,
       response = function()
         self:fire(Events.PAUSE_WAIT)
       end
@@ -589,6 +588,256 @@ local define_patrol = function()
   return prototype
 end
 huashan.patrol = define_patrol().FSM()
+
+local define_teach = function()
+  local prototype = FSM.inheritedMeta()
+  local States = {
+    stop = "stop",    -- 停止状态
+    ask = "ask",    -- 询问任务
+    teaching = "teaching",    -- 教导中
+    searching = "searching",    -- 搜索中
+    begging = "begging",    -- 当老师好可怜
+    wait_ask = "wait_ask",    -- 等待询问任务
+    submit = "submit"
+  }
+  local Events = {
+    STOP = "stop",    -- 停止信号
+    START = "start",    -- 开始信号
+    NO_JOB_AVAILABLE = "no_job_available",    -- 目前没有任务（完成的太快）
+    NEW_JOB = "new_job",    -- 得到一个新的任务
+    PREV_JOB_NOT_FINISH = "prev_job_not_finish",    -- 之前的任务没有完成
+    TEACH_DONE = "teach_done",    -- 教导完成
+    SUBMIT_DONE = "submit_done",    -- 提交完成
+    STUDENT_ESCAPED = "student_escaped",    -- 学生溜走了
+    STUDENT_FOUND = "student_found",    -- 找到学生了
+    STUDENT_ADMITTED = "studuent_admitted",    -- 学生同意继续学习
+    CONTINUE_TEACH = "continue_teach",    -- 继续教学
+    PAUSE_WAIT = "pause_wait",    -- 停止等待
+  }
+  local REGEXP = {
+    NEW_JOB="^[ >]*岳灵珊拿出一张地图，把华山需要巡逻的区域用不同颜色标注出来，并和你说了一遍。$",
+    PREV_JOB_NOT_FINISH = "^[ >]*岳灵珊说道：「你上次任务还没有完成呢！」$",
+    NEXT_JOB_WAIT = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
+    NEXT_JOB_TOO_FAST = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
+    -- EXP_TOO_HIGH = "^[ >]*岳灵珊说道：「你的功夫不错了，找我娘看看有什么任务交给你。」$",
+    ASK_START = "^[ >]*设定环境变量：huashan_teach = \"ask_start\"$",
+    ASK_DONE = "^[ >]*设定环境变量：huashan_teach = \"ask_done\"$",
+    -- PATROLLING="^[ >]*你在(.+?)巡弋，尚未发现敌踪。$",    -- used in wait.regexp
+    TEACH_DONE="^[ >]*设定环境变量：huashan_teach = \"teach_done\"$",
+    REJECT_LING="^[ >]*岳灵珊不想要令牌，你就自个留着吧。$",
+    ACCEPT_LING="^[ >]*你给岳灵珊一块令牌。$",
+    SUBMIT_START = "^[ >]*设定环境变量：huashan_patrol = \"submit_start\"$",
+    SUBMIT_DONE = "^[ >]*设定环境变量：huashan_patrol = \"submit_done\"$",
+    NOT_BUSY = "^[ >]*你现在不忙。$",
+    DZ_FINISH = "^[ >]*你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。$",
+    DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$"
+  }
+
+  local teacher = "scala"
+
+  function prototype:FSM()
+    local obj = FSM:new()
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
+  end
+
+  function prototype:postConstruct()
+    self:initStates()
+    self:initTransitions()
+    self:initTriggers()
+    self:initAliases()
+    self.studentCaught = false
+    self.studentName = nil
+  end
+
+  function prototype:initStates()
+    self:addState {
+      state = States.stop,
+      enter = function()
+        self.studentCaught = false
+        self.studentName = nil
+      end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.ask,
+      enter = function() end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.teaching,
+      enter = function() end,
+      exit = function()
+        self.studentCaught = false
+      end
+    }
+    self:addState {
+      state = States.searching,
+      enter = function() end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.begging,
+      enter = function() end,
+      exit = function() end
+    }
+  end
+
+  function prototype:initTransitions()
+    -- transition from state<stop>
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.ask,
+      event = Events.START,
+      action = function()
+        travel:walkto(66, function()
+          self:doAsk()
+        end)
+      end
+    }
+    -- transition from state<ask>
+    self:addTranition {
+      oldState = States.ask,
+      newState = States.teaching,
+      event = Events.NEW_JOB,
+      action = function()
+        travel:walkto(2918, function()
+          self:recognizeStudent()
+          self:doTeach()
+        end)
+      end
+    }
+    self:addTransition {
+      oldState = States.ask,
+      newState = States.wait_ask,
+      event = Events.NO_JOB_AVAILABLE,
+      action = function()
+        travel:walto(2921, function()
+          self:doWaitAsk()
+        end)
+      end
+    }
+    self:addTransitionToStop(States.ask)
+    -- transition from state<wait_ask>
+    self:addTransition {
+      oldState = States.wait_ask,
+      newState = States.ask,
+      event = Events.PAUSE_WAIT,
+      action = function()
+        travel:walkto(66, function()
+          self:doAsk()
+        end)
+      end
+    }
+    -- transition from state<teaching>
+    self:addTransition {
+      oldState = States.teaching,
+      newState = States.teaching,
+      event = Events.CONTINUE_TEACH,
+      action = function()
+        self:doTeach()
+      end
+    }
+    self:addTransition {
+      oldState = States.teaching,
+      newState = States.searching,
+      event = Events.STUDENT_ESCAPED,
+      action = function()
+        travel:traverse {
+          rooms = travel:getNearbyRooms(8),
+          check = function()
+            return self:catchStudent()
+          end,
+          action = function()
+            if self.studentCaught then
+              return self:fire(Events.STUDENT_FOUND)
+            else
+              return self:fire(Events.STUDENT_NOT_FOUND)
+            end
+          end
+        }
+      end
+    }
+    self:addTransition {
+      oldState = States.teaching,
+      newState = States.submit,
+      event = Events.TEACH_DONE,
+      action = function()
+        travel:walkto(66, function()
+          self:doSubmit()
+        end)
+      end
+    }
+    self:addTransitionToStop(States.teaching)
+    -- transition from state<searching>
+    self:addTransition {
+      oldState = States.searching,
+      newState = States.begging,
+      event = Events.STUDENT_FOUND,
+      action = function()
+        self:begStudentUntilAdmitted()
+      end
+    }
+    self:addTransition {
+      oldState = States.searching,
+      newState = States.stop,
+      event = Events.STUDENT_NOT_FOUND,
+      action = function()
+        print("找不到学生了！任务失败")
+      end
+    }
+    self:addTransitionToStop(States.searching)
+    -- transition from state<begging>
+    self:addTransition {
+      oldState = States.begging,
+      newState = States.teaching,
+      event = Events.STUDENT_ADMITTED,
+      action = function()
+        travel:walkto(2918, function()
+          self:doTeach()
+        end)
+      end
+    }
+    self:addTransitionToStop(States.begging)
+    -- transition from state<submit>
+    self:addTransition {
+      oldState = States.submit,
+      newState = States.ask,
+      event = Events.SUMIT_DONE,
+      action = function()
+        wait.time(3)
+        self:doAsk()
+      end
+    }
+    self:addTransitionToStop(States.submit)
+  end
+
+  function prototype:initTriggers() end
+
+  function prototype:initAliases() end
+
+
+  function prototype:addTransitionToStop(fromState)
+    self:addTransition {
+      oldState = fromState,
+      newState = States.stop,
+      event = Events.STOP,
+      action = function()
+        print("停止教导任务 - 当前状态", self.currState)
+      end
+    }
+  end
+
+  function prototype:doAsk()
+    SendNoEcho("set huashan_teach ask_start")
+    SendNoEcho("ask ning about job")
+    SendNoEcho("set huashan_teach ask_done")
+  end
+
+  return prototype
+end
+huashan.teach = define_teach().FSM()
 
 return huashan
 
