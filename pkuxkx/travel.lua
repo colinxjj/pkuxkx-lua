@@ -93,10 +93,12 @@ local define_travel = function()
     BLOCKING_SOLVED = "blocking_solved",    -- 阻塞解除信号
     TRY_RELOCATE = "try_relocate",    -- 尝试重定位
     ROOM_INFO_UNKNOWN = "room_info_unknown",    -- 没有获取到房间信息
+    WALK_NEXT_STEP = "walk_next_step"    -- 走下一步
   }
   local RELOC_MAX_RETRIES = 4    -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_MOVES = 50    -- 每次重定位最大移动步数(每个房间算1步)，当进入locating状态时重置
-
+  local DESC_DISPLAY_LINE_WIDTH = 30    -- 描述显示每行字数
+  local INTERVAL = 12
 
   prototype.regexp = {
     -- aliases
@@ -117,7 +119,7 @@ local define_travel = function()
     LOOK_START = "^[ >]*设定环境变量：travel_look = \"start\"$",
     LOOK_DONE = "^[ >]*设定环境变量：travel_look = \"done\"$",
     ARRIVED = "^[ >]*设定环境变量：travel_walk = \"arrived\"$",
-    WALK_LOST = "^[> ]*(这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*)$",
+    WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*)$",
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
     WALK_BREAK = "^[ >]*设定环境变量：travel_walk = \"break\"$",
@@ -148,12 +150,16 @@ local define_travel = function()
     self.currRoomName = nil
     self.targetRoomId = nil -- if target room id is nil, means locating only
     self.targetAction = nil
-    self.relocMaxRetries = RELOC_MAX_RETRIES
-    self.relocMaxMoves = RELOC_MAX_MOVES
     self.busyLook = false  -- used when relocating, system might tell you too busy to look around
+    self.relocMoves = 0  -- reset when located
+    self.relocRetries = 0  -- reset when walking -> located, locating -> located with Only
     -- walking
     self.walkPlan = nil
     self.walkLost = false
+    self.walkSteps = 0
+    self.walkInterval = self.walkInterval or INTERVAL
+    self.mode = self.mode or "quick"
+    self.delay = self.delay or 1
   end
 
   -- if you want to sync, call it in coroutine
@@ -215,24 +221,14 @@ local define_travel = function()
     }
     self:addState {
       state = States.locating,
-      enter = function()
-
-      end,
-      exit = function()
-        helper.disableTriggerGroups(
-          "travel_look_start",
-          "travel_look_name",
-          "travel_look_desc",
-          "travel_look_season",
-          "travel_look_exits",
-          "travel_walk"
-        )
-      end
+      enter = function() end,
+      exit = function() end
     }
     self:addState {
       state = States.located,
       enter = function()
-        self.relocMaxRetries = RELOC_MAX_RETRIES
+        self.relocMoves = 0
+        self.walkLost = false
       end,
       exit = function()
 
@@ -307,7 +303,11 @@ local define_travel = function()
           end
           print("出发地与目的地处于同一区域，共" .. roomCnt .. "个房间")
         end
-        return self.roomsearch(startZone.rooms, fromid, toid)
+        return self.roomsearch {
+          rooms = startZone.rooms,
+          startid = fromid,
+          targetid = toid
+        }
       else
         -- zone search for shortest path
         local zoneStack = self.zonesearch {
@@ -331,7 +331,11 @@ local define_travel = function()
             end
           end
           self:debug("本次路径计算跨" .. zoneCnt .. "个区域，共" .. roomCnt .. "个房间")
-          return self.roomsearch(startZone.rooms, fromid, toid)
+          return self.roomsearch {
+            rooms = rooms,
+            startid = fromid,
+            targetid = toid
+          }
         end
       end
     end
@@ -344,11 +348,19 @@ local define_travel = function()
       newState = States.locating,
       event = Events.START,
       action = function()
-        self:relocate()
+        return self:relocate()
       end
     }
     addTransitionToStop(self, States.stop)
     -- transitions from state<locating>
+    self:addTransition {
+      oldState = States.locating,
+      newState = States.locating,
+      event = Events.TRY_RELOCATE,
+      action = function()
+        return self:relocate()
+      end
+    }
     self:addTransition {
       oldState = States.locating,
       newState = States.located,
@@ -359,6 +371,7 @@ local define_travel = function()
           return self:fire(Events.WALK_PLAN_NOT_EXISTS)
         else
           self:debug("本次自动行走共" .. #walkPlan .. "步")
+          self:debug("曾有" .. self.relocRetries .. "次定位重试")
           -- this is the only place to store walk plan
           self.walkPlan = walkPlan
           return self:fire(Events.WALK_PLAN_GENERATED)
@@ -370,6 +383,7 @@ local define_travel = function()
       newState = States.located,
       event = Events.LOCATION_CONFIRMED_ONLY,
       action = function()
+        self.relocRetries = 0
         print("完成重新定位。房间名称：", self.currRoomName, "房间编号：", self.currRoomId)
       end
     }
@@ -378,7 +392,7 @@ local define_travel = function()
       newState = States.stop,
       event = Events.MAX_RELOC_RETRIES,
       action = function()
-
+        print("达到重定位重试次数上限", self.currState)
       end
     }
     self:addTransition {
@@ -386,7 +400,7 @@ local define_travel = function()
       newState = States.stop,
       event = Events.MAX_RELOC_MOVES,
       action = function()
-
+        print("达到单次重定位移动步数上限", self.currState)
       end
     }
     self:addTransition {
@@ -394,17 +408,34 @@ local define_travel = function()
       newState = States.stop,
       event = Events.ROOM_NO_EXITS,
       action = function()
-
+        print("房间不存在")
       end
     }
     addTransitionToStop(self, States.locating)
     -- transitions from state<located>
     self:addTransition {
       oldState = States.located,
+      newState = States.located,
+      event = Events.START,
+      action = function()
+        local walkPlan = self:generateWalkPlan()
+        if not walkPlan then
+          return self:fire(Events.WALK_PLAN_NOT_EXISTS)
+        else
+          self:debug("本次自动行走共" .. #walkPlan .. "步")
+          self:debug("曾有" .. self.relocRetries .. "次定位重试")
+          -- this is the only place to store walk plan
+          self.walkPlan = walkPlan
+          return self:fire(Events.WALK_PLAN_GENERATED)
+        end
+      end
+    }
+    self:addTransition {
+      oldState = States.located,
       newState = States.walking,
       event = Events.WALK_PLAN_GENERATED,
       action = function()
-        self:walking()
+        return self:walking()
       end
     }
     self:addTransition {
@@ -412,17 +443,26 @@ local define_travel = function()
       newState = States.stop,
       event = Events.WALK_PLAN_NOT_EXISTS,
       action = function()
-        print("自动行走失败！无法获取从房间" .. self.currRoomId .. "到达房间" .. self.targetRoomId .. "的行走计划")
+        print("自动行走失败！房间" .. self.currRoomId .. "到房间" .. self.targetRoomId .. "不可达", self.currState)
       end
     }
     addTransitionToStop(self, States.located)
     -- transitions from state<walking>
     self:addTransition {
       oldState = States.walking,
+      newState = States.walking,
+      event = Events.WALK_NEXT_STEP,
+      action = function()
+        return self:walking()
+      end
+    }
+    self:addTransition {
+      oldState = States.walking,
       newState = States.located,
       event = Events.ARRIVED,
       action = function()
         self.walkPlan = nil
+        self.relocRetries = 0
         self.currRoomId = self.targetRoomId
         SendNoEcho("set travel_walk arrived")  -- this is for
         if self.targetAction then
@@ -451,7 +491,8 @@ local define_travel = function()
       newState = States.lost,
       event = Events.GET_LOST,
       action = function()
-
+        print("迷路，曾尝试重定位" .. self.relocRetries .. "次", self.currState)
+        return self:fire(Events.TRY_RELOCATE)
       end
     }
     addTransitionToStop(self, States.walking)
@@ -461,7 +502,7 @@ local define_travel = function()
       newState = States.walking,
       event = Events.BLOCKING_SOLVED,
       action = function()
-
+        return self:walking()
       end
     }
     addTransitionToStop(self, States.blocked)
@@ -471,7 +512,8 @@ local define_travel = function()
       newState = States.locating,
       event = Events.TRY_RELOCATE, -- always try relocate and the retries threshold is checked when locating
       action = function()
-
+        self.relocRetries = self.relocRetries + 1
+        return self:relocate()
       end
     }
     addTransitionToStop(self, States.lost)
@@ -607,6 +649,7 @@ local define_travel = function()
       response = function(name, line, wildcards)
         self:debug("SEASON_TIME_DESC triggered")
         if self._roomDescInline then
+          self._roomDescInline = false
           helper.disableTriggerGroups("travel_look_desc")    -- 禁止其后抓取描述
         end
         self.currSeason = wildcards[1]
@@ -897,8 +940,8 @@ local define_travel = function()
 
   function prototype:showDesc(roomDesc)
     if type(roomDesc) == "string" then
-      for i = 1, string.len(roomDesc), self.DESC_DISPLAY_LINE_WIDTH do
-        print(string.sub(roomDesc, i, i + self.DESC_DISPLAY_LINE_WIDTH - 1))
+      for i = 1, string.len(roomDesc), DESC_DISPLAY_LINE_WIDTH do
+        print(string.sub(roomDesc, i, i + DESC_DISPLAY_LINE_WIDTH - 1))
       end
     elseif type(roomDesc) == "table" then
       for _, d in ipairs(roomDesc) do
@@ -1075,64 +1118,99 @@ local define_travel = function()
     dal:updateRoom(room)
   end
 
-
   function prototype:relocate()
-    local moves = 0
-    repeat
-      self:lookUntilNotBusy()
-      -- 尝试匹配当前房间
-      if not self.currRoomName then
-        if not self.currRoomExits then
-          return self:fire(Events.ROOM_INFO_UNKNOWN)
-        else
-          -- 尝试随机游走，重新定位
-          self:randomGo(self.currRoomExits)
-        end
+    if self.relocRetries > RELOC_MAX_RETRIES then
+      return self:fire(Events.MAX_RELOC_RETRIES)
+    else
+      self.relocMoves = self.relocMoves + 1
+      if self.relocMoves > RELOC_MAX_MOVES then
+        return self:fire(Events.MAX_RELOC_MOVES)
       else
-        local potentialRooms = dal:getRoomsByName(self.currRoomName)
-        local matched = self:matchPotentialRooms(table.concat(self.currRoomDesc), self.currRoomExits, potentialRooms)
-        if #matched == 1 then
-          self:debug("成功匹配唯一房间", matched[1])
-          self.currRoomId = matched[1]
-          if self.targetRoomId then
-            return self:fire(Events.LOCATION_CONFIRMED)
+        self:lookUntilNotBusy()
+        -- 尝试匹配当前房间
+        if not self.currRoomName then
+          if not self.currRoomExits then
+            return self:fire(Events.ROOM_INFO_UNKNOWN)
           else
-            return self:fire(Events.LOCATION_CONFIRMED_ONLY)
+            -- 尝试随机游走，重新定位
+            wait.time(1.5)
+            self:randomGo(self.currRoomExits)
+            return self:fire(Events.TRY_RELOCATE)
           end
         else
-          if #matched == 0 then
-            self:debug("没有可匹配的房间，房间名", self.currRoomName)
+          local potentialRooms = dal:getRoomsByName(self.currRoomName)
+          local matched = self:matchPotentialRooms(table.concat(self.currRoomDesc), self.currRoomExits, potentialRooms)
+          if #matched == 1 then
+            self:debug("成功匹配唯一房间", matched[1])
+            self.currRoomId = matched[1]
+            if self.targetRoomId then
+              return self:fire(Events.LOCATION_CONFIRMED)
+            else
+              return self:fire(Events.LOCATION_CONFIRMED_ONLY)
+            end
           else
-            self:debug("查找到多个匹配成功的房间", table.concat(matched, ","))
+            if #matched == 0 then
+              self:debug("没有可匹配的房间，房间名", self.currRoomName)
+            else
+              self:debug("查找到多个匹配成功的房间", table.concat(matched, ","))
+            end
+            -- 尝试随机游走，重新定位
+            wait.time(1.5)
+            self:randomGo(self.currRoomExits)
+            return self:fire(Events.TRY_RELOCATE)
           end
-          -- 尝试随机游走，重新定位
-          self:randomGo(self.currRoomExits)
         end
       end
-      wait.time(1)
-      moves = moves + 1
-      if self.currState == States.stop then return end
-    until moves > RELOC_MAX_MOVES
-    -- 重试多次仍无法定位当前房间
-    return self:fire(Events.MAX_RELOC_MOVES)
+    end
   end
 
-  function prototype:walking()
-    local interval = self.interval or 12
-    local restTime = self.restTime or 1
-    local mode = self:getMode() or "quick"    -- the default walkto mode
-    self:debug("行走模式", mode)
-    local delay = self.delay or 1    -- the default walkto delay in slow mode
+--  function prototype:relocate()
+--    local moves = 0
+--    repeat
+--      self:lookUntilNotBusy()
+--      -- 尝试匹配当前房间
+--      if not self.currRoomName then
+--        if not self.currRoomExits then
+--          return self:fire(Events.ROOM_INFO_UNKNOWN)
+--        else
+--          -- 尝试随机游走，重新定位
+--          self:randomGo(self.currRoomExits)
+--        end
+--      else
+--        local potentialRooms = dal:getRoomsByName(self.currRoomName)
+--        local matched = self:matchPotentialRooms(table.concat(self.currRoomDesc), self.currRoomExits, potentialRooms)
+--        if #matched == 1 then
+--          self:debug("成功匹配唯一房间", matched[1])
+--          self.currRoomId = matched[1]
+--          if self.targetRoomId then
+--            return self:fire(Events.LOCATION_CONFIRMED)
+--          else
+--            return self:fire(Events.LOCATION_CONFIRMED_ONLY)
+--          end
+--        else
+--          if #matched == 0 then
+--            self:debug("没有可匹配的房间，房间名", self.currRoomName)
+--          else
+--            self:debug("查找到多个匹配成功的房间", table.concat(matched, ","))
+--          end
+--          -- 尝试随机游走，重新定位
+--          self:randomGo(self.currRoomExits)
+--        end
+--      end
+--      wait.time(1)
+--      moves = moves + 1
+--      if self.currState == States.stop then return end
+--    until moves > RELOC_MAX_MOVES
+--    -- 重试多次仍无法定位当前房间
+--    return self:fire(Events.MAX_RELOC_MOVES)
+--  end
 
-    local steps = 0
-    while #(self.walkPlan) > 0 do
+  function prototype:walking()
+    if #(self.walkPlan) > 0 then
+      self.walkSteps = self.walkSteps + 1
       local move = table.remove(self.walkPlan)
-      -- here should be refined, the state may change
-      -- due to the path
-      -- evaluate the move and may be transit to other state
-      if mode ~= "quick" then
-        SendNoEcho("halt")
-      end
+      self:debug("move", move.path, move.category)
+      -- 执行路径
       if move.category == "busy" then
         SendNoEcho(move.path)
         return self:fire(Events.BUSY)
@@ -1141,41 +1219,31 @@ local define_travel = function()
         return self:fire(Events.BOAT)
       else
         SendNoEcho(move.path)
+        -- return self:fire(Events.WALK_NEXT_STEP)
       end
-
-      steps = steps + 1
-      if mode == "quick" and steps >= interval then
-        steps = 0
-        while true do
-          SendNoEcho("set travel_walk break")
-          local line = wait.regexp(self.regexp.WALK_BREAK, 5)
-          if not line then
-            print("系统反应超时，等待5秒重试")
-            wait.time(5)
-          elseif self.walkLost then
-            return self:fire(Events.GET_LOST)
-          else
-            wait.time(1)
-            SendNoEcho("halt")
-            break
+      if self.mode == "quick" then
+        if (self.walkSteps % self.walkInterval) == 0 then
+          while true do
+            SendNoEcho("set travel_walk break")
+            local line = wait.regexp(self.regexp.WALK_BREAK, 5)
+            if not line then
+              print("系统反应超时，等待5秒重试")
+              wait.time(5)
+            elseif self.walkLost then
+              return self:fire(Events.GET_LOST)
+            else
+              wait.time(1)
+              SendNoEcho("halt")
+              return self:fire(Events.WALK_NEXT_STEP)
+            end
           end
+        else
+          return self:fire(Events.WALK_NEXT_STEP)
         end
-      end
-      if mode == "normal" then
-        while true do
-          SendNoEcho("set travel_walk step")
-          local line = wait.regexp(self.regexp.WALK_STEP, 5)
-          if not line then
-            print("系统反应超时，等待5秒重试")
-            wait.time(5)
-          elseif self.walkLost then
-            return self:fire(Events.GET_LOST)
-          else
-            SendNoEcho("halt")
-            break
-          end
+      else
+        if move.category == "slow" then
+          wait.time(1)
         end
-      elseif mode == "slow" then
         while true do
           SendNoEcho("set travel_walk step")
           local line = wait.regexp(self.regexp.WALK_STEP, 5)
@@ -1185,16 +1253,95 @@ local define_travel = function()
           elseif self.walkLost then
             return self:fire(Events.GET_LOST)
           else
-            wait.time(1)
             SendNoEcho("halt")
             break
           end
         end
       end
-      if self.currState == States.stop then return end
+      return self:fire(Events.WALK_NEXT_STEP)
+    else
+      return self:fire(Events.ARRIVED)
     end
-    return self:fire(Events.ARRIVED)
   end
+
+--  function prototype:walking()
+--    local interval = self.interval or 12
+--    local restTime = self.restTime or 1
+--    local mode = self:getMode() or "quick"    -- the default walkto mode
+--    self:debug("行走模式", mode)
+--    local delay = self.delay or 1    -- the default walkto delay in slow mode
+--
+--    local steps = 0
+--    while #(self.walkPlan) > 0 do
+--      local move = table.remove(self.walkPlan)
+--      -- here should be refined, the state may change
+--      -- due to the path
+--      -- evaluate the move and may be transit to other state
+--      if mode ~= "quick" then
+--        SendNoEcho("halt")
+--      end
+--      if move.category == "busy" then
+--        SendNoEcho(move.path)
+--        return self:fire(Events.BUSY)
+--      elseif move.category == "boat" then
+--        SendNoEcho(move.path)
+--        return self:fire(Events.BOAT)
+--      else
+--        SendNoEcho(move.path)
+--      end
+--
+--      steps = steps + 1
+--      if mode == "quick" and steps >= interval then
+--        steps = 0
+--        while true do
+--          SendNoEcho("set travel_walk break")
+--          local line = wait.regexp(self.regexp.WALK_BREAK, 5)
+--          if not line then
+--            print("系统反应超时，等待5秒重试")
+--            wait.time(5)
+--          elseif self.walkLost then
+--            return self:fire(Events.GET_LOST)
+--          else
+--            wait.time(1)
+--            SendNoEcho("halt")
+--            break
+--          end
+--        end
+--      end
+--      if mode == "normal" then
+--        while true do
+--          SendNoEcho("set travel_walk step")
+--          local line = wait.regexp(self.regexp.WALK_STEP, 5)
+--          if not line then
+--            print("系统反应超时，等待5秒重试")
+--            wait.time(5)
+--          elseif self.walkLost then
+--            return self:fire(Events.GET_LOST)
+--          else
+--            SendNoEcho("halt")
+--            break
+--          end
+--        end
+--      elseif mode == "slow" then
+--        while true do
+--          SendNoEcho("set travel_walk step")
+--          local line = wait.regexp(self.regexp.WALK_STEP, 5)
+--          if not line then
+--            print("系统反应超时，等待5秒重试")
+--            wait.time(5)
+--          elseif self.walkLost then
+--            return self:fire(Events.GET_LOST)
+--          else
+--            wait.time(1)
+--            SendNoEcho("halt")
+--            break
+--          end
+--        end
+--      end
+--      if self.currState == States.stop then return end
+--    end
+--    return self:fire(Events.ARRIVED)
+--  end
 
   ---------------------------------------------------
 
@@ -1234,7 +1381,7 @@ local define_travel = function()
 
   function prototype:matchPotentialRooms(currRoomDesc, currRoomExits, potentialRooms)
     local matched = {}
-    print(currRoomDesc)
+    -- self:debug(currRoomDesc)
     for i = 1, #potentialRooms do
       local room = potentialRooms[i]
       local exitsMatched = room.exits == currRoomExits
