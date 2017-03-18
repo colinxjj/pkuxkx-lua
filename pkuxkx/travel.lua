@@ -390,6 +390,7 @@ local define_travel = function()
   function prototype:reloc()
     local co = coroutine.create(function()
       self:stop()
+      print("stopped, to fire start")
       self:fire(Events.START)
     end)
     coroutine.resume(co)
@@ -1435,8 +1436,10 @@ local define_travel = function()
   function prototype:prepareWalkPlan()
     local walkPlan
     if self.traverseCheck then
+      self:debug("生成遍历计划")
       walkPlan = self:generateTraversePlan()
     else
+      self:debug("生成直达计划")
       walkPlan = self:generateWalkPlan()
     end
     if not walkPlan then
@@ -1484,13 +1487,13 @@ end
 local travel = define_travel().FSM()
 
 -- test
-travel.currRoomId = 1
-local results = travel:getNearbyRooms(1)
-travel.traverseRooms = results
-local plan = travel:generateTraversePlan()
-
-local tb = {}
-for _, move in pairs(plan) do
-  table.insert(tb, move.path .. ":" .. move.endid)
-end
-print(table.concat(tb, ", "))
+--travel.currRoomId = 1
+--local results = travel:getNearbyRooms(1)
+--travel.traverseRooms = results
+--local plan = travel:generateTraversePlan()
+--
+--local tb = {}
+--for _, move in pairs(plan) do
+--  table.insert(tb, move.path .. ":" .. move.endid)
+--end
+--print(table.concat(tb, ", "))
