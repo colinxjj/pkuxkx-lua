@@ -11,8 +11,6 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 
-local p1 = "一招一式有板有眼，你可以回去和宁中则复命了。"
-
 local define_patrol = function()
   local prototype = FSM.inheritedMeta()
   -- define own states and events
@@ -581,4 +579,4 @@ local define_patrol = function()
 
   return prototype
 end
-return define_patrol().FSM()
+return define_patrol():FSM()

@@ -29,7 +29,7 @@ local define_FSM = function()
   end
 
   function prototype:debug(...)
-    if (self.DEBUG) then print(...) end
+    if self.DEBUG then print(...) end
   end
 
   function prototype:debugOn()
@@ -84,6 +84,7 @@ local define_FSM = function()
   function prototype:getState() return self.currState end
 
   function prototype:fire(event)
+    self:debug("×´Ì¬", self.currState, "ÊÂ¼þ", event)
     local transition = self.transitions[self.currState][event]
     --    tprint(transition)
     if not transition then
@@ -112,7 +113,11 @@ local define_FSM = function()
 
         return coroutine.yield()
       end)
-      return coroutine.resume(transitioner)
+      local ok, ret = coroutine.resume(transitioner)
+      if not ok then
+        error(ret, 2)
+      end
+      return ret
     end
   end
 

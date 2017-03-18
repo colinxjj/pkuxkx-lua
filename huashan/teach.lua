@@ -35,8 +35,13 @@ local p2 = [[
 王亮涛道：休息一会行不行啊？
 
 王亮涛一招一式有板有眼，你可以回去和宁中则复命了。
+你对崔久慕挥了挥手，崔久慕转身离去了。
 
 完成任务后，你被奖励了：
+
+在指点弟子练功中，你印证心中所学，经验增加了一点。
+
+    斯卡拉教导的华山弟子 崔久慕(Scala's student)
 
 ]]
 
@@ -53,6 +58,7 @@ local define_teach = function()
     wait_ask = "wait_ask",    -- 等待询问任务
     submit = "submit",    -- 提交任务
     wenhao = "wenhao",    -- 问好...
+    cancel = "cancel"    -- 取消任务
   }
   local Events = {
     STOP = "stop",    -- 停止信号
@@ -73,12 +79,14 @@ local define_teach = function()
     PAUSE_WAIT = "pause_wait",    -- 停止等待
     GO_BACK_TEACH = "go_back_teach",    -- 回去教
     CONTINUE_BEG = "continue_beg",    -- 继续求
+    WENHAO_DONE = "wenhao_done",    -- 问好成功
+    WENHAO_FAIL = "wenhao_fail",    -- 问好失败
   }
   local REGEXP = {
     NEW_JOB_TEACH = "^[ >]*宁中则对你说道：最近华山来了些新弟子，你带去练功房指点\\(zhidian\\)一下吧。$",
     NEW_JOB_WENHAO = "^[ >]*宁中则看着你，道：好久没有见过(.*?) 这些人了，你在江湖中，如果遇到这些前辈中的一个，代我向他问个好\\(wenhao\\)吧，并把礼品带给他。\\s*$",
     STUDENT_FOLLOWED = "^[ >]*(.*)决定开始跟随你一起行动。$",
-    PREV_JOB_NOT_FINISH = "^[ >]*岳灵珊说道：「你上次任务还没有完成呢！」$",
+    PREV_JOB_NOT_FINISH = "^[ >]*宁中则说道：「你上次任务还没有完成呢！」$",
     NEXT_JOB_WAIT = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
     NEXT_JOB_TOO_FAST = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
     -- EXP_TOO_HIGH = "^[ >]*岳灵珊说道：「你的功夫不错了，找我娘看看有什么任务交给你。」$",
@@ -96,9 +104,12 @@ local define_teach = function()
     SUBMIT_START = "^[ >]*设定环境变量：huashan_patrol = \"submit_start\"$",
     SUBMIT_DONE = "^[ >]*设定环境变量：huashan_patrol = \"submit_done\"$",
     SUBMIT_SUCCESS = "^[ >]*完成任务后，你被奖励了：$",
+    CANCEL_START = "^[ >]*设定环境变量：huashan_patrol = \"cancel_start\"$",
+    CANCEL_DONE = "^[ >]*设定环境变量：huashan_patrol = \"cancel_done\"$",
     NOT_BUSY = "^[ >]*你现在不忙。$",
     DZ_FINISH = "^[ >]*你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。$",
-    DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$"
+    DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$",
+    WENHAO_DESC = "^[ >]*你对着(.+)深深一揖：鄙派掌门向.*问好。$"
   }
   local teacherId = "scala"
   local teacherName = "斯卡拉"
@@ -115,6 +126,7 @@ local define_teach = function()
     self:initTransitions()
     self:initTriggers()
     self:initAliases()
+    self:setState(States.stop)
     self.studentId = teacherId .. "'s student"
     self:resetOnStop()
   end
@@ -154,19 +166,21 @@ local define_teach = function()
     self:addState {
       state = States.wenhao,
       enter = function()
-
+        helper.enableTriggerGroups("huashan_teach_wenhao")
       end,
       exit = function()
-
+        helper.disableTriggerGroups("huashan_teach_wenhao")
       end
     }
     self:addState {
       state = States.searching,
       enter = function()
         self.studentCaught = false
+        helper.enableTriggerGroups("huashan_teach_searching")
       end,
       exit = function()
         self.studentCaught = false
+        helper.disableTriggerGroups("huashan_teach_searching")
       end
     }
     self:addState {
@@ -199,6 +213,15 @@ local define_teach = function()
         helper.disableTriggerGroups("huashan_teach_submit_start", "huashan_teach_submit_done")
       end
     }
+    self:addState {
+      state = States.cancel,
+      enter = function()
+        helper.enableTriggerGroups("huashan_teach_cancel_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("huashan_teach_cancel_start", "huashan_teach_cancel_done")
+      end
+    }
   end
 
   function prototype:initTransitions()
@@ -208,6 +231,7 @@ local define_teach = function()
       newState = States.ask,
       event = Events.START,
       action = function()
+        travel:stop()
         travel:walkto(66, function()
           self:doAsk()
         end)
@@ -261,7 +285,7 @@ local define_teach = function()
       event = Events.CONTINUE_TEACH,
       action = function()
         -- 每次教导间隔2秒
-        wait.time(2)
+        self:assureNotBusy()
         self:doTeach()
       end
     }
@@ -270,19 +294,17 @@ local define_teach = function()
       newState = States.searching,
       event = Events.STUDENT_ESCAPED,
       action = function()
-        travel:traverse {
-          rooms = travel:getNearbyRooms(8),
-          check = function()
-            return self:catchStudent()
-          end,
-          action = function()
-            if self.studentCaught then
-              return self:fire(Events.STUDENT_FOUND)
-            else
-              return self:fire(Events.STUDENT_NOT_FOUND)
-            end
+        local check = function() return self.studentCaught end
+        local action = function()
+          if self.studentCaught then
+            return self:fire(Events.STUDENT_FOUND)
+          else
+            return self:fire(Events.STUDENT_NOT_FOUND)
           end
-        }
+        end
+        self:debug("准备搜索")
+        self:assureNotBusy()
+        travel:traverseZone("huashan", check, action)
       end
     }
     self:addTransition {
@@ -330,7 +352,7 @@ local define_teach = function()
       newState = States.begging,
       event = Events.CONTINUE_BEG,
       action = function()
-        time.wait(1)
+        wait.time(1)
         self:doBeg()
       end
     }
@@ -346,6 +368,38 @@ local define_teach = function()
       end
     }
     self:addTransitionToStop(States.submit)
+    -- transition from state<wenhao>
+    self:addTransition {
+      oldState = States.wenhao,
+      newState = States.submit,
+      event = Events.WENHAO_DONE,
+      action = function()
+        travel:walkto(66, function()
+          self:doSubmit()
+        end)
+      end
+    }
+    self:addTransition {
+      oldState = States.wenhao,
+      newState = States.cancel,
+      event = Events.WENHAO_FAIL,
+      action = function()
+        travel:walkto(66, function()
+          self:doCancel()
+        end)
+      end
+    }
+    self:addTransitionToStop(States.wenhao)
+    -- transition from state<cancel>
+    self:addTransition {
+      oldState = States.cancel,
+      newState = States.ask,
+      event = Events.START,
+      action = function()
+        self:doAsk()
+      end
+    }
+    self:addTransitionToStop(States.cancel)
   end
 
   function prototype:initTriggers()
@@ -354,8 +408,10 @@ local define_teach = function()
       "huashan_teach_wait_ask",
       "huashan_teach_teaching_start", "huashan_teach_teaching_done",
       "huashan_teach_beg_start", "huashan_teach_beg_done",
+      "huashan_teach_searching",
       "huashan_teach_submit_start", "huashan_teach_submit_done",
-      "huashan_teach_wenhao_start", "huashan_teach_wenhao_done")
+      "huashan_teach_cancel_start", "huashan_teach_cancel_done",
+      "huashan_teach_wenhao")
     -- 开始询问
     helper.addTrigger {
       group = "huashan_teach_ask_start",
@@ -386,6 +442,7 @@ local define_teach = function()
       group = "huashan_teach_ask_done",
       regexp = REGEXP.NEW_JOB_WENHAO,
       response = function(name, line, wildcards)
+        self:debug("问好玩家有", wildcards[1])
         local patterns = utils.split(wildcards[1], " ")
         local players = {}
         for _, pattern in ipairs(patterns) do
@@ -405,8 +462,11 @@ local define_teach = function()
       response = function()
         if self.jobType == "teach" then
           self:fire(Events.NEW_TEACH)
-        else
+        elseif self.jobType == "wenhao" then
           self:fire(Events.NEW_WENHAO)
+        else
+          print("没有获取到任务，出错")
+          self:fire(Events.stop)
         end
       end
     }
@@ -494,7 +554,7 @@ local define_teach = function()
     helper.addTrigger {
       group = "huashan_teach_beg_done",
       regexp = REGEXP.STUDENT_PERSUADED,
-      response = function()
+      response = function(name, line, wildcards)
         local name = wildcards[1]
         if name == self.studentName then
           self.studentPersuaded = true
@@ -530,9 +590,87 @@ local define_teach = function()
         self.submitted = true
       end
     }
+    -- 查找弟子
+    helper.addTrigger {
+      group = "huashan_teach_searching",
+      regexp = "^[ >]*" .. teacherName .. "教导的华山弟子 (.*)\\(.*'s student\\)$",
+      response = function(name, line, wildcards)
+        local name = wildcards[1]
+        if name == self.studentName then
+          self:debug("找到我的弟子", name)
+          self.studentCaught = true
+        else
+          self:debug("这不是我的弟子", self.studentName, name)
+        end
+      end
+    }
+    -- 取消任务开始
+    helper.addTrigger {
+      group = "huashan_teach_cancel_start",
+      regexp = REGEXP.CANCEL_START,
+      response = function()
+        helper.enableTriggerGroups("huashan_teach_cancel_done")
+      end
+    }
+    -- 取消任务结束
+    helper.addTrigger {
+      group = "huashan_teach_cancel_done",
+      regexp = REGEXP.CANCEL_DONE,
+      response = function()
+        self:fire(Events.START)
+      end
+    }
+    -- 问好
+    helper.addTrigger {
+      group = "huashan_teach_wenhao",
+      regexp = REGEXP.WENHAO_DESC,
+      response = function()
+
+      end
+    }
   end
 
-  function prototype:initAliases() end
+  function prototype:initAliases()
+    helper.removeAliasGroups("huashan_teach")
+
+    helper.addAlias {
+      group = "huashan_teach",
+      regexp = "^teaching\\s*$",
+      response = function()
+        print("TEACHING华山新手教导任务，用法如下：")
+        print("teaching start", "开始教导")
+        print("teaching stop", "完成当前任务后，停止巡逻")
+        print("teaching debug on/off", "开启/关闭巡逻调试模式")
+      end
+    }
+
+    helper.addAlias {
+      group = "huashan_teach",
+      regexp = "^teaching\\s+start\\s*$",
+      response = function()
+        self:fire(Events.START)
+      end
+    }
+    helper.addAlias {
+      group = "huashan_teach",
+      regexp = "^teaching\\s+stop\\s*$",
+      response = function()
+        self:fire(Events.STOP)
+      end
+    }
+    helper.addAlias {
+      group = "huashan_teach",
+      regexp = "^teaching\\s+debug\\s+(on|off)\\s*$",
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self:debugOn()
+        elseif cmd == "off" then
+          self:debugOff()
+        end
+      end
+    }
+  end
 
   function prototype:addTransitionToStop(fromState)
     self:addTransition {
@@ -558,7 +696,13 @@ local define_teach = function()
   end
 
   function prototype:doWenhao()
+    print("请手动执行问好任务")
+  end
 
+  function prototype:doBeg()
+    SendNoEcho("set huashan_teach beg_start")
+    SendNoEcho("ask " .. self.studentId .. " about 指点")
+    SendNoEcho("set huashan_teach beg_done")
   end
 
   function prototype:doWaitAsk()
@@ -571,14 +715,21 @@ local define_teach = function()
     SendNoEcho("set huashan_teach submit_done")
   end
 
+  function prototype:doCancel()
+    SendNoEcho("set huashan_teach cancel_start")
+    SendNoEcho("ask ning about fail")
+    SendNoEcho("set huashan_teach cancel_done")
+  end
+
   function prototype:disableAllTriggers()
     helper.disableTriggerGroups(
       "huashan_teach_ask_start", "huashan_teach_ask_done",
+      "huashan_teach_wait_ask",
       "huashan_teach_teaching_start", "huashan_teach_teaching_done",
       "huashan_teach_beg_start", "huashan_teach_beg_done",
+      "huashan_teach_searching",
       "huashan_teach_submit_start", "huashan_teach_submit_done",
-      "huashan_teach_wenhao_start", "huashan_teach_wenhao_done",
-      "huashan_teach_wait_ask")
+      "huashan_teach_wenhao")
   end
 
   function prototype:resetOnStop()
@@ -592,8 +743,17 @@ local define_teach = function()
     self.jobType = nil
   end
 
+  function prototype:assureNotBusy()
+    while true do
+      SendNoEcho("halt")
+      -- busy or wait for 3 seconds to resend
+      local line = wait.regexp(REGEXP.NOT_BUSY, 3)
+      if line then break end
+    end
+  end
+
   return prototype
 end
-return define_teach().FSM()
+return define_teach():FSM()
 
 

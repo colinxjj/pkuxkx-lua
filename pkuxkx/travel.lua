@@ -69,6 +69,7 @@ local dbDef = require "pkuxkx.db"
 local db = dbDef.open("data/pkuxkx-gb2312.db")
 local dalDef = require "pkuxkx.dal"
 local dal = dalDef.open(db)
+local Room = require "pkuxkx.Room"
 local ZonePath = require "pkuxkx.ZonePath"
 local Deque = require "pkuxkx.deque"
 
@@ -139,6 +140,7 @@ local define_travel = function()
     ALIAS_WALKTO_LIST = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
     ALIAS_WALKTO_MODE = "^walkto\\s+mode\\s+(quick|normal|slow)$",
     ALIAS_TRAVERSE = "^traverse\\s+(\\d+)\\s*$",
+    ALIAS_TRAVERSE_ZONE = "^traverse\\s+([a-z][a-z0-9]+)\\s*$",
     ALIAS_LOC_HERE = "^loc\\s+here\\s*$",
     ALIAS_LOC_ID = "^loc\\s+(\\d+)$",
     ALIAS_LOC_GUESS = "^loc\\s+guess\\s*$",
@@ -219,9 +221,9 @@ local define_travel = function()
 
   -- 设置遍历参数
   function prototype:setTraverse(args)
-    local rooms = assert(type(args.rooms) == "table", "rooms must be a table")
-    local check = assert(type(args.check) == "function", "check must be a function")
-    local action = assert(not args.action or type(args.action) == "function", "action must be nil or function")
+    local rooms = assert(type(args.rooms) == "table" and args.rooms, "rooms must be a table")
+    local check = assert(type(args.check) == "function" and args.check, "check must be a function")
+    local action = assert(not args.action or type(args.action) == "function" and args.action, "action must be nil or function")
     -- no defensive copy, user should make sure immutable :)
     self.traverseRooms = rooms
     self.traverseCheck = check
@@ -231,6 +233,19 @@ local define_travel = function()
   function prototype:traverse(args)
     self:setTraverse(args)
     self:fire(Events.START)
+  end
+
+  function prototype:traverseZone(zone, check, action)
+    assert(zone, "zone cannot be nil")
+    if not self.zonesByCode[zone] then
+      print("查找不到区域：", zone)
+    else
+      self:traverse {
+        rooms = self.zonesByCode[zone].rooms,
+        check = check or function() return false end,
+        action = action or function() print("遍历结束") end
+      }
+    end
   end
 
   -- 自动行走
@@ -682,9 +697,11 @@ local define_travel = function()
         -- 区别直达与遍历
         if self.traverseCheck then
           self.currRoomId = self.traverseRoomId
+          self:refreshRoomInfo()
           self:clearTraverseInfo()
         else
           self.currRoomId = self.targetRoomId
+          self:refreshRoomInfo()
         end
         SendNoEcho("set travel_walk arrived")  -- this is for
         if self.targetAction then
@@ -973,6 +990,8 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_WALKTO_CODE,
       response = function(name, line, wildcards)
         local target = wildcards[1]
+--        print("inputzone", self.zonesByCode)
+--        for k, v in pairs(self.zonesByCode) do print(k) end
         if target == "showzone" then
           print(string.format("%16s%16s%16s", "区域代码", "区域名称", "区域中心"))
           for _, zone in pairs(self.zonesById) do
@@ -980,7 +999,7 @@ local define_travel = function()
           end
         elseif self.zonesByCode[target] then
           local targetRoomCode = self.zonesByCode[target].centercode
-          local targetRoomId = self.roomsByCode[targetRoomCode]
+          local targetRoomId = self.roomsByCode[targetRoomCode].id
           local co = coroutine.create(function()
             self:stop()
             self:walkto(targetRoomId, function() self:debug("到达目的地") end)
@@ -1031,6 +1050,15 @@ local define_travel = function()
       response = function(name, line, wildcards)
         local depth = tonumber(wildcards[1])
         self:traverseNearby(depth)
+      end
+    }
+    -- 遍历区域
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_TRAVERSE_ZONE,
+      response = function(name, line, wildcards)
+        local zone = wildcards[1]
+        self:traverseZone(zone)
       end
     }
     -- 更新地图与查看功能
@@ -1309,7 +1337,7 @@ local define_travel = function()
             if self.targetRoomId then
               return self:fire(Events.LOCATION_CONFIRMED)
             elseif self.traverseCheck then
-              return self.fire(Events.LOCATION_CONFIRMED_TRAVERSE)
+              return self:fire(Events.LOCATION_CONFIRMED_TRAVERSE)
             else
               return self:fire(Events.LOCATION_CONFIRMED_ONLY)
             end
@@ -1338,24 +1366,32 @@ local define_travel = function()
       self:debug("move", move.startid, move.path, move.category)
       -- 当遍历时，先执行遍历检查函数
       if self.traverseCheck then
+        -- 设置遍历房间号
+        self.traverseRoomId = move.endid
         local checked, msg = self.traverseCheck()
         self:debug("遍历检测结果", checked, msg)
         if checked then
+          -- 将遍历房间号设置回当前房间
+          self.traverseRoomId = move.startid
           return self:fire(Events.ARRIVED)
         end
       end
       -- 执行路径
       if move.category == "busy" then
+        self:debug("路径", move.startid, move.endid, move.path)
         SendNoEcho(move.path)
         return self:fire(Events.BUSY)
       elseif move.category == "boat" then
+        self:debug("路径", move.startid, move.endid, move.path)
         SendNoEcho(move.path)
         return self:fire(Events.BOAT)
       else
+        self:debug("路径", move.startid, move.endid, move.path)
         SendNoEcho(move.path)
-        -- return self:fire(Events.WALK_NEXT_STEP)
       end
-      if self.mode == "quick" then
+      -- we cannot use quick mode to traverse, because traverse has to use callback check
+      -- for each move
+      if self.mode == "quick" and not self.traverseCheck then
         if (self.walkSteps % self.walkInterval) == 0 then
           while true do
             SendNoEcho("set travel_walk break")
@@ -1377,6 +1413,9 @@ local define_travel = function()
       else
         if move.category == "slow" then
           wait.time(1)
+        elseif self.traverseCheck then
+          -- for traverse, we still need to wait some time
+          wait.time(0.2)
         end
         while true do
           SendNoEcho("set travel_walk step")
@@ -1482,18 +1521,15 @@ local define_travel = function()
     return visited
   end
 
+  -- 通过id更新房间信息
+  function prototype:refreshRoomInfo()
+    -- 更新房间信息
+    local currRoom = self.roomsById[self.currRoomId]
+    self.currRoomName = currRoom and currRoom.name
+    self.currRoomExits = currRoom and currRoom.exits
+    self.currRoomDesc = currRoom and {currRoom.description}
+  end
+
   return prototype
 end
-local travel = define_travel().FSM()
-
--- test
---travel.currRoomId = 1
---local results = travel:getNearbyRooms(1)
---travel.traverseRooms = results
---local plan = travel:generateTraversePlan()
---
---local tb = {}
---for _, move in pairs(plan) do
---  table.insert(tb, move.path .. ":" .. move.endid)
---end
---print(table.concat(tb, ", "))
+return define_travel():FSM()

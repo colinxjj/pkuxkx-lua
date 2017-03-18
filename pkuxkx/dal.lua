@@ -17,6 +17,7 @@ local Zone = require "pkuxkx.Zone"
 local ZonePath = require "pkuxkx.ZonePath"
 local Room = require "pkuxkx.Room"
 local RoomPath = require "pkuxkx.RoomPath"
+local gb2312 = require "pkuxkx.gb2312"
 
 local define_dal = function()
   local prototype = {}
@@ -27,6 +28,7 @@ local define_dal = function()
     GET_ROOM_BY_ID = "select * from rooms where id = ?",
     GET_ROOMS_BY_NAME = "select * from rooms where name = ?",
     GET_ROOMS_LIKE_CODE = "select * from rooms where code like ?",
+    GET_ROOMS_BY_ZONE = "select * from rooms where zone = ?",
     GET_PATHS_BY_STARTID = "select * from paths where startid = ?",
     --    GET_PINYIN_BY_CHR = "select * from pinyin2chr where pinyin = ?",
     --    GET_CHR_BY_PINYIN = "select * from chr2pinyin where chr = ?",
@@ -90,6 +92,14 @@ local define_dal = function()
   function prototype:getAllRooms()
     return self.db:fetchRowsAs {
       stmt = "GET_ALL_ROOMS",
+      constructor = Room.decorate,
+      key = function(room) return room.id end
+    }
+  end
+
+  function prototype:getRoomsByZone(zone)
+    return self.db:fetchRowsAs {
+      stmt = "GET_ROOMS_BY_ZONE",
       constructor = Room.decorate,
       key = function(room) return room.id end
     }
