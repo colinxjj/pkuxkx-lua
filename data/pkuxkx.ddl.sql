@@ -52,9 +52,9 @@ values
   ('xiaoshancun', '小山村', 'xiaoshancundaguchang'),
   ('huashan', '华山', 'huashanshufang'),
   ('qufu', '曲阜', 'qufukongmiao'),
-  ('xinyang', '信阳', 'xinyangxiaoguangchang')
-  --
-  --('quanzhen', '全真', 'quanzhenchongxuantai')
+  ('xinyang', '信阳', 'xinyangxiaoguangchang'),
+  ('quanzhen', '全真', 'quanzhenchongxuantai'),
+  ('changjiangbeian', '长江北岸', 'changjiangbeianchangjiangdukou1')
 ;
 --   ('taishan', '泰山');
 
@@ -80,10 +80,13 @@ values
   ('xinyang', 'yangzhou', 10),
   ('yangzhou', 'xinyang', 10),
   ('xinyang', 'zhongyuan', 6),
-  ('zhongyuan', 'xinyang', 6)
-  --
-  --('xiaoshancun', 'quanzhen', 13),
-  --('quanzhen', 'xiaoshancun', 13)
+  ('zhongyuan', 'xinyang', 6),
+  ('xiaoshancun', 'quanzhen', 13),
+  ('quanzhen', 'xiaoshancun', 13),
+  ('changjiangbeian', 'yangzhou', 12),
+  ('yangzhou', 'changjiangbeian', 12),
+  ('changjiangbeian', 'xinyang', 15),
+  ('xinyang', 'changjiangbeian', 15)
 ;
 
 

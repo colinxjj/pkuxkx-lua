@@ -105,28 +105,6 @@ local define_travel = function()
     ROOM_INFO_UNKNOWN = "room_info_unknown",    -- 没有获取到房间信息
     WALK_NEXT_STEP = "walk_next_step"    -- 走下一步
   }
-  -- 方向简称列表
-  local DIRECTIONS = {
-    s="south",
-    n="north",
-    w="west",
-    e="east",
-    ne="northeast",
-    se="southeast",
-    sw="southwest",
-    nw="northwest",
-    su="southup",
-    nu="northup",
-    eu="eastup",
-    wu="westup",
-    sd="southdown",
-    nd="northdown",
-    wd="westdown",
-    ed="eastdown",
-    u="up",
-    d="down"
-  }
-  -- 正则列表
   -- 正则列表
   local REGEXP = {
     -- aliases
@@ -284,10 +262,6 @@ local define_travel = function()
   -- in alias
   -------------------------------------
 
-  function prototype:expandDirection(path)
-    return DIRECTIONS[path] or path
-  end
-
   -- 别名-匹配
   function prototype:match(roomId, performUpdate)
     local performUpdate = performUpdate or false
@@ -347,7 +321,7 @@ local define_travel = function()
     local tgtPathCnt = 0
     for _, tgtPath in pairs(tgtPaths) do
       tgtPathCnt = tgtPathCnt + 1
-      if not currExits[self:expandDirection(tgtPath.path)] then
+      if not currExits[helper.expandDirection(tgtPath.path)] then
         pathIdentical = false
         break
       end
@@ -775,6 +749,10 @@ local define_travel = function()
     for _, zone in pairs(zonesById) do
       zonesByCode[zone.code] = zone
     end
+    local zonesByName = {}
+    for _, zone in pairs(zonesById) do
+      zonesByName[zone.name] = zone
+    end
     -- initialize rooms
     local roomsById = dal:getAllAvailableRooms()
     local roomsByCode = {}
@@ -797,6 +775,7 @@ local define_travel = function()
     -- assign to prototype
     self.zonesById = zonesById
     self.zonesByCode = zonesByCode
+    self.zonesByName = zonesByName
     self.roomsById = roomsById
     self.roomsByCode = roomsByCode
   end
@@ -990,8 +969,6 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_WALKTO_CODE,
       response = function(name, line, wildcards)
         local target = wildcards[1]
---        print("inputzone", self.zonesByCode)
---        for k, v in pairs(self.zonesByCode) do print(k) end
         if target == "showzone" then
           print(string.format("%16s%16s%16s", "区域代码", "区域名称", "区域中心"))
           for _, zone in pairs(self.zonesById) do

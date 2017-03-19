@@ -10,6 +10,41 @@ require "pkuxkx.predefines"
 local define_helper = function()
   local helper = {}
 
+  local REGEXP = {
+    NOT_BUSY = "^[ >]*你现在不忙。$",
+    SETTING = "^[ >]*设定环境变量：__SETTING_NAME__ = \"__SETTING_VALUE__\"$",
+  }
+
+  helper.settingRegexp = function(name, value)
+    return string.gsub(string.gsub(REGEXP.SETTING, "__SETTING_NAME__", name), "__SETTING_VALUE__", value)
+  end
+
+  -- 方向简称列表
+  local DIRECTIONS = {
+    s="south",
+    n="north",
+    w="west",
+    e="east",
+    ne="northeast",
+    se="southeast",
+    sw="southwest",
+    nw="northwest",
+    su="southup",
+    nu="northup",
+    eu="eastup",
+    wu="westup",
+    sd="southdown",
+    nd="northdown",
+    wd="westdown",
+    ed="eastdown",
+    u="up",
+    d="down"
+  }
+
+  helper.expandDirection = function(path)
+    return DIRECTIONS[path] or path
+  end
+
   -- add trigger but disabled
   local TRIGGER_BASE_FLAG = trigger_flag.RegularExpression
     + trigger_flag.Replace + trigger_flag.KeepEvaluating
@@ -79,7 +114,7 @@ local define_helper = function()
       _G.world[name] = nil
     end
     local retCode = DeleteTrigger(name)
-    print("remove trigger", name, retCode)
+    -- print("remove trigger", name, retCode)
     assert(retCode == eOK or retCode == eTriggerNotFound)
   end
 
@@ -330,7 +365,82 @@ local define_helper = function()
     return place
   end
 
-  -- convenient way to add trigger
+  -- 保证不busy，必须在coroutine中
+  helper.assureNotBusy = function()
+    while true do
+      SendNoEcho("halt")
+      -- busy or wait for 3 seconds to resend
+      local line = wait.regexp(REGEXP.NOT_BUSY, 3)
+      if line then break end
+    end
+  end
+
+  local jobs = {}
+  -- 辅助任务触发
+  helper.initJobTriggers = function(args)
+    local prefix = assert(type(args.prefix) == "string" and args.prefix, "prefix must be string")
+    local acquire = assert(type(args.acquire) == "string" and args.acquire, "acquire must be function")
+    local afterAcquire = assert(type(args.afterAcquire) == "function" and args.afterAcquire, "afterAcquire must be function")
+    local submit = assert(type(args.submit) == "string" and args.submit, "submit must be string")
+    local afterSubmit = assert(type(args.afterSubmit) == "function" and args.afterSubmit, "afterSubmit must be function")
+    assert(jobs[prefix], "Cannot re-initialize job triggers")
+    jobs[prefix] = {}
+    local setAcquireStart = "set " .. prefix .. " acquire_start"
+    local setAcquireDone = "set " .. prefix .. " acquire_done"
+    local acquireAction = function()
+      SendNoEcho(setAcquireStart)
+      SendNoEcho(acquire)
+      SendNoEcho(setAcquireDone)
+    end
+    jobs[prefix].acquire = acquireAction
+    local setSubmitStart = "set " .. prefix .. " submit_start"
+    local setSubmitDone = "set " .. prefix .. " submit_done"
+    local submitAction = function()
+      SendNoEcho(setSubmitStart)
+      SendNoEcho(submit)
+      SendNoEcho(setSubmitDone)
+    end
+    jobs[prefix].submit = submitAction
+    local trigger_acq_start = prefix .. "_acquire_start"
+    local trigger_acq_done = prefix .. "_acquire_done"
+    local trigger_sub_start = prefix .. "_submit_start"
+    local trigger_sub_done = prefix .. "_submit_done"
+    helper.removeTriggerGroups(trigger_acq_start, trigger_acq_done, trigger_sub_start, trigger_sub_done)
+    helper.addTrigger {
+      group = trigger_acq_start,
+      regexp = helper.settingRegexp(prefix, "acquire_start"),
+      response = function()
+        helper.enableTriggerGroups(trigger_acq_done)
+      end
+    }
+    helper.addTrigger {
+      group = trigger_acq_done,
+      regexp = helper.settingRegexp(prefix, "acquire_done"),
+      response = afterAcquire
+    }
+    helper.addTrigger {
+      group = trigger_sub_start,
+      regexp = helper.settingRegexp(prefix, "submit_start"),
+      response = function()
+        helper.enableTriggerGroups(trigger_sub_done)
+      end
+    }
+    helper.addTrigger {
+      group = trigger_sub_done,
+      regexp = helper.settingRegexp(prefix, "submit_done"),
+      response = afterSubmit
+    }
+  end
+
+  helper.acquireJob = function(prefix)
+    assert(jobs[prefix], "job trigger is not initialized by helper: " .. prefix)
+    jobs[prefix].acquire()
+  end
+
+  helper.submitJob = function(prefix)
+    assert(jobs[prefix], "job trigger is not initialized by helper: " .. prefix)
+    job[prefix].submit()
+  end
 
   return helper
 end

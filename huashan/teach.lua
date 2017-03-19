@@ -88,8 +88,8 @@ local define_teach = function()
     STUDENT_FOLLOWED = "^[ >]*(.*)决定开始跟随你一起行动。$",
     PREV_JOB_NOT_FINISH = "^[ >]*宁中则说道：「你上次任务还没有完成呢！」$",
     NEXT_JOB_WAIT = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
-    NEXT_JOB_TOO_FAST = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
-    -- EXP_TOO_HIGH = "^[ >]*岳灵珊说道：「你的功夫不错了，找我娘看看有什么任务交给你。」$",
+    WORK_TOO_FAST = "^[ >]*宁中则说道：「你刚刚做过任务，先去休息一会吧。」$",
+    EXP_TOO_HIGH = "^[ >]*宁中则说道：「你的功夫不错了，在我这学不到什么了，去找掌门吧。」$",
     ASK_START = "^[ >]*设定环境变量：huashan_teach = \"ask_start\"$",
     ASK_DONE = "^[ >]*设定环境变量：huashan_teach = \"ask_done\"$",
     -- PATROLLING="^[ >]*你在(.+?)巡弋，尚未发现敌踪。$",    -- used in wait.regexp
@@ -101,12 +101,11 @@ local define_teach = function()
     TEACH_DONE = "^[ >]*设定环境变量：huashan_teach = \"teach_done\"$",
     BEG_START = "^[ >]*设定环境变量：huashan_teach = \"beg_start\"$",
     BEG_DONE = "^[ >]*设定环境变量：huashan_teach = \"beg_done\"$",
-    SUBMIT_START = "^[ >]*设定环境变量：huashan_patrol = \"submit_start\"$",
-    SUBMIT_DONE = "^[ >]*设定环境变量：huashan_patrol = \"submit_done\"$",
+    SUBMIT_START = "^[ >]*设定环境变量：huashan_teach = \"submit_start\"$",
+    SUBMIT_DONE = "^[ >]*设定环境变量：huashan_teach = \"submit_done\"$",
     SUBMIT_SUCCESS = "^[ >]*完成任务后，你被奖励了：$",
-    CANCEL_START = "^[ >]*设定环境变量：huashan_patrol = \"cancel_start\"$",
-    CANCEL_DONE = "^[ >]*设定环境变量：huashan_patrol = \"cancel_done\"$",
-    NOT_BUSY = "^[ >]*你现在不忙。$",
+    CANCEL_START = "^[ >]*设定环境变量：huashan_teach = \"cancel_start\"$",
+    CANCEL_DONE = "^[ >]*设定环境变量：huashan_teach = \"cancel_done\"$",
     DZ_FINISH = "^[ >]*你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。$",
     DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$",
     WENHAO_DESC = "^[ >]*你对着(.+)深深一揖：鄙派掌门向.*问好。$"
@@ -146,6 +145,7 @@ local define_teach = function()
         self.studentName = nil
         self.wenhaoList = nil
         self.jobType = nil
+        self.noJobAvailable = false
         helper.enableTriggerGroups("huashan_teach_ask_start")
       end,
       exit = function()
@@ -278,14 +278,14 @@ local define_teach = function()
         end)
       end
     }
+    self:addTransitionToStop(States.wait_ask)
     -- transition from state<teaching>
     self:addTransition {
       oldState = States.teaching,
       newState = States.teaching,
       event = Events.CONTINUE_TEACH,
       action = function()
-        -- 每次教导间隔2秒
-        self:assureNotBusy()
+        helper.assureNotBusy()
         self:doTeach()
       end
     }
@@ -303,7 +303,7 @@ local define_teach = function()
           end
         end
         self:debug("准备搜索")
-        self:assureNotBusy()
+        helper.assureNotBusy()
         travel:traverseZone("huashan", check, action)
       end
     }
@@ -342,6 +342,7 @@ local define_teach = function()
       newState = States.teaching,
       event = Events.STUDENT_PERSUADED,
       action = function()
+        helper.assureNotBusy()
         travel:walkto(2918, function()
           self:doTeach()
         end)
@@ -352,7 +353,7 @@ local define_teach = function()
       newState = States.begging,
       event = Events.CONTINUE_BEG,
       action = function()
-        wait.time(1)
+        helper.assureNotBusy()
         self:doBeg()
       end
     }
@@ -446,13 +447,21 @@ local define_teach = function()
         local patterns = utils.split(wildcards[1], " ")
         local players = {}
         for _, pattern in ipairs(patterns) do
-          local str = utils.split(pattern, "(")
+          local str = utils.split(pattern, "(") -- the utils.split implementatin is not different
           local name = str[1]
-          local id = string.gsub(str[2], ")", "")
+          local id = string.gsub(str[2], "%)", "")
           table.insert(players, {name=name, id=id})
         end
         self.wenhaoList = players
         self.jobType = "wenhao"
+      end
+    }
+    -- 做的太快没任务
+    helper.addTrigger {
+      group = "huashan_teach_ask_done",
+      regexp = REGEXP.WORK_TOO_FAST,
+      response = function()
+        self.noJobAvailable = true
       end
     }
     -- 发送新任务
@@ -464,6 +473,8 @@ local define_teach = function()
           self:fire(Events.NEW_TEACH)
         elseif self.jobType == "wenhao" then
           self:fire(Events.NEW_WENHAO)
+        elseif self.noJobAvailable then
+          self:fire(Events.NO_JOB_AVAILABLE)
         else
           print("没有获取到任务，出错")
           self:fire(Events.stop)
@@ -486,7 +497,7 @@ local define_teach = function()
         if self.studentEscaped then
           self:fire(Events.STUDENT_ESCAPED)
         elseif self.studentImproved then
-          self:fire(Events.STUDENT_IMPROVED)
+          self:fire(Events.TEACH_DONE)
         else
           self:fire(Events.CONTINUE_TEACH)
         end
@@ -741,15 +752,7 @@ local define_teach = function()
     self.studentName = nil
     self.wenhaoList = nil
     self.jobType = nil
-  end
-
-  function prototype:assureNotBusy()
-    while true do
-      SendNoEcho("halt")
-      -- busy or wait for 3 seconds to resend
-      local line = wait.regexp(REGEXP.NOT_BUSY, 3)
-      if line then break end
-    end
+    self.noJobAvailable = false
   end
 
   return prototype

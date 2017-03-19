@@ -96,7 +96,6 @@ local define_patrol = function()
     ACCEPT_LING="^[ >]*你给岳灵珊一块令牌。$",
     SUBMIT_START = "^[ >]*设定环境变量：huashan_patrol = \"submit_start\"$",
     SUBMIT_DONE = "^[ >]*设定环境变量：huashan_patrol = \"submit_done\"$",
-    NOT_BUSY = "^[ >]*你现在不忙。$",
     DZ_FINISH = "^[ >]*你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。$",
     DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$"
   }
@@ -251,7 +250,7 @@ local define_patrol = function()
         travel:stop()
         -- 前往客厅交任务 --在2910有可能busy
         travel:walkto(2910, function()
-          self:assureNotBusy()
+          helper.assureNotBusy()
           travel:walkto(2916, function()
             self:doSubmit()
           end)
@@ -317,15 +316,6 @@ local define_patrol = function()
     self:addTransitionToStop(States.wait_submit)
   end
 
-  function prototype:assureNotBusy()
-    while true do
-      SendNoEcho("halt")
-      -- busy or wait for 3 seconds to resend
-      local line = wait.regexp(REGEXP.NOT_BUSY, 3)
-      if line then break end
-    end
-  end
-
   function prototype:doAsk()
     SendNoEcho("set huashan_patrol ask_start")
     SendNoEcho("ask yue about job")
@@ -345,7 +335,7 @@ local define_patrol = function()
     while #(self.paths) > 0 do
       local next = table.remove(self.paths)
       -- 到达下一个房间，此处有强假设，到达下一个房间不会失败
-      self:assureNotBusy()
+      helper.assureNotBusy()
       SendNoEcho(next.path)
       if self.rooms[next.name] and self.rooms[next.name] > 0 then
         self:debug("首次进入巡逻房间，等待巡逻命令")
