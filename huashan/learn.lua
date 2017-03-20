@@ -40,7 +40,7 @@ local define_learn = function()
     AWAKE = "^[ >]*你一觉醒来，精神抖擞地活动了几下手脚。$",
     SLEEPED = "^[ >]*你往床上一躺，开始睡觉。$",
     SLEEP_TOO_MUCH = "^[ >]*你刚在三分钟内睡过一觉, 多睡对身体有害无益!\\s*$",
-    NO_MASTER = "^[ >]*你附近没有 fuzi 这个人，请用 id here 指令看看周围人物 id 。$",
+    NO_MASTER = "^[ >]*你附近没有 (.*) 这个人，请用 id here 指令看看周围人物 id 。$",
     DZ_BEGIN = "^[ >]*你盘膝坐下，默运华山内功，一股内息自丹田引出……$",
     DZ_FINISH = "^[ >]*你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。$",
     DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$",
@@ -60,6 +60,7 @@ local define_learn = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
+    self.masterExists = true
   end
 
   function prototype:initStates()
@@ -70,8 +71,14 @@ local define_learn = function()
     }
     self:addState {
       state = States.learn,
-      enter = function() end,
-      exit = function() end
+      enter = function()
+        helper.enableTriggerGroups("learn_learn")
+        self.masterExists = true
+      end,
+      exit = function()
+        helper.disableTriggerGroups("learn_learn")
+        self.masterExists = true
+      end
     }
     self:addState {
       state = States.sleep,
@@ -105,7 +112,7 @@ local define_learn = function()
       newState = States.learn,
       event = Events.START,
       action = function()
-        travel:walkto(188, function()
+        travel:walkto(2920, function()
           self:doLearnUntilBadStatus()
         end)
       end
@@ -150,7 +157,7 @@ local define_learn = function()
       newState = States.learn,
       event = Events.FULL,
       action = function()
-        travel:walkto(188, function()
+        travel:walkto(2920, function()
           self:doLearnUntilBadStatus()
         end)
       end
@@ -162,7 +169,7 @@ local define_learn = function()
       newState = States.learn,
       event = Events.PAUSE_EXERCISE,
       action = function()
-        travel:walkto(188, function()
+        travel:walkto(2920, function()
           self:doLearnUntilBadStatus()
         end)
       end
@@ -176,7 +183,7 @@ local define_learn = function()
       newState = States.stop,
       event = Events.STOP,
       action = function()
-        print("停止巡逻任务 - 当前状态", self.currState)
+        print("停止 - 当前状态", self.currState)
       end
     }
   end
@@ -193,6 +200,13 @@ local define_learn = function()
         else
           return self:fire(Events.WAKE_UP)
         end
+      end
+    }
+    helper.addTrigger {
+      group = "learn_learn",
+      regexp = REGEXP.NO_MASTER,
+      response = function()
+        self.masterExists = false
       end
     }
     helper.addTrigger {
@@ -259,20 +273,32 @@ local define_learn = function()
   end
 
   function prototype:doLearnUntilBadStatus()
-    while true do
+    while self.masterExists do
       status:catch()
       status:show()
       --print("currNeili", status.currNeili)
       if status.currNeili > 50 then
         SendNoEcho("yun regenerate")
-        SendNoEcho("do 10 xue fuzi for literate 1")
+--        SendNoEcho("do 10 xue fuzi for literate 1")
+        SendNoEcho("do 2 xue liang for dodge 1")
+        SendNoEcho("do 2 xue liang for sword 1")
+        SendNoEcho("do 2 xue liang for parry 1")
+        SendNoEcho("do 2 xue liang for cuff 1")
+        SendNoEcho("do 2 xue liang for huashan-shenfa 1")
+        SendNoEcho("do 2 xue liang for huashan-jianfa 1")
       elseif status.currJing > 50 then
-        SendNoEcho("do 10 xue fuzi for literate 1")
+--        SendNoEcho("do 10 xue fuzi for literate 1")
+        SendNoEcho("do 2 xue liang for dodge 1")
+        SendNoEcho("do 2 xue liang for sword 1")
+        SendNoEcho("do 2 xue liang for parry 1")
+        SendNoEcho("do 2 xue liang for huashan-shenfa 1")
+        SendNoEcho("do 2 xue liang for huashan-jianfa 1")
       else
         return self:fire(Events.BAD_STATUS)
       end
       wait.time(1)
     end
+    error("Master not exists")
   end
 
   function prototype:doSleepUntilFallAsleep()

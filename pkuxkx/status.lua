@@ -128,16 +128,12 @@ local define_status = function()
       group = "status_hpbrief_done",
       regexp = helper.settingRegexp("status", "hpbrief_done"),
       response = function()
-        print("done triggered")
         helper.disableTriggerGroups("status_hpbrief_start", "status_hpbrief_done")
         self.catchNum = 1
         local thread = self.waitThread
-        print("check if thread exists", thread)
         if thread then
           self.waitThread = nil
-          print("find suspended thread and resume")
           local ok, err = coroutine.resume(thread)
-          print("thread returned")
           if not ok then
             ColourNote ("deeppink", "black", "Error raised in trigger function (in wait module)")
             ColourNote ("darkorange", "black", debug.traceback (thread))
