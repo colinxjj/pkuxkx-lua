@@ -45,28 +45,35 @@ local define_helper = function()
     return DIRECTIONS[path] or path
   end
 
-  -- add trigger but disabled
-  local TRIGGER_BASE_FLAG = trigger_flag.RegularExpression
-    + trigger_flag.Replace + trigger_flag.KeepEvaluating
+  helper.repeatedRunnableWithCo = function(func)
+    local func = func
+    return function(name, line, wildcards)
+      return coroutine.wrap(func)(name, line, wildcards)
+    end
+  end
+
   local COPY_WILDCARDS_NONE = 0
   local SOUND_FILE_NONE = ""
-  -- make sure the name is unique
+
+  -- make sure name is unique
   local _global_trigger_callbacks = {}
   helper.addTrigger = function(args)
     local regexp = assert(type(args.regexp) == "string" and args.regexp, "regexp in trigger must be string")
     local group = assert(args.group, "group in trigger cannot be empty")
-    local response = assert(args.response, "response in trigger cannot be empty")
-    local name = args.name or "auto_added_trigger_" .. GetUniqueID()
+    local response = assert(type(args.response) == "function" and args.response, "response must be function")
+    local name = args.name or (group .. "_" .. GetUniqueID())
     local sequence = args.sequence or 10
-    if type(args.response) == "string" then
-      check(AddTriggerEx(name, regexp, response, TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, "", sendto.world, sequence))
-    elseif type(response) == "function" then
-      _G.world[name] = response
-      _global_trigger_callbacks[name] = true
-      check(AddTriggerEx(name, regexp, "-- added by helper", TRIGGER_BASE_FLAG, custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, name, sendto.script, sequence))
-    else
-      error("response type is unexpected " .. type(response))
-    end
+
+    -- wrap function into coroutine and stored in world for trigger to call
+    _G.world[name] = helper.repeatedRunnableWithCo(response)
+    _global_trigger_callbacks[name] = true
+    check(AddTriggerEx(name, regexp, "-- added by helper",
+      -- add trigger but disabled
+      bit.bor(
+        trigger_flag.RegularExpression,
+        trigger_flag.Replace,
+        trigger_flag.KeepEvaluating),
+      custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, name, sendto.script, sequence))
     check(SetTriggerOption(name, "group", group))
   end
 

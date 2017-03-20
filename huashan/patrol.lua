@@ -543,14 +543,14 @@ local define_patrol = function()
       response = function()
         -- 手动开始时，总是重新加载房间
         self:reloadRooms()
-        self:fire(Events.START)
+        coroutine.wrap(function() self:fire(Events.START) end)()
       end
     }
     helper.addAlias {
       group = "huashan_patrol",
       regexp = "^patrol\\s+stop\\s*$",
       response = function()
-        self:fire(Events.STOP)
+        coroutine.wrap(function() self:fire(Events.STOP) end)()
       end
     }
     helper.addAlias {

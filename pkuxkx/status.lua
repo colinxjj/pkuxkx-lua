@@ -7,34 +7,45 @@
 --
 
 local helper = require "pkuxkx.helper"
+local FSM = require "pkuxkx.FSM"
 
 local define_status = function()
-  local prototype = {}
-  prototype.__index = prototype
+  local prototype = FSM.inheritedMeta()
+
+  local States = {
+    stop = "stop",
+    catch = "catch",
+  }
+  local Events = {
+    STOP = "stop",
+    CATCH = "catch",
+    SHOW = "show"
+  }
 
   local REGEXP = {
     -- 经验，潜能，最大内力，当前内力，最大精力，当前精力
     -- 最大气血，有效气血，当前气血，最大精神，有效精神，当前精神
-    HPBRIEF_LINE = "^[ >]*#(\\d+),(\\d+),(\\d+),(\\d+),(\\d+),(\\d+)$",
+    HPBRIEF_LINE = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
     -- 真气，真元，食物，饮水
-    HPBRIEF_LINE_EX = "^[ >]*#(\\d+),(\\d+),(\\d+),(\\d+)$",
+    HPBRIEF_LINE_EX = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
     ALIAS_STATUS_CATCH = "^status\\s+catch\\s*$",
     ALIAS_STATUS_SHOW = "^status\\s+show\\s*$"
   }
 
-  local SINGLETON
-  function prototype:singleton()
-    if SINGLETON then
-      return SINGLETON
-    else
-      SINGLETON = {}
-      setmetatable(SINGLETON, self or prototype)
-      SINGLETON:postConstruct()
-      return SINGLETON
-    end
+  function prototype:FSM()
+    local obj = FSM:new()
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
   end
 
   function prototype:postConstruct()
+    self:initStates()
+    self:initTransitions()
+    self:initTriggers()
+    self:initAliases()
+    self:setState(States.stop)
+
     self.catchNum = 1
     self.waitThread = nil
 
@@ -54,9 +65,53 @@ local define_status = function()
     self.zhenyuan = nil
     self.food = nil
     self.drink = nil
+  end
 
-    self:initTriggers()
-    self:initAliases()
+  function prototype:initStates()
+    self:addState {
+      state = States.stop,
+      enter = function()
+        self.catchNum = 1
+      end,
+      exit = function()
+        self.catchNum = 1
+      end
+    }
+    self:addState {
+      state = States.catch,
+      enter = function()
+        helper.disableTriggerGroups("status_hpbrief_done")
+        helper.enableTriggerGroups("status_hpbrief_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("status_hpbrief_start", "status_hpbrief_done")
+      end
+    }
+  end
+
+  function prototype:initTransitions()
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.catch,
+      event = Events.CATCH,
+      action = function()
+        self:doCatch()
+      end
+    }
+    self:addTransition {
+      oldState = States.catch,
+      newState = States.stop,
+      event = Events.STOP,
+      action = function() end
+    }
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.stop,
+      event = Events.SHOW,
+      action = function()
+        self:doShow()
+      end
+    }
   end
 
   function prototype:initTriggers()
@@ -73,12 +128,21 @@ local define_status = function()
       group = "status_hpbrief_done",
       regexp = helper.settingRegexp("status", "hpbrief_done"),
       response = function()
+        print("done triggered")
         helper.disableTriggerGroups("status_hpbrief_start", "status_hpbrief_done")
         self.catchNum = 1
-        if self.waitThread then
-          local co = self.waitThread
+        local thread = self.waitThread
+        print("check if thread exists", thread)
+        if thread then
           self.waitThread = nil
-          return coroutine.resume(co)
+          print("find suspended thread and resume")
+          local ok, err = coroutine.resume(thread)
+          print("thread returned")
+          if not ok then
+            ColourNote ("deeppink", "black", "Error raised in trigger function (in wait module)")
+            ColourNote ("darkorange", "black", debug.traceback (thread))
+            error (err)
+          end -- if
         end
       end
     }
@@ -86,22 +150,23 @@ local define_status = function()
       group = "status_hpbrief_done",
       regexp = REGEXP.HPBRIEF_LINE,
       response = function(name, line, wildcards)
-        if self.catchNum == 1 then
+        local catchNum = self.catchNum
+        if catchNum == 1 then
           self.exp = tonumber(wildcards[1])
           self.pot = tonumber(wildcards[2])
           self.maxNeili = tonumber(wildcards[3])
           self.currNeili = tonumber(wildcards[4])
           self.maxJingli = tonumber(wildcards[5])
           self.currJingli = tonumber(wildcards[6])
-          self.catchNum = self.catchNum + 1
-        elseif self.catchNum == 2 then
+          self.catchNum = catchNum + 1
+        elseif catchNum == 2 then
           self.maxQi = tonumber(wildcards[1])
           self.effQi = tonumber(wildcards[2])
           self.currQi = tonumber(wildcards[3])
           self.maxJing = tonumber(wildcards[4])
           self.effJing = tonumber(wildcards[5])
           self.currJing = tonumber(wildcards[6])
-          self.catchNum = self.catchNum + 1
+          self.catchNum = catchNum + 1
         else
           print("错误触发了hpbrief前两行的正则")
         end
@@ -118,7 +183,7 @@ local define_status = function()
           self.drink = tonumber(wildcards[4])
           self.catchNum = 1
         else
-          print("错误触发了hpbrief死三行的正则")
+          print("错误触发了hpbrief第三行的正则")
         end
       end
     }
@@ -130,32 +195,33 @@ local define_status = function()
       group = "status",
       regexp = REGEXP.ALIAS_STATUS_CATCH,
       response = function()
-        local catcher = coroutine.wrap(function()
+        local run = coroutine.wrap(function()
           self:catch()
         end)
-        catcher()
+        run()
       end
     }
     helper.addAlias {
       group = "status",
       regexp = REGEXP.ALIAS_STATUS_SHOW,
       response = function()
-        self:show()
+        self:fireWithCo(Events.SHOW)
       end
     }
   end
 
-  function prototype:catch()
-    local currCo = assert(coroutine.running(), "must in a coroutine")
-    self.waitThread = currCo
-    helper.enableTriggerGroups("status_hpbrief_start")
+  function prototype:doCatch()
+    if self.waitThread then
+      error("Previous thread is not disposed")
+    end
+    self.waitThread = assert(coroutine.running(), "Must be in coroutine")
     SendNoEcho("set status hpbrief_start")
     SendNoEcho("hpbrief")
     SendNoEcho("set status hpbrief_done")
     return coroutine.yield()
   end
 
-  function prototype:show()
+  function prototype:doShow()
     print("精：", self.currJing, "/", self.maxJing)
     print("气：", self.currQi, "/", self.maxQi)
     print("内力：", self.currNeili, "/", self.maxNeili)
@@ -164,7 +230,37 @@ local define_status = function()
     print("食物：", self.food, "饮水：", self.drink)
   end
 
+  function prototype:current()
+    return {
+      exp = self.exp,
+      pot = self.pot,
+      maxNeili = self.maxNeili,
+      currNeili = self.currNeili,
+      maxJingli = self.maxJingli,
+      currJingli = self.currJingli,
+      maxQi = self.maxQi,
+      effQi = self.effQi,
+      currQi = self.currQi,
+      maxJing = self.maxJing,
+      effJing = self.effJing,
+      currJing = self.currJing,
+      zhenqi = self.zhenqi,
+      zhenyuan = self.zhenyuan,
+      food = self.food,
+      drink = self.drink,
+    }
+  end
+
+  function prototype:catch()
+    self:fire(Events.CATCH)
+    self:fire(Events.STOP)
+  end
+
+  function prototype:show()
+    self:fire(Events.SHOW)
+  end
+
   return prototype
 end
 
-return define_status():singleton()
+return define_status():FSM()

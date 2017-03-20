@@ -11,8 +11,6 @@ local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
 
-
-
 local define_learn = function()
   local prototype = FSM.inheritedMeta()
   prototype.__index = prototype
@@ -169,6 +167,7 @@ local define_learn = function()
         end)
       end
     }
+    self:addTransitionToStop(States.exercise)
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -188,15 +187,12 @@ local define_learn = function()
       group = "learn_sleep",
       regexp = REGEXP.AWAKE,
       response = function()
-        local run = coroutine.wrap(function()
-          status:catch()
-          if status.food < 50 or status.drink < 50 then
-            return self:fire(Events.HUNGRY)
-          else
-            return self:fire(Events.WAKE_UP)
-          end
-        end)
-        run()
+        status:catch()
+        if status.food < 50 or status.drink < 50 then
+          return self:fire(Events.HUNGRY)
+        else
+          return self:fire(Events.WAKE_UP)
+        end
       end
     }
     helper.addTrigger {
@@ -210,11 +206,7 @@ local define_learn = function()
       group = "learn_exercise",
       regexp = REGEXP.DZ_FINISH,
       response = function()
-        local co = coroutine.create(function()
-          self:dzOrDazuoIfEnoughQi()
-        end)
-        local ok, err = coroutine.resume(co)
-        print(ok, err)
+        self:dzOrDazuoIfEnoughQi()
       end
     }
     helper.addTrigger {
@@ -242,14 +234,14 @@ local define_learn = function()
       group = "learn",
       regexp = REGEXP.ALIAS_LEARN_START,
       response = function()
-        self:fire(Events.START)
+        self:fireWithCo(Events.START)
       end
     }
     helper.addAlias {
       group = "learn",
       regexp = REGEXP.ALIAS_LEARN_STOP,
       response = function()
-        self:fire(Events.STOP)
+        self:fireWithCo(Events.STOP)
       end
     }
     helper.addAlias {
@@ -269,6 +261,8 @@ local define_learn = function()
   function prototype:doLearnUntilBadStatus()
     while true do
       status:catch()
+      status:show()
+      --print("currNeili", status.currNeili)
       if status.currNeili > 50 then
         SendNoEcho("yun regenerate")
         SendNoEcho("do 10 xue fuzi for literate 1")
@@ -297,9 +291,9 @@ local define_learn = function()
       SendNoEcho("n")
       SendNoEcho("say 狐狸狐狸")
       helper.assureNotBusy()
-      SendNoEcho("eat")
+      SendNoEcho("do 2 eat")
       helper.assureNotBusy()
-      SendNoEcho("drink")
+      SendNoEcho("do 2 drink")
       helper.assureNotBusy()
       SendNoEcho("out")
       SendNoEcho("s")
@@ -322,15 +316,14 @@ local define_learn = function()
 
   function prototype:dzOrDazuoIfEnoughQi()
     status:catch()
-    status:show()
---    local diff = status.maxNeili * 2 - status.currNeili + 1
---    print("还需要" .. diff .. "内力，当前气" .. self.currQi)
---    if diff < status.currQi + 50 then
---      SendNoEcho("dazuo " .. diff)
---    else
---      SendNoEcho("dz max")
---    end
-    SendNoEcho("dz max")
+    local diff = status.maxNeili * 2 - status.currNeili + 1
+    print("还需要" .. diff .. "内力，当前气" .. status.currQi)
+    if diff < status.currQi + 50 then
+      SendNoEcho("dazuo " .. diff)
+    else
+      SendNoEcho("dz max")
+    end
+--    SendNoEcho("dz max")
   end
 
   return prototype

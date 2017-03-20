@@ -121,6 +121,16 @@ local define_dal = function()
     }
   end
 
+  function prototype:getPseudoPath(roomId)
+    return RoomPath:decorate {
+      startid = roomId,
+      endid = roomId,
+      path = "look",
+      endcode = "",
+      weight = 0
+    }
+  end
+
   function prototype:getAllAvailablePaths()
     return self.db:fetchRowsAs {
       stmt = "GET_ALL_AVAILABLE_PATHS",

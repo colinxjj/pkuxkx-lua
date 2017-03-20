@@ -232,7 +232,7 @@ local define_travel = function()
     assert(not action or type(action) == "function", "action must be function or nil")
     self.targetRoomId = targetRoomId
     self.targetAction = action
-    return self:fire(Events.START)
+    self:fire(Events.START)
   end
 
   -- 等待直到到达目的地，必须在coroutine中使用
@@ -377,12 +377,8 @@ local define_travel = function()
 
   -- 别名-重定位
   function prototype:reloc()
-    local co = coroutine.create(function()
-      self:stop()
-      print("stopped, to fire start")
-      self:fire(Events.START)
-    end)
-    coroutine.resume(co)
+    self:fire(Events.STOP)
+    self:fire(Events.START)
   end
 
   function prototype:showDesc(roomDesc)
@@ -944,7 +940,7 @@ local define_travel = function()
       group = "travel",
       regexp = REGEXP.ALIAS_STOP,
       response = function ()
-        self:stop()
+        coroutine.wrap(function() self:stop() end)()
       end
     }
     -- 重定位
@@ -952,7 +948,7 @@ local define_travel = function()
       group = "travel",
       regexp = REGEXP.ALIAS_RELOC,
       response = function()
-        self:reloc()
+        coroutine.wrap(function() self:reloc() end)()
       end
     }
     -- 自动行走
@@ -961,7 +957,9 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_WALKTO_ID,
       response = function(name, line, wildcards)
         local targetRoomId = tonumber(wildcards[1])
-        self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+        coroutine.wrap(function()
+          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+        end)()
       end
     }
     helper.addAlias {
@@ -977,18 +975,16 @@ local define_travel = function()
         elseif self.zonesByCode[target] then
           local targetRoomCode = self.zonesByCode[target].centercode
           local targetRoomId = self.roomsByCode[targetRoomCode].id
-          local co = coroutine.create(function()
+          coroutine.wrap(function()
             self:stop()
             self:walkto(targetRoomId, function() self:debug("到达目的地") end)
-          end)
-          coroutine.resume(co)
+          end)()
         elseif self.roomsByCode[target] then
           local targetRoomId = self.roomsByCode[target].id
-          local co = coroutine.create(function()
+          coroutine.wrap(function()
             self:stop()
             self:walkto(targetRoomId, function() self:debug("到达目的地") end)
-          end)
-          coroutine.resume(co)
+          end)()
         else
           print("查询不到相应房间")
           return false
@@ -1026,7 +1022,9 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_TRAVERSE,
       response = function(name, line, wildcards)
         local depth = tonumber(wildcards[1])
-        self:traverseNearby(depth)
+        coroutine.wrap(function()
+          self:traverseNearby(depth)
+        end)()
       end
     }
     -- 遍历区域
@@ -1043,11 +1041,10 @@ local define_travel = function()
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_HERE,
       response = function()
-        local co = coroutine.create(function()
+        coroutine.wrap(function()
           self:lookUntilNotBusy()
           self:show()
-        end)
-        coroutine.resume(co)
+        end)()
       end
     }
     helper.addAlias {
@@ -1442,10 +1439,15 @@ local define_travel = function()
 
   -- 生成遍历计划
   function prototype:generateTraversePlan()
-    return traversal {
+    local plan = traversal {
       rooms = self.traverseRooms,
       startid = self.currRoomId
     }
+    -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path
+    if plan and #plan > 0 then
+      table.insert(plan, dal:getPseudoPath(plan[#plan].startid))
+    end
+    return plan
   end
 
   -- 准备行走计划（直达，或遍历）
