@@ -118,6 +118,15 @@ local define_helper = function()
     assert(retCode == eOK or retCode == eTriggerNotFound)
   end
 
+  helper.removeAllTriggers = function()
+    local triggerList = GetTriggerList()
+    if triggerList then
+      for _, trigger in ipairs(triggerList) do
+        helper.removeTrigger(trigger)
+      end
+    end
+  end
+
   helper.removeTriggerGroups = function(...)
     local groups = {}
     for _, group in ipairs({...}) do
@@ -168,8 +177,17 @@ local define_helper = function()
       _G.world[name] = nil
     end
     local retCode = DeleteAlias(name)
-    print("remove alias", name, retCode)
+    -- print("remove alias", name, retCode)
     assert(retCode == eOK or retCode == eAliasNotFound)
+  end
+
+  helper.removeAllAliases = function()
+    local aliasList = GetAliasList()
+    if aliasList then
+      for i, alias in ipairs(aliasList) do
+        helper.removeAlias(alias)
+      end
+    end
   end
 
   helper.removeAliasGroups = function(...)
@@ -441,6 +459,10 @@ local define_helper = function()
     assert(jobs[prefix], "job trigger is not initialized by helper: " .. prefix)
     job[prefix].submit()
   end
+
+  -- 删除所有触发与别名
+  helper.removeAllTriggers()
+  helper.removeAllAliases()
 
   return helper
 end

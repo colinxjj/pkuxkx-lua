@@ -146,8 +146,8 @@ local define_status = function()
   end
 
   function prototype:catch()
-    local currCo = assert(coroutine.running, "must in a coroutine")
-    self.currThread = currCo
+    local currCo = assert(coroutine.running(), "must in a coroutine")
+    self.waitThread = currCo
     helper.enableTriggerGroups("status_hpbrief_start")
     SendNoEcho("set status hpbrief_start")
     SendNoEcho("hpbrief")
