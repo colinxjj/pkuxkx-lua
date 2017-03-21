@@ -83,45 +83,6 @@ local define_FSM = function()
 
   function prototype:getState() return self.currState end
 
---  function prototype:fire(event)
---    assert(coroutine.running(), "fire function must be called within coroutine")
---    self:debug("状态", self.currState, "事件", event)
---    local transition = self.transitions[self.currState][event]
---    --    tprint(transition)
---    if not transition then
---      print(string.format("当前状态[%s]不接受事件[%s]", self.currState or "nil", event or "nil"))
---    else
---      self:debug("当前状态", self.currState, "事件", event)
---      -- using coroutine instead of function so that inside we can
---      -- make use of wait functionalities
---      local transitioner = coroutine.create(function()
---        if transition.beforeExit then
---          self:debug("执行退出前转换")
---          transition.beforeExit()
---        end
---
---        self:debug("退出状态", self.currState)
---        self.states[self.currState].exit()
---        self.currState = transition.newState
---
---        self:debug("进入状态", self.currState)
---        self.states[self.currState].enter()
---
---        if transition.afterEnter then
---          self:debug("执行进入后转换")
---          transition.afterEnter()
---        end
---
---        return coroutine.yield()
---      end)
---      local ok, ret = coroutine.resume(transitioner)
---      if not ok then
---        error(ret, 2)
---      end
---      return ret
---    end
---  end
-
   function prototype:fire(event)
     assert(coroutine.running(), "fire function must be called within coroutine")
     self:debug("状态", self.currState, "事件", event)
@@ -149,10 +110,7 @@ local define_FSM = function()
   end
 
   function prototype:fireWithCo(event)
-    local run = coroutine.wrap(function()
-      return self:fire(event)
-    end)
-    return run()
+    coroutine.wrap(function() return self:fire(event) end)()
   end
 
   return prototype

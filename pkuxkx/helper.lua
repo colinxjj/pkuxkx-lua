@@ -166,16 +166,15 @@ local define_helper = function()
   local ALIAS_BASE_FLAG = alias_flag.Enabled + alias_flag.RegularExpression + alias_flag.Replace
   helper.addAlias = function(args)
     local regexp = assert(args.regexp, "regexp of alias cannot be empty")
-    local response = assert(args.response, "response of alias cannot be empty")
+    local response = assert(type(args.response) == "function" and args.response, "response of alias must be function")
     local group = assert(args.group, "group of alias cannot be empty")
     local name = args.name or "auto_added_alias_" .. GetUniqueID()
-    if type(response) == "function" then
-      _G.world[name] = response
-      _global_alias_callbacks[name] = true
-      check(AddAlias(name, regexp, "", ALIAS_BASE_FLAG, name))
-      check(SetAliasOption(name, "send_to", sendto.script))
-      check(SetAliasOption(name, "group", group))
-    end
+
+    _G.world[name] = helper.repeatedRunnableWithCo(response)
+    _global_alias_callbacks[name] = true
+    check(AddAlias(name, regexp, "", ALIAS_BASE_FLAG, name))
+    check(SetAliasOption(name, "send_to", sendto.script))
+    check(SetAliasOption(name, "group", group))
   end
 
   helper.removeAlias = function(name)

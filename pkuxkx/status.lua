@@ -191,17 +191,14 @@ local define_status = function()
       group = "status",
       regexp = REGEXP.ALIAS_STATUS_CATCH,
       response = function()
-        local run = coroutine.wrap(function()
-          self:catch()
-        end)
-        run()
+        self:catch()
       end
     }
     helper.addAlias {
       group = "status",
       regexp = REGEXP.ALIAS_STATUS_SHOW,
       response = function()
-        self:fireWithCo(Events.SHOW)
+        self:fire(Events.SHOW)
       end
     }
   end

@@ -659,14 +659,14 @@ local define_teach = function()
       group = "huashan_teach",
       regexp = "^teaching\\s+start\\s*$",
       response = function()
-        coroutine.wrap(function() self:fire(Events.START) end)()
+        self:fire(Events.START)
       end
     }
     helper.addAlias {
       group = "huashan_teach",
       regexp = "^teaching\\s+stop\\s*$",
       response = function()
-        coroutine.wrap(function() self:fire(Events.STOP) end)()
+        self:fire(Events.STOP)
       end
     }
     helper.addAlias {

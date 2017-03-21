@@ -259,14 +259,14 @@ local define_learn = function()
       group = "learn",
       regexp = REGEXP.ALIAS_LEARN_START,
       response = function()
-        self:fireWithCo(Events.START)
+        self:fire(Events.START)
       end
     }
     helper.addAlias {
       group = "learn",
       regexp = REGEXP.ALIAS_LEARN_STOP,
       response = function()
-        self:fireWithCo(Events.STOP)
+        self:fire(Events.STOP)
       end
     }
     helper.addAlias {

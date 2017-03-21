@@ -126,6 +126,7 @@ local define_travel = function()
     ALIAS_LOC_UPDATE_ID = "^loc\\s+update\\s+(\\d+)\\s*$",
     ALIAS_LOC_MU_ID = "^loc\\s+mu\\s+(\\d+)\\s*$",
     ALIAS_LOC_SHOW = "^loc\\s+show\\s*$",
+    ALIAS_LOC_LMU_ID = "^loc\\s+lmu\\s+(\\d+)\\s*$",
     -- triggers
     ROOM_NAME_WITH_AREA = "^[ >]{0,12}([^ ]+) \\- \\[[^ ]+\\]$",
     ROOM_NAME_WITHOUT_AREA = "^[ >]{0,12}([^ ]+) \\- $",
@@ -233,7 +234,7 @@ local define_travel = function()
     assert(not action or type(action) == "function", "action must be function or nil")
     self.targetRoomId = targetRoomId
     self.targetAction = action
-    self:fire(Events.START)
+    return self:fire(Events.START)
   end
 
   -- 等待直到到达目的地，必须在coroutine中使用
@@ -258,6 +259,15 @@ local define_travel = function()
     return coroutine.yield()
   end
 
+  -- 某个区域是否可遍历，修改该方法可以屏蔽某些危险区域
+  function prototype:isZoneTraversable(zone)
+    if self.zonesByCode[zone] then
+      return true
+    else
+      return false
+    end
+  end
+
   ----------- Alias-only API ----------
   -- below functions are only used
   -- in alias
@@ -268,12 +278,12 @@ local define_travel = function()
     local performUpdate = performUpdate or false
     local room = dal:getRoomById(roomId)
     if not room then
-      print("查询不到指定编号的房间：" .. roomId)
+      ColourNote("red", "", "查询不到指定编号的房间：" .. roomId)
       return
     end
     -- 比较房间名称
     if not self.currRoomName then
-      print("当前房间无可确定的名称，请先使用LOC定位命令捕捉")
+      ColourNote("red", "", "当前房间无可确定的名称，请先使用LOC定位命令捕捉")
       return
     end
     if self.currRoomName == room.name then
@@ -343,9 +353,9 @@ local define_travel = function()
       end
     elseif exitsIdentical and not pathIdentical then
       if performUpdate then
-        print("出口匹配但路径不匹配，不建议更新数据库，如需要请手动update")
+        ColourNote("yellow", "", "出口匹配但路径不匹配，不建议更新数据库，如需要请手动update")
       else
-        print("出口匹配但路径不匹配")
+        ColourNote("yellow", "", "出口匹配但路径不匹配")
       end
     elseif pathIdentical then
       if performUpdate then
@@ -356,9 +366,9 @@ local define_travel = function()
       end
     else
       if performUpdate then
-        print("出口与路径都不匹配，不建议更新数据库，如需要请手动update")
+        ColourNote("yellow", "", "出口与路径都不匹配，不建议更新数据库，如需要请手动update")
       else
-        print("出口与路径都不匹配")
+        ColourNote("yellow", "", "出口与路径都不匹配")
       end
     end
     print(table.concat(pathDisplay, ", "))
@@ -945,6 +955,7 @@ local define_travel = function()
         print("loc show", "仅显示当前房间信息，不做look定位")
         print("loc guess", "通过房间名称的拼音查找类似的房间")
         print("loc mu <number>", "将当前房间与目标房间对比，如果信息匹配，则更新")
+        print("loc lmu <number>", "查看当前房间，与目标房间对比并进行更新，该操作主要用于为地图添加或更新节点")
       end
     }
     helper.addAlias {
@@ -963,7 +974,7 @@ local define_travel = function()
       group = "travel",
       regexp = REGEXP.ALIAS_STOP,
       response = function ()
-        coroutine.wrap(function() self:stop() end)()
+        self:stop()
       end
     }
     -- 重定位
@@ -971,7 +982,7 @@ local define_travel = function()
       group = "travel",
       regexp = REGEXP.ALIAS_RELOC,
       response = function()
-        coroutine.wrap(function() self:reloc() end)()
+        self:reloc()
       end
     }
     -- 自动行走
@@ -980,9 +991,7 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_WALKTO_ID,
       response = function(name, line, wildcards)
         local targetRoomId = tonumber(wildcards[1])
-        coroutine.wrap(function()
-          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
-        end)()
+        self:walkto(targetRoomId, function() self:debug("到达目的地") end)
       end
     }
     helper.addAlias {
@@ -998,16 +1007,12 @@ local define_travel = function()
         elseif self.zonesByCode[target] then
           local targetRoomCode = self.zonesByCode[target].centercode
           local targetRoomId = self.roomsByCode[targetRoomCode].id
-          coroutine.wrap(function()
-            self:stop()
-            self:walkto(targetRoomId, function() self:debug("到达目的地") end)
-          end)()
+          self:stop()
+          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
         elseif self.roomsByCode[target] then
           local targetRoomId = self.roomsByCode[target].id
-          coroutine.wrap(function()
-            self:stop()
-            self:walkto(targetRoomId, function() self:debug("到达目的地") end)
-          end)()
+          self:stop()
+          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
         else
           print("查询不到相应房间")
           return false
@@ -1045,9 +1050,7 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_TRAVERSE,
       response = function(name, line, wildcards)
         local depth = tonumber(wildcards[1])
-        coroutine.wrap(function()
-          self:traverseNearby(depth)
-        end)()
+        self:traverseNearby(depth)
       end
     }
     -- 遍历区域
@@ -1064,10 +1067,8 @@ local define_travel = function()
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_HERE,
       response = function()
-        coroutine.wrap(function()
-          self:lookUntilNotBusy()
-          self:show()
-        end)()
+        self:lookUntilNotBusy()
+        self:show()
       end
     }
     helper.addAlias {
@@ -1125,6 +1126,16 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_LOC_SHOW,
       response = function()
         self:show()
+      end
+    }
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_LOC_LMU_ID,
+      response = function(name, line, wildcards)
+        local targetRoomId = tonumber(wildcards[1])
+        self:lookUntilNotBusy()
+        self:show()
+        self:match(targetRoomId, true)
       end
     }
   end

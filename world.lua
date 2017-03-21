@@ -193,28 +193,5 @@ function utils.split(str, delim)
   return results
 end
 
---local utf8 = require 'utf8'
---local iconv = require "luaiconv"
---local utf16le = iconv.open("utf-16be", "utf-8")
---function utils.utf8decode(str)
---  local ustr = utf16le:iconv(str)
---  local results = {}
---  local c = 0
---  for i=1,string.len(ustr) do
---    if i - math.floor(i / 2) * 2 == 0 then
---      c = c * 256 + string.byte(ustr, i)
---      table.insert(results, c)
---    else
---      c = string.byte(ustr, i)
---    end
---  end
---  return results
---end
---
---function utils.utf8len(str)
---  return #(utils.utf8decode(str))
---end
---
---function utils.utf8sub(str, start_ci, end_ci)
---  return utf8.sub(str, start_ci, end_ci)
---end
+bit = {}
+bit.bor = function() end
