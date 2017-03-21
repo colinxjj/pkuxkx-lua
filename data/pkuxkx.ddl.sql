@@ -54,7 +54,8 @@ values
   ('qufu', '曲阜', 'qufukongmiao'),
   ('xinyang', '信阳', 'xinyangxiaoguangchang'),
   ('quanzhen', '全真', 'quanzhenchongxuantai'),
-  ('changjiangbeian', '长江北岸', 'changjiangbeianchangjiangdukou1')
+  ('changjiangbei', '长江北岸', 'changjiangbeichangjiangdukou1'),
+  ('huanghenan', '黄河南岸', 'huanghenanmengjindu')
 ;
 --   ('taishan', '泰山');
 
@@ -85,8 +86,10 @@ values
   ('quanzhen', 'xiaoshancun', 13),
   ('changjiangbeian', 'yangzhou', 12),
   ('yangzhou', 'changjiangbeian', 12),
-  ('changjiangbeian', 'xinyang', 15),
-  ('xinyang', 'changjiangbeian', 15)
+  ('changjiangbei', 'xinyang', 15),
+  ('xinyang', 'changjiangbei', 15),
+  ('huanghenan', 'qufu', 11),
+  ('qufu', 'huanghenan', 11)
 ;
 
 

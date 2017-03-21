@@ -29,7 +29,8 @@ local define_learn = function()
     FULL = "full",
     BAD_STATUS = "bad_status",
     WAKE_UP = "wake_up",
-    PAUSE_EXERCISE = "pause_exercise"
+    PAUSE_EXERCISE = "pause_exercise",
+    NO_MASTER = "no_master",
   }
 
   local REGEXP = {
@@ -126,6 +127,16 @@ local define_learn = function()
       action = function()
         travel:walkto(2921, function()
           self:doSleepUntilFallAsleep()
+        end)
+      end
+    }
+    self:addTransition {
+      oldState = States.learn,
+      newState = States.exercise,
+      event = Events.NO_MASTER,
+      action = function()
+        travel:walkto(2921, function()
+          self:doExerciseUntilSatisfied()
         end)
       end
     }
@@ -298,7 +309,8 @@ local define_learn = function()
       end
       wait.time(1)
     end
-    error("Master not exists")
+    --error("Master not exists")
+    return self:fire(Events.NO_MASTER)
   end
 
   function prototype:doSleepUntilFallAsleep()

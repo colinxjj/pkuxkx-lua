@@ -142,6 +142,7 @@ local define_travel = function()
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
     WALK_BREAK = "^[ >]*设定环境变量：travel_walk = \"break\"$",
     WALK_STEP = "^[ >]*设定环境变量：travel_walk = \"step\"$",
+    JIANG = "江百胜伸手拦住你说道：盟主很忙，现在不见外客，你下山去吧！"
   }
   -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_RETRIES = 4
@@ -412,6 +413,9 @@ local define_travel = function()
       print("当前房间出口：", self.currRoomExits)
       print("当前房间描述：")
       self:showDesc(self.currRoomDesc)
+      if not self.currRoomName then
+        return
+      end
       local potentialRooms = dal:getRoomsByName(self.currRoomName)
       if #(potentialRooms) > 1 then
         local ids = {}
@@ -421,6 +425,25 @@ local define_travel = function()
         print("同名房间：", table.concat(ids, ","))
       else
         print("无同名房间")
+      end
+
+      self:debug("当前房间名称：", self.currRoomName, "长度：", string.len(self.currRoomName))
+      if gb2312.len(self.currRoomName) > 10 then
+        print("当前版本仅支持10个汉字长度内的名称查询")
+      end
+      local pinyins = dal:getPinyinListByWord(self.currRoomName)
+      self:debug("尝试拼音列表：", pinyins and table.concat(pinyins, ", "))
+      local candidates = {}
+      for _, pinyin in ipairs(pinyins) do
+        local results = dal:getRoomsLikeCode(pinyin)
+        for id, room in pairs(results) do
+          table.insert(candidates, room.id)
+        end
+      end
+      if #candidates > 0 then
+        print("拼音同名房间：", table.concat(candidates, ","))
+      else
+        print("无拼音同名房间")
       end
     end
   end
