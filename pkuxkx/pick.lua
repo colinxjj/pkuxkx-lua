@@ -73,6 +73,9 @@ i
 
 │        你身上带着六件东西          (负重  1%)：
 
+你刚要前行，忽然发现江水决堤，不由暗自庆幸，还好没过去。
+
+
 ]]
 
 
@@ -140,8 +143,8 @@ local define_pick = function()
       "yangzhou",
       "xinyang",
       "zhongyuan",
-      "huanghenan",
-      "changjiangbei",
+      -- "huanghenan",
+      -- "changjiangbei",
       "qufu",
       "xiaoshancun"
     }
@@ -161,7 +164,7 @@ local define_pick = function()
     }
     self.coinThreshold = 3000
     self.silverThreshold = 500
-    self.goldThreashold = 10
+    self.goldThreshold = 10
   end
 
   function prototype:resetOnStop()
@@ -435,7 +438,7 @@ local define_pick = function()
       response = function()
         self:debug("身上物品数目：", self.itemCount)
         self:debug("升上物品重量百分比：", self.weightPercent)
-        if self.weightPercent >= 65 or self.itemCount >= 20 then
+        if self.weightPercent >= 50 or self.itemCount >= 10 then
           return self:fire(Events.ENOUGH_ITEMS)
         else
           return self:fire(Events.NOT_ENOUGH_ITEMS)
@@ -447,7 +450,7 @@ local define_pick = function()
       group = "pick_sell_check_start",
       regexp = helper.settingRegexp("pick", "sellcheck_start"),
       response = function()
-        helper.enableTriggerGroups("pick_item_check_done")
+        helper.enableTriggerGroups("pick_sell_check_done")
       end
     }
     helper.addTrigger {
@@ -456,7 +459,7 @@ local define_pick = function()
       response = function(name, line, wildcards)
         local itemNameCN = wildcards[1]
         local itemIds = wildcards[2]
-        local itemId = utils.split(itemIds, ",")[1]
+        local itemId = string.lower(utils.split(itemIds, ",")[1])
         if not self.itemsToSell then
           self.itemsToSell = {}
         end
@@ -502,7 +505,9 @@ local define_pick = function()
       group = "pick_money_check_done",
       regexp = helper.settingRegexp("pick", "moneycheck_done"),
       response = function()
-        if self.moneyCheckCoins > 2000 or self.moneyCheckS then
+        if self.moneyCheckCoins > self.coinThreshold
+          or self.moneyCheckSilvers > self.silverThreshold
+          or self.moneyCheckGolds > self.goldThreshold then
           self:debug(
             "身上金钱超过限额：",
             "gold:" .. self.moneyCheckGolds,
@@ -542,12 +547,12 @@ local define_pick = function()
     }
     -- picking triggers
     self:addPickingTriggers {
-      -- 黄金
-      "^[ >]*.*两黄金\\((Gold)\\)$",
-      -- 白银
-      "^[ >]*.*两白银\\((Silver)\\)$",
+      -- 黄金，白银
+      "^[ >]*.*两(?:黄金|白银)\\((.*)\\)$",
       -- 铜钱
-      "^[ >]*.*文铜钱\\((Coin)\\)$"
+      "^[ >]*.*文铜钱\\((Coin)\\)$",
+      -- 武器
+      "^[ >]*(?:铁甲|钢刀|钢剑|钢杖|长剑)\\((.*)\\)$"
     }
   end
 
@@ -685,11 +690,11 @@ local define_pick = function()
       wait.time(1)
       if self.moneyCheckCoins > self.coinThreshold then
         helper.assureNotBusy()
-        SendNoEcho("convert " .. self.coinThreshold .. " to silver")
+        SendNoEcho("convert " .. self.coinThreshold .. " coin to silver")
       end
       if self.moneyCheckSilvers > self.silverThreshold then
         helper.assureNotBusy()
-        SendNoEcho("convert " .. self.silverThreashold .. " to gold")
+        SendNoEcho("convert " .. self.silverThreshold .. " silver to gold")
       end
       if self.moneyCheckGolds > self.goldThreshold then
         helper.assureNotBusy()

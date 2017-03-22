@@ -1441,6 +1441,16 @@ local define_travel = function()
       end
       return self:fire(Events.WALK_NEXT_STEP)
     else
+      -- here we also need to put traverse check if traversing
+      if self.traverseCheck then
+        -- 设置遍历房间号
+        local checked, msg = self.traverseCheck()
+        self:debug("遍历检测结果", checked, msg)
+        if checked then
+          -- 将遍历房间号设置回当前房间
+          return self:fire(Events.ARRIVED)
+        end
+      end
       return self:fire(Events.ARRIVED)
     end
   end
