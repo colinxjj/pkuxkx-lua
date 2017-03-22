@@ -18,6 +18,14 @@ local define_RoomPath = function()
   prototype.__index = prototype
   setmetatable(prototype, {__index = Path})
 
+  prototype.Category = {
+    normal = 1,
+    multiple = 2,
+    trigger = 3,
+    busy = 4,
+    boat = 5
+  }
+
   function prototype:new(args)
     local obj = Path:new(args)
     --    assert(obj.endcode, "endcode cannot be nil")

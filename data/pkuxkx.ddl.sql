@@ -55,7 +55,8 @@ values
   ('xinyang', '信阳', 'xinyangxiaoguangchang'),
   ('quanzhen', '全真', 'quanzhenchongxuantai'),
   ('changjiangbei', '长江北岸', 'changjiangbeichangjiangdukou1'),
-  ('huanghenan', '黄河南岸', 'huanghenanmengjindu')
+  ('huanghenan', '黄河南岸', 'huanghenanmengjindu'),
+  ('luoyang', '洛阳', 'luoyangzhongxingguangchang')
 ;
 --   ('taishan', '泰山');
 
@@ -89,7 +90,12 @@ values
   ('changjiangbei', 'xinyang', 15),
   ('xinyang', 'changjiangbei', 15),
   ('huanghenan', 'qufu', 11),
-  ('qufu', 'huanghenan', 11)
+  ('qufu', 'huanghenan', 11),
+  --
+  ('luoyang', 'huanghenan', 8),
+  ('huanghenan', 'luoyang', 8),
+  ('luoyang', 'zhongyuan', 9),
+  ('zhongyuan', 'luoyang', 9)
 ;
 
 

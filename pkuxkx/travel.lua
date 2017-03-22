@@ -9,6 +9,13 @@
 --------------------------------------------------------------
 -- travel.lua
 -- 提供定位与行走功能，使用travel查看别名使用
+-- history:
+-- 2017/3/15 创建
+-- 2017/3/22 修改，添加map_change event
+-- 原因：在江边行走时，会有洪水事件改编当前房间的出口，导致行走失败。
+-- 修改内容：增加map_change事件，可导致walking状态转换为blocked状态，
+--         定时查看当前房间出口，直到与原房间出口匹配时，返回walking状态
+--         添加私有域prevPath，保存前一步行走信息，该
 --
 -- 该模块采用了FSM设计模式，目标是稳定，易用，容错。
 -- FSM状态有：
@@ -71,6 +78,8 @@ local dalDef = require "pkuxkx.dal"
 local dal = dalDef.open(db)
 local Room = require "pkuxkx.Room"
 local ZonePath = require "pkuxkx.ZonePath"
+local RoomPath = require "pkuxkx.RoomPath"
+local PathCategory = RoomPath.Category
 local Deque = require "pkuxkx.deque"
 
 local define_travel = function()
@@ -427,7 +436,7 @@ local define_travel = function()
         return
       end
       local potentialRooms = dal:getRoomsByName(self.currRoomName)
-      if #(potentialRooms) > 1 then
+      if #(potentialRooms) >= 1 then
         local ids = {}
         for _, room in pairs(potentialRooms) do
           table.insert(ids, room.id)
@@ -1371,7 +1380,6 @@ local define_travel = function()
     if #(self.walkPlan) > 0 then
       self.walkSteps = self.walkSteps + 1
       local move = table.remove(self.walkPlan)
-      self:debug("move", move.startid, move.path, move.category)
       -- 当遍历时，先执行遍历检查函数
       if self.traverseCheck then
         -- 设置遍历房间号
@@ -1385,17 +1393,22 @@ local define_travel = function()
         end
       end
       -- 执行路径
-      if move.category == "busy" then
-        self:debug("路径", move.startid, move.endid, move.path)
+      self:debug("路径", move.startid, move.endid, move.path, move.category)
+      if move.category == PathCategory.busy then
         SendNoEcho(move.path)
         return self:fire(Events.BUSY)
-      elseif move.category == "boat" then
-        self:debug("路径", move.startid, move.endid, move.path)
+      elseif move.category == PathCategory.boat then
         SendNoEcho(move.path)
         return self:fire(Events.BOAT)
-      else
-        self:debug("路径", move.startid, move.endid, move.path)
+      elseif move.category == PathCategory.multiple then
+        local cmds = utils.split(move.path, ";")
+        for i = 1, #cmds do
+          SendNoEcho(cmds[i])
+        end
+      elseif move.category == PathCategory.normal then
         SendNoEcho(move.path)
+      else
+        error("current version does not support this path category:" .. move.category, 2)
       end
       -- we cannot use quick mode to traverse, because traverse has to use callback check
       -- for each move
@@ -1419,7 +1432,7 @@ local define_travel = function()
           return self:fire(Events.WALK_NEXT_STEP)
         end
       else
-        if move.category == "slow" then
+        if self.mode == "slow" then
           wait.time(1)
         elseif self.traverseCheck then
           -- for traverse, we still need to wait some time
