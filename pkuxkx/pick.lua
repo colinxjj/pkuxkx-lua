@@ -162,9 +162,11 @@ local define_pick = function()
       ["蓝马褂"] = true,
       ["短打劲装"] = true
     }
-    self.coinThreshold = 3000
-    self.silverThreshold = 500
-    self.goldThreshold = 10
+    self.coinThreshold = 2000
+    self.silverThreshold = 200
+    self.goldThreshold = 2
+    self.weightThreshold = 50
+    self.itemThreshold = 10
   end
 
   function prototype:resetOnStop()
@@ -438,7 +440,7 @@ local define_pick = function()
       response = function()
         self:debug("身上物品数目：", self.itemCount)
         self:debug("升上物品重量百分比：", self.weightPercent)
-        if self.weightPercent >= 50 or self.itemCount >= 10 then
+        if self.weightPercent >= self.weightThreshold or self.itemCount >= self.itemThreshold then
           return self:fire(Events.ENOUGH_ITEMS)
         else
           return self:fire(Events.NOT_ENOUGH_ITEMS)
