@@ -56,7 +56,8 @@ values
   ('quanzhen', '全真', 'quanzhenchongxuantai'),
   ('changjiangbei', '长江北岸', 'changjiangbeichangjiangdukou1'),
   ('huanghenan', '黄河南岸', 'huanghenanmengjindu'),
-  ('luoyang', '洛阳', 'luoyangzhongxingguangchang')
+  ('luoyang', '洛阳', 'luoyangzhongxingguangchang'),
+  ('changan', '长安', 'changanzhuquedajie')
 ;
 --   ('taishan', '泰山');
 
@@ -69,8 +70,8 @@ create table if not exists zone_connectivity (
 
 insert into zone_connectivity (startcode, endcode, weight)
 values
-  ('huashan', 'xiaoshancun', 20),
-  ('xiaoshancun', 'huashan', 20),
+  ('huashan', 'xiaoshancun', 13),    -- use 13 or 20?
+  ('xiaoshancun', 'huashan', 13),
   ('xiaoshancun', 'zhongyuan', 8),
   ('zhongyuan', 'xiaoshancun', 8),
   ('zhongyuan', 'yangzhou', 10),
@@ -91,11 +92,17 @@ values
   ('xinyang', 'changjiangbei', 15),
   ('huanghenan', 'qufu', 11),
   ('qufu', 'huanghenan', 11),
-  --
   ('luoyang', 'huanghenan', 8),
   ('huanghenan', 'luoyang', 8),
   ('luoyang', 'zhongyuan', 9),
-  ('zhongyuan', 'luoyang', 9)
+  ('zhongyuan', 'luoyang', 9),
+  --
+  ('huashan', 'changan', 15),  -- use 15 or 22?
+  ('changan', 'huashan', 15),
+  ('huanghenan', 'changan', 18),
+  ('changan', 'huanghenan', 18),
+  ('luoyang', 'changan', 18),
+  ('changan', 'luoyang', 18)
 ;
 
 
