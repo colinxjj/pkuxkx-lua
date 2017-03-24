@@ -224,6 +224,14 @@ local define_helper = function()
     end
   end
 
+  helper.countElements = function(tb)
+    local cnt = 0
+    for _ in pairs(tb) do
+      cnt = cnt + 1
+    end
+    return cnt
+  end
+
   -- convert chinese string to number
   local _nums = {
     ["һ"] = 1,

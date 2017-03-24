@@ -99,7 +99,7 @@ local define_travel = function()
     STOP = "stop",    -- 停止信号，任何状态收到该信号都会转换到stop状态
     LOCATION_CONFIRMED = "location_confirmed",    -- 确定定位信息
     LOCATION_CONFIRMED_ONLY = "location_confirmed_only",    -- 仅确定定位信息
-    LOCATION_CONFIRMED_TRAVERSE = "location_confirmed_traverse",    -- 确定定位信息（遍历）
+    -- LOCATION_CONFIRMED_TRAVERSE = "location_confirmed_traverse",    -- 确定定位信息（遍历）
     ARRIVED = "arrived",    -- 到达目的地信号
     GET_LOST = "get_lost",    -- 迷路信号
     MAX_RELOC_RETRIES = "max_reloc_retries",    -- 到达重定位重试最大次数
@@ -686,7 +686,11 @@ local define_travel = function()
       newState = States.stop,
       event = Events.WALK_PLAN_NOT_EXISTS,
       action = function()
-        print("自动行走失败！房间" .. self.currRoomId .. "到房间" .. self.targetRoomId .. "不可达", self.currState)
+        if self.traverseCheck then
+          ColourNote("red", "", "自动行走失败！无法遍历房间列表")
+        else
+          ColourNote("red", "", "自动行走失败！房间不可达", self.currRoomId, self.targetRoomId)
+        end
       end
     }
     self:addTransitionToStop(States.located)
@@ -816,6 +820,8 @@ local define_travel = function()
     self.zonesByName = zonesByName
     self.roomsById = roomsById
     self.roomsByCode = roomsByCode
+    print("地图数据加载完毕，共" .. helper.countElements(self.zonesByCode) .. "个区域，" ..
+      helper.countElements(self.roomsByCode) .. "个房间")
   end
 
   -- 初始化触发器
@@ -1354,7 +1360,7 @@ local define_travel = function()
             if self.targetRoomId then
               return self:fire(Events.LOCATION_CONFIRMED)
             elseif self.traverseCheck then
-              return self:fire(Events.LOCATION_CONFIRMED_TRAVERSE)
+              return self:fire(Events.LOCATION_CONFIRMED)
             else
               return self:fire(Events.LOCATION_CONFIRMED_ONLY)
             end
@@ -1511,7 +1517,7 @@ local define_travel = function()
   function prototype:prepareWalkPlan()
     local walkPlan
     if self.traverseCheck then
-      self:debug("生成遍历计划")
+      self:debug("生成遍历计划，起点：", self.currRoomId)
       walkPlan = self:generateTraversePlan()
     else
       self:debug("生成直达计划")
@@ -1568,4 +1574,13 @@ local define_travel = function()
 
   return prototype
 end
-return define_travel():FSM()
+--return define_travel():FSM()
+
+local travel = define_travel():FSM()
+local rooms = travel.zonesByCode["changan"].rooms
+print(helper.countElements(rooms))
+travel.traverseRooms = rooms
+travel.currRoomId = 110
+local plan = travel:generateTraversePlan()
+print(#plan)
+

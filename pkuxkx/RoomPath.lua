@@ -32,7 +32,7 @@ local define_RoomPath = function()
     assert(args.path, "path can not be nil")
     obj.path = args.path
     obj.endcode = args.endcode
-    obj.category = args.category or "normal"
+    obj.category = args.category or prototype.Category.normal
     setmetatable(obj, self or prototype)
     return obj
   end
@@ -41,7 +41,7 @@ local define_RoomPath = function()
     local obj = Path:decorate(obj)
     --    assert(obj.endcode, "endcode cannot be nil")
     assert(obj.path, "path cannot be nil")
-    obj.category = obj.category or "normal"
+    obj.category = obj.category or prototype.Category.normal
     setmetatable(obj, self or prototype)
     return obj
   end

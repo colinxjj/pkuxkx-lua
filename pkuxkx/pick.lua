@@ -140,13 +140,15 @@ local define_pick = function()
 
   function prototype:initPickSettings()
     self.pickZones = {
+      "luoyang",
+      "changan",
       "yangzhou",
       "xinyang",
       "zhongyuan",
       -- "huanghenan",
       -- "changjiangbei",
       "qufu",
-      "xiaoshancun"
+      "xiaoshancun",
     }
     self.pickedZones = {}
     for _, zone in ipairs(self.pickZones) do
