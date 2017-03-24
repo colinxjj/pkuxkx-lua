@@ -18,12 +18,12 @@ local define_RoomPath = function()
   prototype.__index = prototype
   setmetatable(prototype, {__index = Path})
 
+  -- this definition should be in sync with path_category table in db
   prototype.Category = {
     normal = 1,
     multiple = 2,
-    trigger = 3,
-    busy = 4,
-    boat = 5
+    busy = 3,
+    boat = 4
   }
 
   function prototype:new(args)

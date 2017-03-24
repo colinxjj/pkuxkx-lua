@@ -11,11 +11,9 @@
 -- 提供定位与行走功能，使用travel查看别名使用
 -- history:
 -- 2017/3/15 创建
--- 2017/3/22 修改，添加map_change event
--- 原因：在江边行走时，会有洪水事件改编当前房间的出口，导致行走失败。
--- 修改内容：增加map_change事件，可导致walking状态转换为blocked状态，
---         定时查看当前房间出口，直到与原房间出口匹配时，返回walking状态
---         添加私有域prevPath，保存前一步行走信息，该
+-- 2017/3/24 修改，添加busy事件，同时考虑flood事件，配套解决方法可以是
+-- 对可能发生map change的路径标记并禁用quick模式；同时，当flood时，比对
+-- 当前房间出口直到出口发生变化，再进行后续行走。
 --
 -- 该模块采用了FSM设计模式，目标是稳定，易用，容错。
 -- FSM状态有：
@@ -24,21 +22,31 @@
 -- 3. located 已定位
 -- 4. walking 行走中
 -- 5. lost 迷路中
--- 6. blocked 被阻挡中（busy, boat等）
+-- 6. boat 乘船
+-- 7. busy（必须重复相同命令，如西蜀山路等）
+-- 8. flood (洪水导致房间出口发生变化)
+-- 9. blocked 被阻挡中
 -- 状态转换：
 -- 非stop状态都可通过发送STOP消息，转换为stop状态
 -- stop -> locating (event: START)
 -- locating -> locating (event: TRY_RELOCATE)
--- locating -> located (event: LOCATION_CONFIRMED, LOCATION_CONFIRMED_ONLY, LOCATION_CONFIRMED_TRAVERSE)
+-- locating -> located (event: LOCATION_CONFIRMED, LOCATION_CONFIRMED_ONLY)
 -- locating -> stop (event: MAX_RETRIES, ROOM_NO_EXITS)
 -- located -> located (event: START)
 -- located -> walking (event: WALK_PLAN_GENERATED)
 -- located -> stop (event: WALK_PLAN_NOT_EXISTS)
 -- walking -> located (event: ARRIVED)
 -- walking -> lost (event: GET_LOST)
--- walking -> blocked (event: BOAT, BUSY)
+-- walking -> boat (event: BOAT)
+-- walking -> busy (event: BUSY)
+-- walking -> flood (event: FLOOD)
+-- walking -> blocked (event: BLOCKED)
 -- lost -> locating (event: TRY_RELOCATE)
--- blocked -> walking (event: BLOCKING_SOLVED)
+-- boat -> walking (event: LEAVE_BOAT)
+-- busy -> walking (event: EASE)
+-- busy -> busy (event: BUSY)
+-- flood -> walkting (event: EXITS_CHANGE_BACK)
+-- blocked -> walking (event: CLEARED)
 --
 -- 对外API：
 -- travel:stop() 初始化状态，行走时会先定位当前房间，适用于大多数场景
@@ -91,7 +99,10 @@ local define_travel = function()
     lost = "lost",  -- 迷路了
     blocked = "blocked", -- 被阻挡
     locating = "locating",  -- 定位中
-    located = "located" -- 已定位
+    located = "located", -- 已定位
+    busy = "busy",    -- 行走忙碌中
+    boat = "boat",    -- 乘船中
+    flood = "flood",    -- 洪水
   }
   -- 事件列表
   local Events = {
@@ -99,7 +110,6 @@ local define_travel = function()
     STOP = "stop",    -- 停止信号，任何状态收到该信号都会转换到stop状态
     LOCATION_CONFIRMED = "location_confirmed",    -- 确定定位信息
     LOCATION_CONFIRMED_ONLY = "location_confirmed_only",    -- 仅确定定位信息
-    -- LOCATION_CONFIRMED_TRAVERSE = "location_confirmed_traverse",    -- 确定定位信息（遍历）
     ARRIVED = "arrived",    -- 到达目的地信号
     GET_LOST = "get_lost",    -- 迷路信号
     MAX_RELOC_RETRIES = "max_reloc_retries",    -- 到达重定位重试最大次数
@@ -108,8 +118,11 @@ local define_travel = function()
     WALK_PLAN_NOT_EXISTS = "walk_plan_not_exists",    -- 行走计划无法生成
     WALK_PLAN_GENERATED = "walk_plan_generated",    -- 行走计划生成
     BOAT = "boat",    -- 乘船信号
+    LEAVE_BOAT = "leave_boat",    -- 下船信号
     BUSY = "busy",    -- busy信号
-    BLOCKING_SOLVED = "blocking_solved",    -- 阻塞解除信号
+    EASE = "ease",    -- 解除busy信号
+    BLOCKED = "blocked",    -- 阻塞信号
+    CLEARED = "cleared",    -- 阻塞解除信号
     TRY_RELOCATE = "try_relocate",    -- 尝试重定位
     ROOM_INFO_UNKNOWN = "room_info_unknown",    -- 没有获取到房间信息
     WALK_NEXT_STEP = "walk_next_step"    -- 走下一步
@@ -147,12 +160,13 @@ local define_travel = function()
     LOOK_START = "^[ >]*设定环境变量：travel_look = \"start\"$",
     LOOK_DONE = "^[ >]*设定环境变量：travel_look = \"done\"$",
     ARRIVED = "^[ >]*设定环境变量：travel_walk = \"arrived\"$",
-    WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*)$",
+    WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！)$",
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
+    WALK_BUSY = "^[ >]*(你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*)$",
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
     WALK_BREAK = "^[ >]*设定环境变量：travel_walk = \"break\"$",
     WALK_STEP = "^[ >]*设定环境变量：travel_walk = \"step\"$",
-    JIANG = "江百胜伸手拦住你说道：盟主很忙，现在不见外客，你下山去吧！"
+    JIANG = "江百胜伸手拦住你说道：盟主很忙，现在不见外客，你下山去吧！",
   }
   -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_RETRIES = 4
@@ -597,6 +611,36 @@ local define_travel = function()
 
       end
     }
+    self:addState {
+      state = States.boat,
+      enter = function()
+
+      end,
+      exit = function()
+
+      end
+    }
+    self:addState {
+      state = States.busy,
+      enter = function()
+        self.walkBusy = false
+        helper.enableTriggerGroups("travel_walk_busy_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups(
+          "travel_walk_busy_start",
+          "travel_walk_busy_done")
+      end
+    }
+    self:addState {
+      state = States.flood,
+      enter = function()
+
+      end,
+      exit = function()
+
+      end
+    }
   end
 
   -- 初始化转换列表
@@ -685,13 +729,16 @@ local define_travel = function()
       oldState = States.located,
       newState = States.stop,
       event = Events.WALK_PLAN_NOT_EXISTS,
-      action = function()
-        if self.traverseCheck then
-          ColourNote("red", "", "自动行走失败！无法遍历房间列表")
-        else
-          ColourNote("red", "", "自动行走失败！房间不可达", self.currRoomId, self.targetRoomId)
-        end
-      end
+      action = {
+        beforeExit = function()
+          if self.traverseCheck then
+            ColourNote("red", "", "自动行走失败！无法遍历房间列表")
+          else
+            ColourNote("red", "", "自动行走失败！房间不可达 " .. self.currRoomId .. " -> " .. self.targetRoomId)
+          end
+        end,
+        afterEnter = function() end
+      }
     }
     self:addTransitionToStop(States.located)
     -- transitions from state<walking>
@@ -727,7 +774,7 @@ local define_travel = function()
     }
     self:addTransition {
       oldState = States.walking,
-      newState = States.blocked,
+      newState = States.boat,
       event = Events.BOAT,
       action = function()
 
@@ -736,7 +783,7 @@ local define_travel = function()
     self:addTransition {
       oldState = States.walking,
       newState = States.blocked,
-      event = Events.BUSY,
+      event = Events.BLOCKED,
       action = function()
 
       end
@@ -750,12 +797,23 @@ local define_travel = function()
         return self:fire(Events.TRY_RELOCATE)
       end
     }
+    self:addTransition {
+      oldState = States.walking,
+      newState = States.busy,
+      event = Events.BUSY,
+      action = function()
+        assert(self.walkBusyCmd, "进入busy状态walkBusyCmd变量不可为空")
+        self:debug("等待2秒执行walkBusyCmd:", self.walkBusyCmd)
+        wait.time(2)
+        return self:walkBusy()
+      end
+    }
     self:addTransitionToStop(States.walking)
     -- transitions from state<blocked>
     self:addTransition {
       oldState = States.blocked,
       newState = States.walking,
-      event = Events.BLOCKING_SOLVED,
+      event = Events.CLEARED,
       action = function()
         return self:walking()
       end
@@ -772,6 +830,29 @@ local define_travel = function()
       end
     }
     self:addTransitionToStop(States.lost)
+    -- transitions from state<busy>
+    self:addTransition {
+      oldState = States.busy,
+      newState = States.walking,
+      event = Events.EASE,
+      action = function()
+        -- 重置busy命令
+        self.walkBusyCmd = nil
+        return self:walking()
+      end
+    }
+    self:addTransition {
+      oldState = States.busy,
+      newState = States.busy,
+      event = Events.BUSY,
+      action = function()
+        assert(self.walkBusyCmd, "busy状态walkBusyCmd变量不可为空")
+        self:debug("等待2秒执行walkBusyCmd:", self.walkBusyCmd)
+        wait.time(2)
+        return self:walkBusy()
+      end
+    }
+    self:addTransitionToStop(States.stop)
   end
 
   -- 加载区域列表和房间列表
@@ -942,6 +1023,32 @@ local define_travel = function()
       group = "travel_walk",
       regexp = REGEXP.WALK_BLOCK,
       response = lostWay
+    }
+    -- busy触发
+    helper.addTrigger {
+      group = "travel_walk_busy_start",
+      regexp = helper.settingRegexp("travel", "walkbusy_start"),
+      response = function()
+        helper.enableTriggerGroups("travel_walk_busy_done")
+      end
+    }
+    helper.addTrigger {
+      group = "travel_walk_busy_done",
+      regexp = helper.settingRegexp("travel", "walkbusy_done"),
+      response = function()
+        if self.walkBusy then
+          return self:fire(Events.BUSY)
+        else
+          return self:fire(Events.EASE)
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "travel_walk_busy_done",
+      regexp = REGEXP.WALK_BUSY,
+      response = function()
+        self.walkBusy = true
+      end
     }
   end
 
@@ -1172,6 +1279,9 @@ local define_travel = function()
     self.walkInterval = self.walkInterval or INTERVAL
     self.mode = self.mode or "quick"
     self.delay = self.delay or 1
+    -- busy
+    self.walkBusyCmd = nil
+    self.walkBusy = false
     -- traversing
     self.traverseCheck = nil
     self.traverseRoomId = nil    -- 遍历时，每步都执行该方法，为true时停止遍历
@@ -1250,6 +1360,15 @@ local define_travel = function()
           return false
         else
           table.insert(zoneStack, ZonePath:decorate {startid=startZone.id, endid=startZone.id, weight=0})
+          -- only for debug
+          if self.DEBUG then
+            local zones = {}
+            for i=1,#zoneStack do
+              table.insert(zones, zoneStack[i].name)
+            end
+            self:debug("共经过" .. #zoneStack .. "个区域", table.concat(zones, ", "))
+          end
+
           local zoneCnt = #zoneStack
           local rooms = {}
           local roomCnt = 0
@@ -1400,19 +1519,19 @@ local define_travel = function()
       end
       -- 执行路径
       self:debug("路径", move.startid, move.endid, move.path, move.category)
-      if move.category == PathCategory.busy then
+      if move.category == PathCategory.normal then
         SendNoEcho(move.path)
-        return self:fire(Events.BUSY)
-      elseif move.category == PathCategory.boat then
-        SendNoEcho(move.path)
-        return self:fire(Events.BOAT)
       elseif move.category == PathCategory.multiple then
         local cmds = utils.split(move.path, ";")
         for i = 1, #cmds do
           SendNoEcho(cmds[i])
         end
-      elseif move.category == PathCategory.normal then
+      elseif move.category == PathCategory.busy then
+        self.walkbusyCmd = move.path
+        return self:fire(Events.BUSY)
+      elseif move.category == PathCategory.boat then
         SendNoEcho(move.path)
+        return self:fire(Events.BOAT)
       else
         error("current version does not support this path category:" .. move.category, 2)
       end
@@ -1472,6 +1591,12 @@ local define_travel = function()
       end
       return self:fire(Events.ARRIVED)
     end
+  end
+
+  function prototype:walkBusy()
+    SendNoEcho("set travel walkbusy_start")
+    SendNoEcho(self.walkBusyCmd)
+    SendNoEcho("set travel walkbusy_done")
   end
 
   -- 随机游走（重定位失败时）
@@ -1574,13 +1699,12 @@ local define_travel = function()
 
   return prototype
 end
---return define_travel():FSM()
+return define_travel():FSM()
 
-local travel = define_travel():FSM()
-local rooms = travel.zonesByCode["changan"].rooms
-print(helper.countElements(rooms))
-travel.traverseRooms = rooms
-travel.currRoomId = 110
-local plan = travel:generateTraversePlan()
-print(#plan)
-
+--local travel = define_travel():FSM()
+--local rooms = travel.zonesByCode["changan"].rooms
+--print(helper.countElements(rooms))
+--travel.traverseRooms = rooms
+--travel.currRoomId = 110
+--local plan = travel:generateTraversePlan()
+--print(#plan)

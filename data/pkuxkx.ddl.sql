@@ -15,9 +15,22 @@ create table if not exists paths (
   path text,
   endcode text,
   weight integer default 1,
-  enabled integer default 1
+  enabled integer default 1,
+  category integer default 1
 );
 create index if not exists idx_paths on paths (startid, endid);
+
+create table if not exists path_category (
+  id integer primary key AUTOINCREMENT ,
+  name text,
+  description text
+);
+create index idx_path_category_name on path_category (name);
+insert into path_category (id, name, description) values
+  (1, 'normal', '单个命令'),
+  (2, 'multiple', '多个命令，使用分号隔开'),
+  (3, 'busy', '单个命令，将导致busy状态，可能需要多次重复执行'),
+  (4, 'boat', '乘船命令');
 
 create table if not exists pinyin2chr (
   pinyin text primary key,
