@@ -205,7 +205,7 @@ local define_learn = function()
       group = "learn_sleep",
       regexp = REGEXP.AWAKE,
       response = function()
-        status:catch()
+        status:hpbrief()
         if status.food < 50 or status.drink < 50 then
           return self:fire(Events.HUNGRY)
         else
@@ -285,7 +285,7 @@ local define_learn = function()
 
   function prototype:doLearnUntilBadStatus()
     while self.masterExists do
-      status:catch()
+      status:hpbrief()
       status:show()
       --print("currNeili", status.currNeili)
       if status.currNeili > 50 then
@@ -353,7 +353,7 @@ local define_learn = function()
   end
 
   function prototype:dzOrDazuoIfEnoughQi()
-    status:catch()
+    status:hpbrief()
     local diff = status.maxNeili * 2 - status.currNeili + 1
     print("还需要" .. diff .. "内力，当前气" .. status.currQi)
     if diff < status.currQi + 50 then

@@ -114,7 +114,7 @@ local define_pick = function()
     CHECK_ITEM_START = helper.settingRegexp("pick", "checkitem_start"),
     CHECK_ITEM_DONE = helper.settingRegexp("pick", "checkitem_done"),
     WEIGHT_RATE = "^│\\s+你身上带着(.*?)件东西\\s+\\(负重\\s*(-?\\d+)%\\)：.*",
-    CANNOT_SELL_ITEM = "^(你身上没有.*|这样东西不值钱。|这样东西不能买卖。)$",
+    CANNOT_SELL_ITEM = "^[ >]*(你身上没有.*|这样东西不值钱。|这样东西不能买卖。)$",
     ITEM_ID = "([^ ]+)\\s+\\=\\s+([^\"]+)$",
     COINS_DESC = "^[ >]*(.*)文铜板\\((Coin)\\)",
     SILVERS_DESC = "^[ >]*(.*)两白银\\((Silver)\\)$",
@@ -171,7 +171,7 @@ local define_pick = function()
     self.silverThreshold = 200
     self.goldThreshold = 2
     self.weightThreshold = 50
-    self.itemThreshold = 10
+    self.itemThreshold = 15
   end
 
   function prototype:resetOnStop()
@@ -488,9 +488,13 @@ local define_pick = function()
             while #(self.itemsToSell) > 0 do
               local item = table.remove(self.itemsToSell)
               while true do
-                Send("sell " .. item)
+                helper.assureNotBusy()
+                SendNoEcho("sell " .. item)
                 local line = wait.regexp(REGEXP.CANNOT_SELL_ITEM, 2)
-                if line then break end
+                if line then
+                  -- SendNoEcho("drop " .. item)
+                  break
+                end
               end
             end
             return self:fire(Events.NOT_ENOUGH_ITEMS)

@@ -80,22 +80,10 @@ local define_helper = function()
   helper.addOneShotTrigger = function(args)
     local regexp = assert(type(args.regexp) == "string" and args.regexp, "regexp in trigger must be string")
     local group = assert(args.group, "group in trigger cannot be empty")
-    local response = assert(args.response, "response in trigger cannot be empty")
+    local response = assert(type(args.response) == "function" and args.response, "response in trigger must be function")
     local name = args.name or "auto_added_trigger_" .. GetUniqueID()
     local sequence = args.sequence or 10
-    if type(response) == "string" then
-      check(AddTriggerEx(
-        name,
-        regexp,
-        response, bit.bor (0,
-        trigger_flag.Enabled,
-        trigger_flag.RegularExpression,
-        trigger_flag.Temporary,
-        trigger_flag.Replace,
-        trigger_flag.OneShot),
-        custom_color.NoChange,
-        COPY_WILDCARDS_NONE, SOUND_FILE_NONE, "", sendto.world, sequence))
-    elseif type(response) == "function" then
+    if type(response) == "function" then
       _G.world[name] = response
       _global_trigger_callbacks[name] = true
       check(AddTriggerEx(
@@ -112,6 +100,10 @@ local define_helper = function()
     else
       error("response type is unexpected " .. type(response))
     end
+    if args.timerInterval and args.timerCheck then
+
+    end
+
     check(SetTriggerOption(name, "group", group))
   end
 

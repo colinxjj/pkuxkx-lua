@@ -16,7 +16,8 @@ create table if not exists paths (
   endcode text,
   weight integer default 1,
   enabled integer default 1,
-  category integer default 1
+  category integer default 1,
+  mapchange integer default 0
 );
 create index if not exists idx_paths on paths (startid, endid);
 

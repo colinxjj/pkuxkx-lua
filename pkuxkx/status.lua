@@ -14,12 +14,14 @@ local define_status = function()
 
   local States = {
     stop = "stop",
-    catch = "catch",
+    hpbrief = "hpbrief",
+    id = "id"
   }
   local Events = {
     STOP = "stop",
-    CATCH = "catch",
-    SHOW = "show"
+    HPBRIEF = "HPBRIEF",
+    SHOW = "show",
+    ID = "id"
   }
 
   local REGEXP = {
@@ -28,7 +30,8 @@ local define_status = function()
     HPBRIEF_LINE = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
     -- 真气，真元，食物，饮水
     HPBRIEF_LINE_EX = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
-    ALIAS_STATUS_CATCH = "^status\\s+catch\\s*$",
+    ITEM_ID = "([^ ]+)\\s+\\=\\s+([^\"]+)$",
+    ALIAS_STATUS_HPBRIEF = "^status\\s+hpbrief\\s*$",
     ALIAS_STATUS_SHOW = "^status\\s+show\\s*$"
   }
 
@@ -46,7 +49,8 @@ local define_status = function()
     self:initAliases()
     self:setState(States.stop)
 
-    self.catchNum = 1
+    -- hpbrief
+    self.hpbriefNum = 1
     self.waitThread = nil
 
     self.exp = nil
@@ -65,20 +69,23 @@ local define_status = function()
     self.zhenyuan = nil
     self.food = nil
     self.drink = nil
+
+    -- id
+    self.items = nil
   end
 
   function prototype:initStates()
     self:addState {
       state = States.stop,
       enter = function()
-        self.catchNum = 1
+        self.hpbriefNum = 1
       end,
       exit = function()
-        self.catchNum = 1
+        self.hpbriefNum = 1
       end
     }
     self:addState {
-      state = States.catch,
+      state = States.hpbrief,
       enter = function()
         helper.disableTriggerGroups("status_hpbrief_done")
         helper.enableTriggerGroups("status_hpbrief_start")
@@ -87,22 +94,39 @@ local define_status = function()
         helper.disableTriggerGroups("status_hpbrief_start", "status_hpbrief_done")
       end
     }
-  end
-
-  function prototype:initTransitions()
-    self:addTransition {
-      oldState = States.stop,
-      newState = States.catch,
-      event = Events.CATCH,
-      action = function()
-        self:doCatch()
+    self:addState {
+      state = States.id,
+      enter = function()
+        helper.disableTriggerGroups("status_id_done")
+        helper.enableTriggerGroups("status_id_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups(
+          "status_id_start",
+          "status_id_done")
       end
     }
+  end
+
+  function prototype:addTransitionToStop(fromState)
     self:addTransition {
-      oldState = States.catch,
+      oldState = fromState,
       newState = States.stop,
       event = Events.STOP,
       action = function() end
+    }
+  end
+
+  function prototype:initTransitions()
+    -- transition from state<stop>
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.hpbrief,
+      event = Events.HPBRIEF,
+      action = function()
+        self:doHpbrief()
+        return self:fire(Events.STOP)
+      end
     }
     self:addTransition {
       oldState = States.stop,
@@ -110,8 +134,24 @@ local define_status = function()
       event = Events.SHOW,
       action = function()
         self:doShow()
+        return self:fire(Events.STOP)
       end
     }
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.id,
+      event = Events.ID,
+      action = function()
+        self.items = nil
+        self:doId()
+        return self:fire(Events.STOP)
+      end
+    }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<hpbrief>
+    self:addTransitionToStop(States.hpbrief)
+    -- transition from state<id>
+    self:addTransitionToStop(States.id)
   end
 
   function prototype:initTriggers()
@@ -121,7 +161,7 @@ local define_status = function()
       regexp = helper.settingRegexp("status", "hpbrief_start"),
       response = function()
         helper.enableTriggerGroups("status_hpbrief_done")
-        self.catchNum = 1
+        self.hpbriefNum = 1
       end
     }
     helper.addTrigger {
@@ -129,7 +169,7 @@ local define_status = function()
       regexp = helper.settingRegexp("status", "hpbrief_done"),
       response = function()
         helper.disableTriggerGroups("status_hpbrief_start", "status_hpbrief_done")
-        self.catchNum = 1
+        self.hpbriefNum = 1
         local thread = self.waitThread
         if thread then
           self.waitThread = nil
@@ -146,23 +186,23 @@ local define_status = function()
       group = "status_hpbrief_done",
       regexp = REGEXP.HPBRIEF_LINE,
       response = function(name, line, wildcards)
-        local catchNum = self.catchNum
-        if catchNum == 1 then
+        local hpbriefNum = self.hpbriefNum
+        if hpbriefNum == 1 then
           self.exp = tonumber(wildcards[1])
           self.pot = tonumber(wildcards[2])
           self.maxNeili = tonumber(wildcards[3])
           self.currNeili = tonumber(wildcards[4])
           self.maxJingli = tonumber(wildcards[5])
           self.currJingli = tonumber(wildcards[6])
-          self.catchNum = catchNum + 1
-        elseif catchNum == 2 then
+          self.hpbriefNum = hpbriefNum + 1
+        elseif hpbriefNum == 2 then
           self.maxQi = tonumber(wildcards[1])
           self.effQi = tonumber(wildcards[2])
           self.currQi = tonumber(wildcards[3])
           self.maxJing = tonumber(wildcards[4])
           self.effJing = tonumber(wildcards[5])
           self.currJing = tonumber(wildcards[6])
-          self.catchNum = catchNum + 1
+          self.hpbriefNum = hpbriefNum + 1
         else
           print("错误触发了hpbrief前两行的正则")
         end
@@ -172,15 +212,56 @@ local define_status = function()
       group = "status_hpbrief_done",
       regexp = REGEXP.HPBRIEF_LINE_EX,
       response = function(name, line, wildcards)
-        if self.catchNum == 3 then
+        if self.hpbriefNum == 3 then
           self.zhenqi = tonumber(wildcards[1])
           self.zhenyuan = tonumber(wildcards[2])
           self.food = tonumber(wildcards[3])
           self.drink = tonumber(wildcards[4])
-          self.catchNum = 1
+          self.hpbriefNum = 1
         else
           print("错误触发了hpbrief第三行的正则")
         end
+      end
+    }
+    helper.addTrigger {
+      group = "status_id_start",
+      regexp = helper.settingRegexp("status", "id_start"),
+      response = function()
+        helper.enableTriggerGroups("status_id_done")
+      end
+    }
+    helper.addTrigger {
+      group = "status_id_done",
+      regexp = helper.settingRegexp("status", "id_done"),
+      response = function()
+        helper.disableTriggerGroups("status_id_done")
+        local thread = self.waitThread
+        if thread then
+          self.waitThread = nil
+          local ok, err = coroutine.resume(thread)
+          if not ok then
+            ColourNote ("deeppink", "black", "Error raised in trigger function (in wait module)")
+            ColourNote ("darkorange", "black", debug.traceback (thread))
+            error (err)
+          end -- if
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "status_id_done",
+      regexp = REGEXP.ITEM_ID,
+      response = function(name, line, wildcards)
+        local itemName = wildcards[1]
+        local itemIds = string.lower(wildcards[2])
+        local itemId = utils.split(itemIds, ",")[1]
+        if not self.items then
+          self.items = {}
+        end
+        table.insert(self.items, {
+          itemName = itemName,
+          itemId = itemId,
+          itemIds = itemIds
+        })
       end
     }
   end
@@ -189,9 +270,9 @@ local define_status = function()
     helper.removeAliasGroups("status")
     helper.addAlias {
       group = "status",
-      regexp = REGEXP.ALIAS_STATUS_CATCH,
+      regexp = REGEXP.ALIAS_STATUS_HPBRIEF,
       response = function()
-        self:catch()
+        self:hpbrief()
       end
     }
     helper.addAlias {
@@ -203,7 +284,7 @@ local define_status = function()
     }
   end
 
-  function prototype:doCatch()
+  function prototype:doHpbrief()
     if self.waitThread then
       error("Previous thread is not disposed")
     end
@@ -211,6 +292,17 @@ local define_status = function()
     SendNoEcho("set status hpbrief_start")
     SendNoEcho("hpbrief")
     SendNoEcho("set status hpbrief_done")
+    return coroutine.yield()
+  end
+
+  function prototype:doId()
+    if self.waitThread then
+      error("Previous thread is not disposed")
+    end
+    self.waitThread = assert(coroutine.running(), "Must be in coroutine")
+    SendNoEcho("set status id_start")
+    SendNoEcho("id")
+    SendNoEcho("set status id_done")
     return coroutine.yield()
   end
 
@@ -244,9 +336,8 @@ local define_status = function()
     }
   end
 
-  function prototype:catch()
-    self:fire(Events.CATCH)
-    self:fire(Events.STOP)
+  function prototype:hpbrief()
+    self:fire(Events.HPBRIEF)
   end
 
   function prototype:show()

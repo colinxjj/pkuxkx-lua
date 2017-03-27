@@ -41,6 +41,42 @@ local define_boat = function()
     return obj
   end
 
+  function prototype:restart()
+    self:fire(Events.STOP)
+    return self:fire(Events.START)
+  end
+
+  function prototype:waitUntilArrived(timer)
+    local currCo = assert(coroutine.running(), "Must be in coroutine")
+    local waitPattern = helper.settingRegexp("boat", "arrived")
+    if timer then
+      -- timer means we need to check the status periodically
+      local interval = assert(timer.interval, "interval of timer cannot be nil")
+      local check = assert(type(timer.check) == "function", "check of timer must be function")
+      while true do
+        local line = wait.regexp(waitPattern, interval)
+        if line then break end
+        if check() then break end
+      end
+    else
+      -- no timer, so just schedule a one-shot trigger without timeout
+      local resumeCo = function()
+        local ok, err = coroutine.resume(currCo)
+        if not ok then
+          ColourNote ("deeppink", "black", "Error raised in timer function (in wait module).")
+          ColourNote ("darkorange", "black", debug.traceback(currCo))
+          error (err)
+        end -- if
+      end
+      helper.addOneShotTrigger {
+        group = "boat_one_shot",
+        regexp = waitPattern,
+        response = resumeCo
+      }
+      return coroutine.yield()
+    end
+  end
+
   function prototype:postConstruct()
     self:initStates()
     self:initTransitions()
@@ -257,25 +293,6 @@ local define_boat = function()
         end
       end
     }
-  end
-
-  function prototype:waitUntilArrived()
-    local currCo = assert(coroutine.running(), "Must be in coroutine")
-    local resumeCo = function()
-      local ok, err = coroutine.resume(currCo)
-      if not ok then
-        ColourNote ("deeppink", "black", "Error raised in timer function (in wait module).")
-        ColourNote ("darkorange", "black", debug.traceback(currCo))
-        error (err)
-      end -- if
-    end
-
-    helper.addOneShotTrigger {
-      group = "boat_one_shot",
-      regexp = helper.settingRegexp("boat", "arrived"),
-      response = resumeCo
-    }
-    return coroutine.yield()
   end
 
   function prototype:doWait()

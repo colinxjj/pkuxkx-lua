@@ -89,6 +89,7 @@ local ZonePath = require "pkuxkx.ZonePath"
 local RoomPath = require "pkuxkx.RoomPath"
 local PathCategory = RoomPath.Category
 local Deque = require "pkuxkx.deque"
+local boat = require "pkuxkx.boat"
 
 local define_travel = function()
   local prototype = FSM.inheritedMeta()
@@ -125,7 +126,10 @@ local define_travel = function()
     CLEARED = "cleared",    -- 阻塞解除信号
     TRY_RELOCATE = "try_relocate",    -- 尝试重定位
     ROOM_INFO_UNKNOWN = "room_info_unknown",    -- 没有获取到房间信息
-    WALK_NEXT_STEP = "walk_next_step"    -- 走下一步
+    WALK_NEXT_STEP = "walk_next_step",    -- 走下一步
+    FLOOD = "flood",    -- 洪水引发地图变化
+    FLOOD_OVER = "flood_over",    -- 洪水结束，地图恢复原样
+    FLOOD_CONTINUED = "flood_continued",    -- 洪水持续
   }
   -- 正则列表
   local REGEXP = {
@@ -167,7 +171,8 @@ local define_travel = function()
     WALK_BREAK = "^[ >]*设定环境变量：travel_walk = \"break\"$",
     WALK_STEP = "^[ >]*设定环境变量：travel_walk = \"step\"$",
     JIANG = "江百胜伸手拦住你说道：盟主很忙，现在不见外客，你下山去吧！",
-    strage = "你不小心被什么东西绊了一下，差点摔个大跟头。",
+    strange = "你不小心被什么东西绊了一下，差点摔个大跟头。",
+    FLOOD_OCCURRED = "^[ >]*(你刚要前行，忽然发现江水决堤，不由暗自庆幸，还好没过去。|你正要前行，有人大喝：黄河决堤啦，快跑啊！)$",
   }
   -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_RETRIES = 4
@@ -264,23 +269,34 @@ local define_travel = function()
   -- 等待直到到达目的地，必须在coroutine中使用
   -- 注意，如果调用walkto并传递了action方法，
   -- 有可能产生并发问题，建议不要同时使用该方法和walkto中的action
-  function prototype:waitUntilArrived()
+  function prototype:waitUntilArrived(timer)
     local currCo = assert(coroutine.running(), "Must be in coroutine")
-    local resumeCo = function()
-      local ok, err = coroutine.resume(currCo)
-      if not ok then
-        ColourNote ("deeppink", "black", "Error raised in timer function (in wait module).")
-        ColourNote ("darkorange", "black", debug.traceback(currCo))
-        error (err)
-      end -- if
+    local waitPattern = helper.settingRegexp("travel_walk", "arrived")
+    if timer then
+      -- timer means we need to check the status periodically
+      local interval = assert(timer.interval, "interval of timer cannot be nil")
+      local check = assert(type(timer.check) == "function", "check of timer must be function")
+      while true do
+        local line = wait.regexp(waitPattern, interval)
+        if line then break end
+        if check() then break end
+      end
+    else
+      local resumeCo = function()
+        local ok, err = coroutine.resume(currCo)
+        if not ok then
+          ColourNote ("deeppink", "black", "Error raised in timer function (in wait module).")
+          ColourNote ("darkorange", "black", debug.traceback(currCo))
+          error (err)
+        end -- if
+      end
+      helper.addOneShotTrigger {
+        group = "travel_one_shot",
+        regexp = waitPattern,
+        response = resumeCo
+      }
+      return coroutine.yield()
     end
-
-    helper.addOneShotTrigger {
-      group = "travel_one_shot",
-      regexp = REGEXP.ARRIVED,
-      response = resumeCo
-    }
-    return coroutine.yield()
   end
 
   -- 某个区域是否可遍历，修改该方法可以屏蔽某些危险区域
@@ -291,6 +307,10 @@ local define_travel = function()
       return false
     end
   end
+
+  -- 获取指定房间的附近N格房间列表
+
+
 
   ----------- Alias-only API ----------
   -- below functions are only used
@@ -613,15 +633,6 @@ local define_travel = function()
       end
     }
     self:addState {
-      state = States.boat,
-      enter = function()
-
-      end,
-      exit = function()
-
-      end
-    }
-    self:addState {
       state = States.busy,
       enter = function()
         self.walkBusy = false
@@ -634,12 +645,19 @@ local define_travel = function()
       end
     }
     self:addState {
-      state = States.flood,
+      state = States.boat,
       enter = function()
-
+        assert(self.boatCmd, "boatCmd cannot be nil when entering boat status")
       end,
       exit = function()
-
+        self.boatCmd = nil
+      end
+    }
+    self:addState {
+      state = States.flood,
+      enter = function()
+      end,
+      exit = function()
       end
     }
   end
@@ -723,6 +741,10 @@ local define_travel = function()
       newState = States.walking,
       event = Events.WALK_PLAN_GENERATED,
       action = function()
+        -- 这是开始行走的唯一入口，初始化prevMove变量，
+        -- 该变量保存前一步的路径信息，用于应对洪水事件
+        helper.assureNotBusy()
+        self.prevMove = nil
         return self:walking()
       end
     }
@@ -757,6 +779,7 @@ local define_travel = function()
       event = Events.ARRIVED,
       action = function()
         self.walkPlan = nil
+        self.prevMove = nil
         self.relocRetries = 0
         -- 区别直达与遍历
         if self.traverseCheck then
@@ -769,16 +792,8 @@ local define_travel = function()
         end
         SendNoEcho("set travel_walk arrived")  -- this is for
         if self.targetAction then
-          self.targetAction()
+          return self.targetAction()
         end
-      end
-    }
-    self:addTransition {
-      oldState = States.walking,
-      newState = States.boat,
-      event = Events.BOAT,
-      action = function()
-
       end
     }
     self:addTransition {
@@ -807,6 +822,32 @@ local define_travel = function()
         self:debug("等待2秒执行walkBusyCmd:", self.walkBusyCmd)
         wait.time(2)
         return self:walkingBusy()
+      end
+    }
+    self:addTransition {
+      oldState = States.walking,
+      newState = States.boat,
+      event = Events.BOAT,
+      action = function()
+        boat:restart()
+        boat:waitUntilArrived {
+          interval = 2,
+          check = function()
+            return self.currState == States.stop
+          end
+        }
+        return self:fire(Events.LEAVE_BOAT)
+      end
+    }
+    self:addTransition {
+      oldState = States.walking,
+      newState = States.flood,
+      event = Events.FLOOD,
+      action = function()
+        -- 获取当前房间信息
+        self:lookUntilNotBusy()
+        self.snapshotExits = self.currRoomExits
+        return self:fire(Events.FLOOD_CONTINUED)
       end
     }
     self:addTransitionToStop(States.walking)
@@ -854,6 +895,45 @@ local define_travel = function()
       end
     }
     self:addTransitionToStop(States.busy)
+    -- transition from state<boat>
+    self:addTransition {
+      oldState = States.boat,
+      newState = States.walking,
+      event = Events.LEAVE_BOAT,
+      action = function()
+        return self:walking()
+      end
+    }
+    self:addTransitionToStop(States.boat)
+    -- transition from state<flood>
+    self:addTransition {
+      oldState = States.flood,
+      newState = States.walking,
+      event = Events.FLOOD_OVER,
+      action = function()
+        self.floodOccurred = false
+        self.snapshotExits = nil
+        self:debug("洪水结束，补足由于洪水少走的一步并继续前进")
+        table.insert(self.walkPlan, self.prevMove)
+        return self:walking()
+      end
+    }
+    self:addTransition {
+      oldState = States.flood,
+      newState = States.flood,
+      event = Events.FLOOD_CONTINUED,
+      action = function()
+        self:debug("等待10秒后重新获取当前房间出口信息并与快照对比")
+        wait.time(10)
+        self:lookUntilNotBusy()
+        if self.currRoomExits == self.snapshotExits then
+          self:debug("出口没有变化，表明洪水没有消退，继续等到")
+          return self:fire(Events.FLOOD_CONTINUED)
+        else
+          return self:fire(Events.FLOOD_OVER)
+        end
+      end
+    }
   end
 
   -- 加载区域列表和房间列表
@@ -1024,6 +1104,15 @@ local define_travel = function()
       group = "travel_walk",
       regexp = REGEXP.WALK_BLOCK,
       response = lostWay
+    }
+    helper.addTrigger {
+      group = "travel_walk",
+      regexp = REGEXP.FLOOD_OCCURRED,
+      response = function()
+        self.floodOccurred = true
+        self.snapshotExits = nil
+        self:debug("洪水泛滥，房间出口改变")
+      end
     }
     -- busy触发
     helper.addTrigger {
@@ -1283,6 +1372,10 @@ local define_travel = function()
     -- busy
     self.walkBusyCmd = nil
     self.walkBusy = false
+    -- flood
+    self.prevMove = nil
+    self.floodOccurred = false
+    self.snapshotExits = nil
     -- traversing
     self.traverseCheck = nil
     self.traverseRoomId = nil    -- 遍历时，每步都执行该方法，为true时停止遍历
@@ -1502,7 +1595,20 @@ local define_travel = function()
 
   -- 核心函数，执行行走命令
   -- 增加对遍历的支持
+  -- 添加对地图改变事件的之处
   function prototype:walking()
+    -- 优先检查前一步是否有可能触发房间出口变化事件（洪水），
+    -- 如果发生，转换到对应状态
+    if self.prevMove and self.prevMove.mapchange == 1 then
+      self:assureStepResponsive()
+      if self.floodOccurred then
+        return self:fire(Events.FLOOD)
+      elseif self.walkLost then
+        return self:fire(Events.GET_LOST)
+      else
+        return self:fire(Events.WALK_NEXT_STEP)
+      end
+    end
     if #(self.walkPlan) > 0 then
       self.walkSteps = self.walkSteps + 1
       local move = table.remove(self.walkPlan)
@@ -1520,6 +1626,8 @@ local define_travel = function()
       end
       -- 执行路径
       self:debug("路径", move.startid, move.endid, move.path, move.category)
+      -- 存储当前步，以便于地图变化事件处理
+      self.prevMove = move
       if move.category == PathCategory.normal then
         SendNoEcho(move.path)
       elseif move.category == PathCategory.multiple then
@@ -1531,7 +1639,8 @@ local define_travel = function()
         self.walkBusyCmd = move.path
         return self:fire(Events.BUSY)
       elseif move.category == PathCategory.boat then
-        SendNoEcho(move.path)
+        -- SendNoEcho(move.path)
+        self.boatCmd = move.path
         return self:fire(Events.BOAT)
       else
         error("current version does not support this path category:" .. move.category, 2)
@@ -1540,19 +1649,11 @@ local define_travel = function()
       -- for each move
       if self.mode == "quick" and not self.traverseCheck then
         if (self.walkSteps % self.walkInterval) == 0 then
-          while true do
-            SendNoEcho("set travel_walk break")
-            local line = wait.regexp(REGEXP.WALK_BREAK, 5)
-            if not line then
-              print("系统反应超时，等待5秒重试")
-              wait.time(5)
-            elseif self.walkLost then
-              return self:fire(Events.GET_LOST)
-            else
-              wait.time(1)
-              SendNoEcho("halt")
-              return self:fire(Events.WALK_NEXT_STEP)
-            end
+          self:assureStepResponsive(1)
+          if self.walkLost then
+            return self:fire(Events.GET_LOST)
+          else
+            return self:fire(Events.WALK_NEXT_STEP)
           end
         else
           return self:fire(Events.WALK_NEXT_STEP)
@@ -1564,21 +1665,13 @@ local define_travel = function()
           -- for traverse, we still need to wait some time
           wait.time(0.2)
         end
-        while true do
-          SendNoEcho("set travel_walk step")
-          local line = wait.regexp(REGEXP.WALK_STEP, 5)
-          if not line then
-            print("系统反应超时，等待5秒重试")
-            wait.time(5)
-          elseif self.walkLost then
-            return self:fire(Events.GET_LOST)
-          else
-            SendNoEcho("halt")
-            break
-          end
+        self:assureStepResponsive()
+        if self.walkLost then
+          return self:fire(Events.GET_LOST)
+        else
+          return self:fire(Events.WALK_NEXT_STEP)
         end
       end
-      return self:fire(Events.WALK_NEXT_STEP)
     else
       -- here we also need to put traverse check if traversing
       if self.traverseCheck then
@@ -1591,6 +1684,26 @@ local define_travel = function()
         end
       end
       return self:fire(Events.ARRIVED)
+    end
+  end
+
+  function prototype:assureStepResponsive(extraWaitTime)
+    while true do
+      SendNoEcho("set travel_walk step")
+      local line = wait.regexp(REGEXP.WALK_STEP, 5)
+      if not line then
+        print("系统反应超时，等待5秒重试")
+        wait.time(5)
+      elseif self.walkLost then
+        SendNoEcho("halt")
+        break
+      else
+        if extraWaitTime and extraWaitTime > 0 then
+          wait.time(extraWaitTime)
+        end
+        SendNoEcho("halt")
+        break
+      end
     end
   end
 
