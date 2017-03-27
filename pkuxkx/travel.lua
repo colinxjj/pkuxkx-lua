@@ -167,6 +167,7 @@ local define_travel = function()
     WALK_BREAK = "^[ >]*设定环境变量：travel_walk = \"break\"$",
     WALK_STEP = "^[ >]*设定环境变量：travel_walk = \"step\"$",
     JIANG = "江百胜伸手拦住你说道：盟主很忙，现在不见外客，你下山去吧！",
+    strage = "你不小心被什么东西绊了一下，差点摔个大跟头。",
   }
   -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_RETRIES = 4
@@ -805,7 +806,7 @@ local define_travel = function()
         assert(self.walkBusyCmd, "进入busy状态walkBusyCmd变量不可为空")
         self:debug("等待2秒执行walkBusyCmd:", self.walkBusyCmd)
         wait.time(2)
-        return self:walkBusy()
+        return self:walkingBusy()
       end
     }
     self:addTransitionToStop(States.walking)
@@ -849,10 +850,10 @@ local define_travel = function()
         assert(self.walkBusyCmd, "busy状态walkBusyCmd变量不可为空")
         self:debug("等待2秒执行walkBusyCmd:", self.walkBusyCmd)
         wait.time(2)
-        return self:walkBusy()
+        return self:walkingBusy()
       end
     }
-    self:addTransitionToStop(States.stop)
+    self:addTransitionToStop(States.busy)
   end
 
   -- 加载区域列表和房间列表
@@ -1527,7 +1528,7 @@ local define_travel = function()
           SendNoEcho(cmds[i])
         end
       elseif move.category == PathCategory.busy then
-        self.walkbusyCmd = move.path
+        self.walkBusyCmd = move.path
         return self:fire(Events.BUSY)
       elseif move.category == PathCategory.boat then
         SendNoEcho(move.path)
@@ -1593,7 +1594,7 @@ local define_travel = function()
     end
   end
 
-  function prototype:walkBusy()
+  function prototype:walkingBusy()
     SendNoEcho("set travel walkbusy_start")
     SendNoEcho(self.walkBusyCmd)
     SendNoEcho("set travel walkbusy_done")

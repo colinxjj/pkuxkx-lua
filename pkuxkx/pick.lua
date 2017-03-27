@@ -115,7 +115,7 @@ local define_pick = function()
     CHECK_ITEM_DONE = helper.settingRegexp("pick", "checkitem_done"),
     WEIGHT_RATE = "^│\\s+你身上带着(.*?)件东西\\s+\\(负重\\s*(-?\\d+)%\\)：.*",
     CANNOT_SELL_ITEM = "^(你身上没有.*|这样东西不值钱。|这样东西不能买卖。)$",
-    ITEM_ID = "([^ ]+)\\s+\\=\\s+(.+)$",
+    ITEM_ID = "([^ ]+)\\s+\\=\\s+([^\"]+)$",
     COINS_DESC = "^[ >]*(.*)文铜板\\((Coin)\\)",
     SILVERS_DESC = "^[ >]*(.*)两白银\\((Silver)\\)$",
     GOLDS_DESC = "^[ >]*(.*)两黄金\\((Gold)\\)$",
@@ -140,6 +140,9 @@ local define_pick = function()
 
   function prototype:initPickSettings()
     self.pickZones = {
+      "nanchang",
+      "chengdu",
+      "dali",
       "luoyang",
       "changan",
       "yangzhou",
@@ -155,7 +158,7 @@ local define_pick = function()
       self.pickedZones[zone] = 0
     end
     self.itemsExcluded = {
-      ["铜钱"] = true,
+      ["铜板"] = true,
       ["白银"] = true,
       ["黄金"] = true,
       ["路引"] = true,
@@ -473,6 +476,7 @@ local define_pick = function()
       end
     }
     helper.addTrigger {
+      sequence = 5, -- must be higher than item_id
       group = "pick_sell_check_done",
       regexp = helper.settingRegexp("pick", "sellcheck_done"),
       response = function()
@@ -484,7 +488,7 @@ local define_pick = function()
             while #(self.itemsToSell) > 0 do
               local item = table.remove(self.itemsToSell)
               while true do
-                SendNoEcho("sell " .. item)
+                Send("sell " .. item)
                 local line = wait.regexp(REGEXP.CANNOT_SELL_ITEM, 2)
                 if line then break end
               end
@@ -626,6 +630,7 @@ local define_pick = function()
 
   function prototype:doStatusCheck()
     wait.time(1)
+    helper.assureNotBusy()
     status:catch()
     if status.food < 100 or status.drink < 100 then
       return self:fire(Events.HUNGRY)
@@ -660,6 +665,7 @@ local define_pick = function()
   function prototype:doItemsCheck()
     self:debug("1秒后检查身上物品")
     wait.time(1)
+    helper.assureNotBusy()
     SendNoEcho("set pick itemcheck_start")
     SendNoEcho("i")
     SendNoEcho("set pick itemcheck_done")
@@ -668,6 +674,7 @@ local define_pick = function()
   function prototype:doSell()
     self:debug("1秒后检查身上可售卖物品")
     wait.time(1)
+    helper.assureNotBusy()
     SendNoEcho("set pick sellcheck_start")
     SendNoEcho("id")
     SendNoEcho("set pick sellcheck_done")
@@ -676,6 +683,7 @@ local define_pick = function()
   function prototype:doMoneyCheck()
     self:debug("1秒后检查身上金额")
     wait.time(1)
+    helper.assureNotBusy()
     SendNoEcho("set pick moneycheck_start")
     SendNoEcho("get coin")
     SendNoEcho("l coin")
@@ -709,6 +717,7 @@ local define_pick = function()
   end
 
   function prototype:doPlanCheck()
+    helper.assureNotBusy()
     if travel:isZoneTraversable(self:currZone()) then
       return self:fire(Events.ZONE_TRAVERSABLE)
     else

@@ -87,6 +87,7 @@ local define_patrol = function()
     PREV_JOB_NOT_FINISH = "^[ >]*岳灵珊说道：「你上次任务还没有完成呢！」$",
     NEXT_JOB_WAIT = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
     NEXT_JOB_TOO_FAST = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
+    NO_JOB_AVAILABLE = "^[ >]*岳灵珊说道：「你刚刚做过任务，先去休息一会吧。」$",
     EXP_TOO_HIGH = "^[ >]*岳灵珊说道：「你的功夫不错了，找我娘看看有什么任务交给你。」$",
     ASK_START = "^[ >]*设定环境变量：huashan_patrol = \"ask_start\"$",
     ASK_DONE = "^[ >]*设定环境变量：huashan_patrol = \"ask_done\"$",
@@ -227,6 +228,7 @@ local define_patrol = function()
       newState = States.wait_ask,
       event = Events.NO_JOB_AVAILABLE,
       action = function()
+        helper.assureNotBusy()
         travel:stop()
         -- 在练功室2921打坐等待ask
         travel:walkto(2921, function()
@@ -409,6 +411,14 @@ local define_patrol = function()
       regexp = REGEXP.NEXT_JOB_WAIT,
       response = function()
         self:debug("NEXT_JOB_WAIT triggered")
+        self.eventToSend = Events.NO_JOB_AVAILABLE
+      end
+    }
+    helper.addTrigger {
+      group = "huashan_patrol_ask_done",
+      regexp = REGEXP.NO_JOB_AVAILABLE,
+      response = function()
+      self:debug("NO_JOB_AVAILABLE triggered")
         self.eventToSend = Events.NO_JOB_AVAILABLE
       end
     }
