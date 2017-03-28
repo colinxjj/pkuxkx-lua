@@ -829,7 +829,7 @@ local define_travel = function()
       newState = States.boat,
       event = Events.BOAT,
       action = function()
-        boat:restart()
+        boat:restart(self.boatCmd)
         boat:waitUntilArrived {
           interval = 2,
           check = function()

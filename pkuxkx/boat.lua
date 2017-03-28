@@ -21,7 +21,7 @@ local define_boat = function()
   local Events = {
     STOP = "stop",
     START = "start",
-    BOAT_COMMING = "boat_comming",
+    BOAT_COMING = "boat_coming",
     NOT_ENOUGH_MONEY = "not_enough_money",
     ONBOARD = "onboard",
     BOAT_ARRIVED = "boat_arrived",
@@ -41,7 +41,12 @@ local define_boat = function()
     return obj
   end
 
-  function prototype:restart()
+  function prototype:restart(waitCmd)
+    if not waitCmd then
+      self.waitCmd = "yell boat"
+    else
+      self.waitCmd = waitCmd
+    end
     self:fire(Events.STOP)
     return self:fire(Events.START)
   end
@@ -82,14 +87,14 @@ local define_boat = function()
     self:initTransitions()
     self:initTriggers()
     self:initAliases()
-    self:setState(Events.stop)
+    self:setState(States.stop)
     self:resetOnStop()
   end
 
   function prototype:resetOnStop()
-    self.boatComming = false
+    self.boatComing = false
     self.noMoney = false
-    self.waitCmd = nil
+    self.waitCmd = "yell boat"
     helper.removeTriggerGroups("boat_one_shot")
   end
 
@@ -104,7 +109,7 @@ local define_boat = function()
     self:addState {
       state = States.wait,
       enter = function()
-        self.boatComming = false
+        self.boatComing = false
         self.noMoney = false
         helper.enableTriggerGroups(
           "boat_wait_start",
@@ -121,10 +126,10 @@ local define_boat = function()
     self:addState {
       state = States.onboard,
       enter = function()
-        helper.enableTriggerGroup("boat_onboard")
+        helper.enableTriggerGroups("boat_onboard")
       end,
       exit = function()
-        helper.disableTriggerGroup("boat_onboard")
+        helper.disableTriggerGroups("boat_onboard")
       end
     }
     self:addState {
@@ -151,8 +156,8 @@ local define_boat = function()
       newState = States.wait,
       event = Events.START,
       action = function()
-        self:debug("µÈ´ý2ÃëºóÕÐºô´¬¼Ò")
-        wait.time(2)
+        self:debug("µÈ´ý3ÃëºóÕÐºô´¬¼Ò")
+        wait.time(3)
         return self:doWait()
       end
     }
@@ -218,7 +223,9 @@ local define_boat = function()
       group = "boat_wait_done",
       regexp = helper.settingRegexp("boat", "wait_done"),
       response = function()
-        if self.boatComming then
+        self:debug("WAIT_DONE triggered", "boatComing?", self.boatComing)
+        helper.disableTriggerGroups("boat_wait_done")
+        if self.boatComing then
           return self:doEnter()
         else
           return self:fire(Events.START)
@@ -229,6 +236,7 @@ local define_boat = function()
       group = "boat_wait_done",
       regexp = REGEXP.BOAT_COMING,
       response = function()
+        self:debug("BOAT_COMING triggered")
         self.boatComing = true
       end
     }
@@ -261,17 +269,25 @@ local define_boat = function()
       group = "boat_onboard",
       regexp = REGEXP.BOAT_ARRIVED,
       response = function()
+        self:debug("BOAT_ARRIVED triggered")
         return self:fire(Events.BOAT_ARRIVED)
       end
     }
   end
 
   function prototype:initAliases()
+    helper.removeAliasGroups("boat")
+
     helper.addAlias {
       group = "boat",
-      regexp = "^boat\\s+start\\s*",
-      response = function()
-        return self:fire(Events.START)
+      regexp = "^boat\\s+start\\s*(.*)$",
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if not cmd or cmd == "" then
+          return self:restart("yell boat")
+        else
+          return self:restart(cmd)
+        end
       end
     }
     helper.addAlias {
@@ -305,7 +321,7 @@ local define_boat = function()
     helper.assureNotBusy()
     SendNoEcho("set boat enter_start")
     SendNoEcho("enter")
-    SendNoEcho("set boat enter done")
+    SendNoEcho("set boat enter_done")
   end
 
   function prototype:doLeave()
