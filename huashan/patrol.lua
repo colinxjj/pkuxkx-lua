@@ -87,7 +87,8 @@ local define_patrol = function()
     PREV_JOB_NOT_FINISH = "^[ >]*岳灵珊说道：「你上次任务还没有完成呢！」$",
     NEXT_JOB_WAIT = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
     NEXT_JOB_TOO_FAST = "^[ >]*岳灵珊说道：「等你忙完再来找我吧。」$",
-    NO_JOB_AVAILABLE = "^[ >]*岳灵珊说道：「你刚刚做过任务，先去休息一会吧。」$",
+    -- or be killed
+    NO_JOB_AVAILABLE = "^[ >]*(岳灵珊说道：「你刚刚做过任务，先去休息一会吧。」|这里没有这个人。)$",
     EXP_TOO_HIGH = "^[ >]*岳灵珊说道：「你的功夫不错了，找我娘看看有什么任务交给你。」$",
     ASK_START = "^[ >]*设定环境变量：huashan_patrol = \"ask_start\"$",
     ASK_DONE = "^[ >]*设定环境变量：huashan_patrol = \"ask_done\"$",

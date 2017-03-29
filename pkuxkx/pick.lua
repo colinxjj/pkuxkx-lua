@@ -140,9 +140,9 @@ local define_pick = function()
 
   function prototype:initPickSettings()
     self.pickZones = {
-      "nanchang",
-      "chengdu",
-      "dali",
+      --"nanchang",
+      --"chengdu",
+      --"dali",
       "luoyang",
       "changan",
       "yangzhou",
@@ -152,6 +152,7 @@ local define_pick = function()
       -- "changjiangbei",
       "qufu",
       "xiaoshancun",
+      "lingzhou"
     }
     self.pickedZones = {}
     for _, zone in ipairs(self.pickZones) do
@@ -635,7 +636,7 @@ local define_pick = function()
   function prototype:doStatusCheck()
     wait.time(1)
     helper.assureNotBusy()
-    status:catch()
+    status:hpbrief()
     if status.food < 100 or status.drink < 100 then
       return self:fire(Events.HUNGRY)
     else
