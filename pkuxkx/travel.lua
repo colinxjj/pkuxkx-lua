@@ -164,7 +164,7 @@ local define_travel = function()
     LOOK_START = "^[ >]*设定环境变量：travel_look = \"start\"$",
     LOOK_DONE = "^[ >]*设定环境变量：travel_look = \"done\"$",
     ARRIVED = "^[ >]*设定环境变量：travel_walk = \"arrived\"$",
-    WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！)$",
+    WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你反应迅速，急忙双手抱头，身体蜷曲。眼前昏天黑地，顺着山路直滚了下去。)$",
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
     WALK_BUSY = "^[ >]*(你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*)$",
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
@@ -831,6 +831,7 @@ local define_travel = function()
       newState = States.boat,
       event = Events.BOAT,
       action = function()
+        self:debug("等船命令", self.boatCmd)
         boat:restart(self.boatCmd)
         boat:waitUntilArrived {
           interval = 2,

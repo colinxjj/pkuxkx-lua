@@ -29,50 +29,56 @@ require "tprint"
 --
 --print(gb2312.char(47811), gb2312.code(gb2312.char(47811), 1))
 --
+--
+--local define_A = function()
+--  local prototype = {
+--    __eq = function(a, b) return a.value == b.value end,
+--    __lt = function(a, b) return a.value < b.value end,
+--    __le = function(a, b) return a.value <= b.value end
+--  }
+--  prototype.__index = prototype
+--
+--  function prototype:new(args)
+--    local obj = {}
+--    obj.value = args.value
+--    setmetatable(obj, prototype)
+--    return obj
+--  end
+--
+--  return prototype
+--end
+--local A = define_A()
+--
+--local a1 = A:new {value = 100}
+--local a2 = A:new {value = 200}
+--print (a1 < a2)
+--
+--local define_B = function()
+--  local prototype = {
+--    __eq = A.__eq,
+--    __lt = A.__lt,
+--    __le = A.__le
+--  }
+--  setmetatable(prototype, {
+--    __index = A
+--  })
+--
+--  function prototype:new(args)
+--    local obj = A:new(args)
+--    obj.code = args.code
+--    setmetatable(obj, self or prototype)
+--    return obj
+--  end
+--
+--  return prototype
+--end
+--local B = define_B()
+--local b1 = B:new {value = 100, code = 'B1'}
+--local b2 = B:new {value = 200, code = 'B2'}
+--print(b1 < b2)
 
-local define_A = function()
-  local prototype = {
-    __eq = function(a, b) return a.value == b.value end,
-    __lt = function(a, b) return a.value < b.value end,
-    __le = function(a, b) return a.value <= b.value end
-  }
-  prototype.__index = prototype
+local http = require "socket.http"
 
-  function prototype:new(args)
-    local obj = {}
-    obj.value = args.value
-    setmetatable(obj, prototype)
-    return obj
-  end
-
-  return prototype
-end
-local A = define_A()
-
-local a1 = A:new {value = 100}
-local a2 = A:new {value = 200}
-print (a1 < a2)
-
-local define_B = function()
-  local prototype = {
-    __eq = A.__eq,
-    __lt = A.__lt,
-    __le = A.__le
-  }
-  setmetatable(prototype, {
-    __index = A
-  })
-
-  function prototype:new(args)
-    local obj = A:new(args)
-    obj.code = args.code
-    setmetatable(obj, self or prototype)
-    return obj
-  end
-
-  return prototype
-end
-local B = define_B()
-local b1 = B:new {value = 100, code = 'B1'}
-local b2 = B:new {value = 200, code = 'B2'}
-print(b1 < b2)
+http.TIMEOUT = 1
+local responseText = http.request("http://www.baidu.com")
+print(responseText)

@@ -88,7 +88,13 @@ values
   ('dufu', '都府', 'dufudating'),
   ('jiankang', '建康', 'jiankangzhongcheng'),
   ('linan', '临安', 'linanfudalisi'),
-  ('changjiangnan', '长江南岸', 'changjiangnanyanziji')
+  ('changjiangnan', '长江南岸', 'changjiangnanyanziji'),
+  ('lingzhou', '灵州', 'lingzhouchengzhongxin'),
+  ('dalunsi', '大轮寺', 'dalunsizhudubadian'),
+  ('huizuxiaozhen', '回族小镇', 'huizuxiaozhenxiaozhen'),
+  ('qilincun', '麒麟村', 'qilincunxiaoguangchang'),
+  ('kunming', '昆明', 'kunmingzhongxinguangchang'),
+  ('pingxiwangfu', '平西王府', 'pingxiwangfupingxiwangfudamen')
 ;
 --   ('taishan', '泰山');
 
@@ -187,9 +193,24 @@ values
   ('changjiangnan', 'zhenjiang', 11),
   ('suzhou', 'changjiangnan', 22),
   ('changjiangnan', 'suzhou', 22),
-  --
   ('changjiangbei', 'changjiangnan', 1),
-  ('changjiangnan', 'changjiangbei', 1)
+  ('changjiangnan', 'changjiangbei', 1),
+  ('huanghenan', 'lingzhou', 17),
+  ('lingzhou', 'huanghenan', 17),
+  ('lingzhou', 'dalunsi', 16),  -- use zanpu as connect-point
+  ('dalunsi', 'lingzhou', 16),
+  ('dalunsi', 'chengdu', 13),  -- use zanpu as connect-point
+  ('chengdu', 'dalunsi', 13),
+  ('huanghenan', 'huizuxiaozhen', 21),
+  ('huizuxiaozhen', 'huanghenan', 21),
+  ('huizuxiaozhen', 'changan', 10),
+  ('changan', 'huizuxiaozhen', 10),
+  ('luoyang', 'qilincun', 13),
+  ('qilincun', 'luoyang', 13),
+  ('dali', 'kunming', 11),
+  ('kunming', 'dali', 11),
+  ('kunming', 'pingxiwangfu', 7),
+  ('pingxiwangfu', 'kunming', 7)
 ;
 
 update zone_connectivity set boat = 1
