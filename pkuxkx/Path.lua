@@ -38,6 +38,11 @@ local define_Path = function()
     return obj
   end
 
+  -- subclass can override this method to introduce different weight algorithm
+  function prototype:adjustedWeight()
+    return self.weight
+  end
+
   return prototype
 end
 return define_Path()

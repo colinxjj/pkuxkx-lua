@@ -96,6 +96,8 @@ create table if not exists zone_connectivity (
   startcode text,
   endcode text,
   weight integer,
+  busy integer not null default 0,
+  boat integer not null default 0,
   primary key (startcode, endcode)
 );
 
@@ -184,9 +186,15 @@ values
   ('zhenjiang', 'changjiangnan', 11),
   ('changjiangnan', 'zhenjiang', 11),
   ('suzhou', 'changjiangnan', 22),
-  ('changjiangnan', 'suzhou', 22)
+  ('changjiangnan', 'suzhou', 22),
+  --
+  ('changjiangbei', 'changjiangnan', 1),
+  ('changjiangnan', 'changjiangbei', 1)
 ;
 
+update zone_connectivity set boat = 1
+where (startcode = 'changjiangnan' and endcode = 'changjiangbei')
+or (startcode = 'changjiangbei' and endcode = 'changjiangnan');
 
 --.separator ':'
 --.import char2pinyin.csv chr2pinyin

@@ -275,7 +275,7 @@ local define_travel = function()
     if timer then
       -- timer means we need to check the status periodically
       local interval = assert(timer.interval, "interval of timer cannot be nil")
-      local check = assert(type(timer.check) == "function", "check of timer must be function")
+      local check = assert(type(timer.check) == "function" and timer.check, "check of timer must be function")
       while true do
         local line = wait.regexp(waitPattern, interval)
         if line then break end
@@ -745,6 +745,7 @@ local define_travel = function()
         -- 该变量保存前一步的路径信息，用于应对洪水事件
         helper.assureNotBusy()
         self.prevMove = nil
+        self.prevCheck = false
         return self:walking()
       end
     }
@@ -780,6 +781,7 @@ local define_travel = function()
       action = function()
         self.walkPlan = nil
         self.prevMove = nil
+        self.prevCheck = false
         self.relocRetries = 0
         -- 区别直达与遍历
         if self.traverseCheck then
@@ -1374,6 +1376,7 @@ local define_travel = function()
     self.walkBusy = false
     -- flood
     self.prevMove = nil
+    self.prevCheck = false
     self.floodOccurred = false
     self.snapshotExits = nil
     -- traversing
@@ -1599,13 +1602,16 @@ local define_travel = function()
   function prototype:walking()
     -- 优先检查前一步是否有可能触发房间出口变化事件（洪水），
     -- 如果发生，转换到对应状态
-    if self.prevMove and self.prevMove.mapchange == 1 then
+    if self.prevMove and not self.prevCheck and self.prevMove.mapchange == 1 then
+      self:debug("可能发生洪水事件")
       self:assureStepResponsive()
       if self.floodOccurred then
         return self:fire(Events.FLOOD)
       elseif self.walkLost then
         return self:fire(Events.GET_LOST)
       else
+        -- 已经检查过上一步，确保下一次不再检查
+        self.prevCheck = true
         return self:fire(Events.WALK_NEXT_STEP)
       end
     end
@@ -1628,6 +1634,7 @@ local define_travel = function()
       self:debug("路径", move.startid, move.endid, move.path, move.category)
       -- 存储当前步，以便于地图变化事件处理
       self.prevMove = move
+      self.prevCheck = false
       if move.category == PathCategory.normal then
         SendNoEcho(move.path)
       elseif move.category == PathCategory.multiple then

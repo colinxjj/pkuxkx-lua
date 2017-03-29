@@ -74,7 +74,7 @@ local define_Algo = function()
         if not closes[endid] then
           local newDistance = HypoDistance:decorate {
             id=endid,
-            real=min.real + path.weight,
+            real=min.real + path:adjustedWeight(),
             hypo=hypo(endid, targetid)
           }
           if opens:contains(endid) then
@@ -115,7 +115,7 @@ local define_Algo = function()
         local endid = path.endid
         -- dijkstra algorithm must traverse all nodes
         if not closes[endid] then
-          local newDistance = Distance:decorate { id=endid, weight=min.weight + path.weight }
+          local newDistance = Distance:decorate { id=endid, weight=min.weight + path:adjustedWeight() }
           if opens:contains(endid) then
             local currDistance = opens:get(endid)
             if newDistance < currDistance then

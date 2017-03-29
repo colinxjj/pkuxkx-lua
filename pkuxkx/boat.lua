@@ -57,7 +57,7 @@ local define_boat = function()
     if timer then
       -- timer means we need to check the status periodically
       local interval = assert(timer.interval, "interval of timer cannot be nil")
-      local check = assert(type(timer.check) == "function", "check of timer must be function")
+      local check = assert(type(timer.check) == "function" and timer.check, "check of timer must be function")
       while true do
         local line = wait.regexp(waitPattern, interval)
         if line then break end
