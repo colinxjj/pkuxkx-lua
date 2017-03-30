@@ -1622,7 +1622,7 @@ local define_travel = function()
       self.walkSteps = self.walkSteps + 1
       local move = table.remove(self.walkPlan)
       -- 当前步如果可能改变地图，优先检查是否地图已经被改变（他人触发）
-      if move.category.mapchange == 1 then
+      if move.mapchange == 1 then
         self:debug("当前步可能改变房间出口，需要确认地图是否已经被改变")
         local origExits = self.roomsById[move.startid].exits
         self:debug("原始出口信息：", origExits)
