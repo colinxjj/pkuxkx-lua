@@ -94,7 +94,7 @@ local define_patrol = function()
     ASK_DONE = "^[ >]*设定环境变量：huashan_patrol = \"ask_done\"$",
     PATROLLING="^[ >]*你在(.+?)巡弋，尚未发现敌踪。$",    -- used in wait.regexp
     WORK_DONE="^[ >]*设定环境变量：huashan_patrol = \"work_done\"$",
-    REJECT_LING="^[ >]*岳灵珊不想要令牌，你就自个留着吧。$",
+    REJECT_LING="^[ >]*(岳灵珊不想要令牌，你就自个留着吧。|这里没有 yue 。)$",
     ACCEPT_LING="^[ >]*你给岳灵珊一块令牌。$",
     SUBMIT_START = "^[ >]*设定环境变量：huashan_patrol = \"submit_start\"$",
     SUBMIT_DONE = "^[ >]*设定环境变量：huashan_patrol = \"submit_done\"$",
