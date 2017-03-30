@@ -1599,7 +1599,9 @@ local define_travel = function()
 
   -- 核心函数，执行行走命令
   -- 增加对遍历的支持
-  -- 添加对地图改变事件的之处
+  -- 添加对地图改变事件的处理，
+  -- 这里需要考虑该步行走前可能已经有别人触发了这个事件（小概率）
+  -- 以及当自己行走命令执行后，触发了该事件
   function prototype:walking()
     -- 优先检查前一步是否有可能触发房间出口变化事件（洪水），
     -- 如果发生，转换到对应状态
@@ -1619,6 +1621,22 @@ local define_travel = function()
     if #(self.walkPlan) > 0 then
       self.walkSteps = self.walkSteps + 1
       local move = table.remove(self.walkPlan)
+      -- 当前步如果可能改变地图，优先检查是否地图已经被改变（他人触发）
+      if move.category.mapchange == 1 then
+        self:debug("当前步可能改变房间出口，需要确认地图是否已经被改变")
+        local origExits = self.roomsById[move.startid].exits
+        self:debug("原始出口信息：", origExits)
+        while true do
+          self:lookUntilNotBusy()
+          if self.currRoomExits == origExits then
+            self:debug("当前出口信息符合原始数据，继续行走")
+            break
+          else
+            self:debug("当前出口信息不符合原始数据，等待10秒后再检查")
+            wait.time(10)
+          end
+        end
+      end
       -- 当遍历时，先执行遍历检查函数
       if self.traverseCheck then
         -- 设置遍历房间号

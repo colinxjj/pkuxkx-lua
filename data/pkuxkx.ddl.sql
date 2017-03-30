@@ -94,9 +94,10 @@ values
   ('huizuxiaozhen', '回族小镇', 'huizuxiaozhenxiaozhen'),
   ('qilincun', '麒麟村', 'qilincunxiaoguangchang'),
   ('kunming', '昆明', 'kunmingzhongxinguangchang'),
-  ('pingxiwangfu', '平西王府', 'pingxiwangfupingxiwangfudamen')
+  ('pingxiwangfu', '平西王府', 'pingxiwangfupingxiwangfudamen'),
+  ('guiyunzhuang', '归云庄', 'guiyunzhuangguiyunzhuangdamen'),
+  ('taishan', '泰山', 'taishannantianmen')
 ;
---   ('taishan', '泰山');
 
 create table if not exists zone_connectivity (
   startcode text,
@@ -210,7 +211,11 @@ values
   ('dali', 'kunming', 11),
   ('kunming', 'dali', 11),
   ('kunming', 'pingxiwangfu', 7),
-  ('pingxiwangfu', 'kunming', 7)
+  ('pingxiwangfu', 'kunming', 7),
+  ('suzhou', 'guiyunzhuang', 27),
+  ('guiyunzhuang', 'suzhou', 27),
+  ('qufu', 'taishan', 21),
+  ('taishan', 'qufu', 21)
 ;
 
 update zone_connectivity set boat = 1

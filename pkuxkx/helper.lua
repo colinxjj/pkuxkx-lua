@@ -6,6 +6,7 @@
 -- To change this template use File | Settings | File Templates.
 --
 require "pkuxkx.predefines"
+require "check"
 
 local define_helper = function()
   local helper = {}
@@ -213,6 +214,47 @@ local define_helper = function()
   helper.disableAliasGroups = function(...)
     for _, group in ipairs({...}) do
       EnableAliasGroup(group, false)
+    end
+  end
+
+  local _global_timer_callbacks = {}
+  helper.addTimer = function(args)
+    local interval = assert(args.interval, "interval of timer cannot be nil")
+    local response = assert(type(args.response) == "function" and args.response, "response of timer must be function")
+    local group = assert(args.group, "group of timer cannot be nil")
+    local name = args.name or "auto_added_timer_" .. GetUniqueID()
+    _G.world[name] = helper.repeatedRunnableWithCo(response)
+    _global_timer_callbacks[name] = true
+    local hours = math.floor(interval / 3600)
+    local minutes = math.floor((interval - hours * 3600) / 60)
+    local seconds = interval - hours * 3600 - minutes * 60
+    check(AddTimer(name, hours, minutes, seconds, "-- added by helper", 0, name))
+    check(SetTimerOption(name, "send_to", "12"))
+    check(SetTimerOption(name, "group", group))
+  end
+
+  helper.removeTimer = function(name)
+    if _global_timer_callbacks[name] then
+      _global_timer_callbacks[name] = nil
+      _G.world[name] = nil
+    end
+    local retCode = DeleteTimer(name)
+    assert(retCode == eOK or retCode == eTimerNotFound)
+  end
+
+  helper.removeTimerGroups = function(...)
+    local groups = {}
+    for _, group in ipairs({...}) do
+      groups[group] = true
+    end
+    local timerList = GetTimerList()
+    if timerList then
+      for i, timer in ipairs(timerList) do
+        local group = GetTimerInfo(timer, timer_info_flag.group)
+        if groups[group] then
+          helper.removeTimer(timer)
+        end
+      end
     end
   end
 

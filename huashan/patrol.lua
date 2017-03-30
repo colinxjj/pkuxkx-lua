@@ -10,6 +10,7 @@ require "wait"
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
+local status = require "pkuxkx.status"
 
 local define_patrol = function()
   local prototype = FSM.inheritedMeta()
@@ -233,7 +234,10 @@ local define_patrol = function()
         travel:stop()
         -- 在练功室2921打坐等待ask
         travel:walkto(2921, function()
-          SendNoEcho("dz max")
+--          SendNoEcho("dz max")
+          print("等待10秒后再尝试提交")
+          wait.time(10)
+          return self:fire(Events.PAUSE_WAIT)
         end)
       end
     }
@@ -267,8 +271,24 @@ local define_patrol = function()
       newState = States.ask,
       event = Events.SUBMIT_ACCEPT,
       action = function()
-        -- 就在当前房间
-        self:doAsk()
+        -- 此处，添加判断食物饮水
+        status:hpbrief()
+        if status.food < 100 or status.drink < 100 then
+          return travel:walkto(3798, function()
+            helper.assureNotBusy()
+            SendNoEcho("do 2 eat")
+            helper.assureNotBusy()
+            SendNoEcho("do 2 drink")
+            helper.assureNotBusy()
+            wait.time(3)
+            return travel:walkto(2916, function()
+              return self:doAsk()
+            end)
+          end)
+        else
+          -- 就在当前房间
+          return self:doAsk()
+        end
       end
     }
     self:addTransition {
@@ -285,8 +305,11 @@ local define_patrol = function()
       event = Events.WORK_TOO_FAST,
       action = function()
         -- 在练功室2921打坐等待submit
+        -- 修改：不打坐直接等待
         travel:walkto(2921, function()
-          SendNoEcho("dz max")
+          print("等待10秒后再尝试提交")
+          wait.time(10)
+          return self:fire(Events.PAUSE_WAIT)
         end)
       end
     }
@@ -442,7 +465,7 @@ local define_patrol = function()
         else
           local event = self.eventToSend
           self.eventToSend = nil
-          self:fire(event)
+          return self:fire(event)
         end
       end
     }
@@ -451,7 +474,7 @@ local define_patrol = function()
       regexp = REGEXP.WORK_DONE,
       response = function()
         self:debug("WORK_DONE triggered")
-        self:fire(Events.WORK_DONE)
+        return self:fire(Events.WORK_DONE)
       end
     }
     helper.addTrigger {
@@ -478,7 +501,7 @@ local define_patrol = function()
           print("有部分区域没有巡逻到，重新巡逻")
           self:fire(Events.WORK_MISS)
         else
-          print("巡逻时间太快，尝试打坐等待")
+          print("巡逻时间太快，需要等待")
           self:fire(Events.WORK_TOO_FAST)
         end
       end
@@ -500,7 +523,7 @@ local define_patrol = function()
         else
           local event = self.eventToSend
           self.eventToSend = nil
-          self:fire(self.eventToSend)
+          self:fire(event)
         end
       end
     }

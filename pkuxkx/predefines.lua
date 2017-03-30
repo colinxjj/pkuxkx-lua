@@ -59,6 +59,8 @@ local predefines = function()
   trigger_info_flag.group = 26
   alias_info_flag = {}
   alias_info_flag.group = 16
+  timer_info_flag = {}
+  timer_info_flag.group = 19
 
   -- error code
   eOK = 0; -- No error

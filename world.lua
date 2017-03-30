@@ -152,6 +152,8 @@ function AddTriggerEx() end
 
 function AddAlias() end
 
+function AddTimer() end
+
 local id = 0
 function GetUniqueID()
   id = id + 1
@@ -161,6 +163,8 @@ end
 function SetTriggerOption() end
 
 function SetAliasOption() end
+
+function SetTimerOption() end
 
 function SendNoEcho() end
 
@@ -175,6 +179,10 @@ function GetTriggerInfo() end
 function GetAliasList() return {} end
 
 function GetAliasInfo() end
+
+function GetTimerList() return {} end
+
+function GetTimerInfo() end
 
 function Note() end
 
