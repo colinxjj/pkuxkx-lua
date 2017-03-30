@@ -1628,7 +1628,7 @@ local define_travel = function()
         self:debug("原始出口信息：", origExits)
         while true do
           self:lookUntilNotBusy()
-          if self.currRoomExits == origExits then
+          if self:checkExitsIdentical(self.currRoomExits, origExits) then
             self:debug("当前出口信息符合原始数据，继续行走")
             break
           else
@@ -1713,6 +1713,24 @@ local define_travel = function()
     end
   end
 
+  function prototype:checkExitsIdentical(exits1, exits2)
+    local ls1 = utils.split(exits1, ";")
+    local ls2 = utils.split(exits2, ";")
+    if #ls1 ~= #ls2 then
+      return false
+    end
+    local map1 = {}
+    for i = 1, #ls1 do
+      map1[ls1[i]] = true
+    end
+    for i = 1, #ls2 do
+      if not map1[ls2[i]] then
+        return false
+      end
+    end
+    return true
+  end
+
   function prototype:assureStepResponsive(extraWaitTime)
     while true do
       SendNoEcho("set travel_walk step")
@@ -1755,7 +1773,7 @@ local define_travel = function()
     -- self:debug(currRoomDesc)
     for i = 1, #potentialRooms do
       local room = potentialRooms[i]
-      local exitsMatched = room.exits == currRoomExits
+      local exitsMatched = self:checkExitsIdentical(room.exits, currRoomExits)
       local descMatched = room.description == currRoomDesc
       self:debug("房间编号", room.id, "出口匹配：", exitsMatched, "描述匹配：", descMatched)
       if exitsMatched and descMatched then
