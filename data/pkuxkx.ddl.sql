@@ -96,7 +96,9 @@ values
   ('kunming', '昆明', 'kunmingzhongxinguangchang'),
   ('pingxiwangfu', '平西王府', 'pingxiwangfupingxiwangfudamen'),
   ('guiyunzhuang', '归云庄', 'guiyunzhuangguiyunzhuangdamen'),
-  ('taishan', '泰山', 'taishannantianmen')
+  ('taishan', '泰山', 'taishannantianmen'),
+  ('huanghebei', '黄河北岸', 'huanghebeifenglingdu'),
+  ('jinyang', '晋阳', 'jinyangchaoximenneijie')
 ;
 
 create table if not exists zone_connectivity (
@@ -215,12 +217,19 @@ values
   ('suzhou', 'guiyunzhuang', 27),
   ('guiyunzhuang', 'suzhou', 27),
   ('qufu', 'taishan', 21),
-  ('taishan', 'qufu', 21)
+  ('taishan', 'qufu', 21),
+  ('huanghenan', 'huanghebei', 1),
+  ('huanghebei', 'huanghenan', 1),
+  ('huanghebei', 'jinyang', 12),
+  ('jinyang', 'huanghebei', 12)
 ;
 
 update zone_connectivity set boat = 1
 where (startcode = 'changjiangnan' and endcode = 'changjiangbei')
-or (startcode = 'changjiangbei' and endcode = 'changjiangnan');
+or (startcode = 'changjiangbei' and endcode = 'changjiangnan')
+or (startcode = 'huanghebei' and endcode = 'huanghenan')
+or (startcode = 'huanghenan' and endcode = 'huanghebei')
+;
 
 --.separator ':'
 --.import char2pinyin.csv chr2pinyin

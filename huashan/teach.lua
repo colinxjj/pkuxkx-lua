@@ -9,8 +9,7 @@ require "wait"
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
-
-local p1 = "一招一式有板有眼，你可以回去和宁中则复命了。"
+local status = require "pkuxkx.status"
 
 local p2 = [[
 > 你向宁中则打听有关『job』的消息。
@@ -110,8 +109,8 @@ local define_teach = function()
     DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$",
     WENHAO_DESC = "^[ >]*你对着(.+)深深一揖：鄙派掌门向.*问好。$"
   }
-  local teacherId = "scala"
-  local teacherName = "斯卡拉"
+  local teacherId = "luar"
+  local teacherName = "撸啊"
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -261,7 +260,7 @@ local define_teach = function()
       newState = States.wait_ask,
       event = Events.NO_JOB_AVAILABLE,
       action = function()
-        travel:walto(2921, function()
+        travel:walkto(2921, function()
           self:doWaitAsk()
         end)
       end
@@ -364,8 +363,25 @@ local define_teach = function()
       newState = States.ask,
       event = Events.SUBMIT_DONE,
       action = function()
-        wait.time(3)
-        self:doAsk()
+        -- 此处，添加判断食物饮水
+        status:hpbrief()
+        if status.food < 100 or status.drink < 100 then
+          return travel:walkto(3798, function()
+            helper.assureNotBusy()
+            SendNoEcho("do 2 eat")
+            helper.assureNotBusy()
+            SendNoEcho("do 2 drink")
+            helper.assureNotBusy()
+            wait.time(3)
+            return travel:walkto(66, function()
+              return self:doAsk()
+            end)
+          end)
+        else
+          -- 就在当前房间
+          wait.time(3)
+          return self:doAsk()
+        end
       end
     }
     self:addTransitionToStop(States.submit)
@@ -717,7 +733,9 @@ local define_teach = function()
   end
 
   function prototype:doWaitAsk()
-    SendNoEcho("dz max")
+    print("等待10秒后再询问")
+    wait.time(10)
+    return self:fire(Events.PAUSE_WAIT)
   end
 
   function prototype:doSubmit()
