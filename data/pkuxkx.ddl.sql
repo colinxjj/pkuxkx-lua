@@ -87,7 +87,7 @@ values
   ('zhenjiang', '镇江', 'zhenjiangguangchang'),
   ('dufu', '都府', 'dufudating'),
   ('jiankang', '建康', 'jiankangzhongcheng'),
-  ('linan', '临安', 'linanfudalisi'),
+  ('linan', '临安府', 'linanfudalisi'),
   ('changjiangnan', '长江南岸', 'changjiangnanyanziji'),
   ('lingzhou', '灵州', 'lingzhouchengzhongxin'),
   ('dalunsi', '大轮寺', 'dalunsizhudubadian'),
@@ -98,7 +98,8 @@ values
   ('guiyunzhuang', '归云庄', 'guiyunzhuangguiyunzhuangdamen'),
   ('taishan', '泰山', 'taishannantianmen'),
   ('huanghebei', '黄河北岸', 'huanghebeifenglingdu'),
-  ('jinyang', '晋阳', 'jinyangchaoximenneijie')
+  ('jinyang', '晋阳', 'jinyangchaoximenneijie'),
+  ('zhangjiakou', '张家口', 'zhangjiakouguangchang')
 ;
 
 create table if not exists zone_connectivity (
@@ -221,7 +222,9 @@ values
   ('huanghenan', 'huanghebei', 1),
   ('huanghebei', 'huanghenan', 1),
   ('huanghebei', 'jinyang', 12),
-  ('jinyang', 'huanghebei', 12)
+  ('jinyang', 'huanghebei', 12),
+  ('jinyang', 'zhangjiakou', 16),
+  ('zhangjiakou', 'jinyang', 16)
 ;
 
 update zone_connectivity set boat = 1

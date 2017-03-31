@@ -10,6 +10,7 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
+local wenhao = require "huashan.wenhao"
 
 local p2 = [[
 > 你向宁中则打听有关『job』的消息。

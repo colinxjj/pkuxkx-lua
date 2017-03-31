@@ -25,7 +25,7 @@
 -- 6. boat 乘船
 -- 7. busy（必须重复相同命令，如西蜀山路等）
 -- 8. flood (洪水导致房间出口发生变化)
--- 9. blocked 被阻挡中
+-- 9. blocked 被阻挡中（目前还没实现）
 -- 状态转换：
 -- 非stop状态都可通过发送STOP消息，转换为stop状态
 -- stop -> locating (event: START)

@@ -189,7 +189,7 @@ local define_fsm = function()
         elseif cmd == "dazuo" then
           self.dazuoCmd = "dazuo " .. num
           self.dazuoNum = tonumber(num)
-          self.dazuoCmd = nil
+          self.tunaCmd = nil
           self.learnCmd = nil
           self.lianCmd = nil
         end

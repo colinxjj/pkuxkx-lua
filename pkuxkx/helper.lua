@@ -64,6 +64,7 @@ local define_helper = function()
     local response = assert(type(args.response) == "function" and args.response, "response must be function")
     local name = args.name or (group .. "_" .. GetUniqueID())
     local sequence = args.sequence or 10
+    local stopEvaluation = args.stopEvaluation or false
 
     -- wrap function into coroutine and stored in world for trigger to call
     _G.world[name] = helper.repeatedRunnableWithCo(response)
@@ -76,6 +77,9 @@ local define_helper = function()
         trigger_flag.KeepEvaluating),
       custom_colour.NoChange, COPY_WILDCARDS_NONE, SOUND_FILE_NONE, name, sendto.script, sequence))
     check(SetTriggerOption(name, "group", group))
+    if stopEvaluation then
+      check(SetTriggerOption(name, "keep_evaluating", false))
+    end
   end
 
   helper.addOneShotTrigger = function(args)

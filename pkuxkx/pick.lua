@@ -86,9 +86,7 @@ local define_pick = function()
     stop = "stop",
     status_check = "status_check",
     dining = "dining",
-    items_check = "items_check",
     sell = "sell",
-    money_check = "money_check",
     store = "store",
     plan_check = "plan_check",
     picking = "picking"
@@ -97,28 +95,30 @@ local define_pick = function()
     STOP = "stop",  --  -> stop
     START = "start",  --  -> status_check
     HUNGRY = "hungry",  --  -> dining
-    FULL = "full",  --  -> item_check
+    FULL = "full",  --  -> status_check
     ENOUGH_ITEMS = "enough_items",  --  -> sell
-    NOT_ENOUGH_ITEMS = "not_enough_items",  --  -> money_check
+    NOT_ENOUGH_ITEMS = "not_enough_items",  --  -> status_check
     ENOUGH_MONEY = "enough_money", --  -> store
-    NOT_ENOUGH_MONEY = "not_enough_money",  --  -> plan_check
+    NOT_ENOUGH_MONEY = "not_enough_money",  --  -> status_check
+    PREPARE_PLAN = "prepare_plan", --  -> plan_check
     ZONE_TRAVERSABLE = "zone_traversable",  --  -> picking
     ZONE_NOT_TRAVERSABLE = "zone_not_traversable",  --  -> zone+1, status_check
     PICK_DONE = "pick_done",  --  -> status_check
+    MAX_MONEY_STORED = "max_money_stored",  -- -> stop
+
   }
   local REGEXP = {
     ALIAS_PICK = "^picking\\s*$",
     ALIAS_PICK_DEBUG = "^picking\\s+debug\\s+(on|off)\\s*$",
     ALIAS_PICK_START = "^picking\\s+start\\s*$",
     ALIAS_PICK_STOP = "^picking\\s+stop\\s*$",
-    CHECK_ITEM_START = helper.settingRegexp("pick", "checkitem_start"),
-    CHECK_ITEM_DONE = helper.settingRegexp("pick", "checkitem_done"),
     WEIGHT_RATE = "^│\\s+你身上带着(.*?)件东西\\s+\\(负重\\s*(-?\\d+)%\\)：.*",
     CANNOT_SELL_ITEM = "^[ >]*(你身上没有.*|这样东西不值钱。|这样东西不能买卖。)$",
     ITEM_ID = "([^ ]+)\\s+\\=\\s+([^\"]+)$",
     COINS_DESC = "^[ >]*(.*)文铜板\\((Coin)\\)",
     SILVERS_DESC = "^[ >]*(.*)两白银\\((Silver)\\)$",
     GOLDS_DESC = "^[ >]*(.*)两黄金\\((Gold)\\)$",
+    CANNOT_STORE_MONEY = "^[ >]*您目前已有存款.*，再存那么多的钱，我们小号可难保管了。$",
   }
 
   function prototype:FSM()
@@ -140,16 +140,11 @@ local define_pick = function()
 
   function prototype:initPickSettings()
     self.pickZones = {
-      --"nanchang",
-      --"chengdu",
-      --"dali",
       "luoyang",
       "changan",
       "yangzhou",
       "xinyang",
       "zhongyuan",
-      -- "huanghenan",
-      -- "changjiangbei",
       "qufu",
       "xiaoshancun",
       "lingzhou"
@@ -208,45 +203,11 @@ local define_pick = function()
       exit = function() end
     }
     self:addState {
-      state = States.items_check,
-      enter = function()
-        helper.enableTriggerGroups(
-          "pick_item_check_start")
-        self.itemCount = nil
-        self.weightPercent = nil
-      end,
-      exit = function()
-        helper.disableTriggerGroups(
-          "pick_item_check_start",
-          "pick_item_check_done")
-      end
-    }
-    self:addState {
       state = States.sell,
       enter = function()
-        helper.enableTriggerGroups(
-          "pick_sell_check_start")
         self.itemsToSell = {}
       end,
       exit = function()
-        helper.disableTriggerGroups(
-          "pick_sell_check_start",
-          "pick_sell_check_done")
-      end
-    }
-    self:addState {
-      state = States.money_check,
-      enter = function()
-        helper.enableTriggerGroups(
-          "pick_money_check_start")
-        self.moneyCheckCoins = 0
-        self.moneyCheckSilvers = 0
-        self.moneyCheckGolds = 0
-      end,
-      exit = function()
-        helper.disableTriggerGroups(
-          "pick_money_check_start",
-          "pick_money_check_done")
       end
     }
     self:addState {
@@ -262,12 +223,12 @@ local define_pick = function()
     self:addState {
       state = States.picking,
       enter = function()
-        helper.enableTriggerGroups("pick_picking")
+        helper.enableTriggerGroups("pick")
         -- only stop by user send the stop command
         self.stopPick = false
       end,
       exit = function()
-        helper.disableTriggerGroups("pick_picking")
+        helper.disableTriggerGroups("pick")
       end
     }
   end
@@ -294,26 +255,6 @@ local define_pick = function()
     }
     self:addTransition {
       oldState = States.status_check,
-      newState = States.items_check,
-      event = Events.FULL,
-      action = function()
-        return self:doItemsCheck()
-      end
-    }
-    self:addTransitionToStop(States.status_check)
-    -- transitions from state<dining>
-    self:addTransition {
-      oldState = States.dining,
-      newState = States.items_check,
-      event = Events.FULL,
-      action = function()
-        return self:doItemsCheck()
-      end
-    }
-    self:addTransitionToStop(States.dining)
-    -- transitions from state<items_check>
-    self:addTransition {
-      oldState = States.items_check,
       newState = States.sell,
       event = Events.ENOUGH_ITEMS,
       action = function()
@@ -321,27 +262,7 @@ local define_pick = function()
       end
     }
     self:addTransition {
-      oldState = States.items_check,
-      newState = States.money_check,
-      event = Events.NOT_ENOUGH_ITEMS,
-      action = function()
-        return self:doMoneyCheck()
-      end
-    }
-    self:addTransitionToStop(States.items_check)
-    -- transitions from state<sell>
-    self:addTransition {
-      oldState = States.sell,
-      newState = States.money_check,
-      event = Events.NOT_ENOUGH_ITEMS,
-      action = function()
-        return self:doMoneyCheck()
-      end
-    }
-    self:addTransitionToStop(States.sell)
-    -- transitions from state<money_check>
-    self:addTransition {
-      oldState = States.money_check,
+      oldState = States.status_check,
       newState = States.store,
       event = Events.ENOUGH_MONEY,
       action = function()
@@ -349,21 +270,49 @@ local define_pick = function()
       end
     }
     self:addTransition {
-      oldState = States.money_check,
+      oldState = States.status_check,
       newState = States.plan_check,
-      event = Events.NOT_ENOUGH_MONEY,
+      event = Events.PREPARE_PLAN,
       action = function()
         return self:doPlanCheck()
       end
     }
-    self:addTransitionToStop(States.money_check)
+    self:addTransitionToStop(States.status_check)
+    -- transitions from state<dining>
+    self:addTransition {
+      oldState = States.dining,
+      newState = States.status_check,
+      event = Events.FULL,
+      action = function()
+        return self:doStatusCheck()
+      end
+    }
+    self:addTransitionToStop(States.dining)
+    -- transitions from state<sell>
+    self:addTransition {
+      oldState = States.sell,
+      newState = States.status_check,
+      event = Events.NOT_ENOUGH_ITEMS,
+      action = function()
+        return self:doStatusCheck()
+      end
+    }
+    self:addTransitionToStop(States.sell)
     -- transitions from state<store>
     self:addTransition {
       oldState = States.store,
-      newState = States.plan_check,
+      newState = States.status_check,
       event = Events.NOT_ENOUGH_MONEY,
       action = function()
-        return self:doPlanCheck()
+        return self:doStatusCheck()
+      end
+    }
+    self:addTransition {
+      oldState = States.store,
+      newState = States.stop,
+      event = Events.MAX_MONEY_STORED,
+      action = function()
+        print("任务完成！存储金额到达上限，停止捡垃圾。")
       end
     }
     self:addTransitionToStop(States.store)
@@ -393,16 +342,25 @@ local define_pick = function()
       event = Events.PICK_DONE,
       action = function()
         local currZone = self:currZone()
+        -- 当完成时，进行计数
         if self.pickedZones[currZone] then
           self.pickedZones[currZone] = self.pickedZones[currZone] + 1
         else
           self.pickedZones[currZone] = 1
         end
+        self:showPickedZones()
         self:nextPick()
         return self:doStatusCheck()
       end
     }
     self:addTransitionToStop(States.picking)
+  end
+
+  function prototype:showPickedZones()
+    print("已完成捡垃圾区域及次数如下：")
+    for zone, cnt in pairs(self.pickedZones) do
+      print(zone, cnt)
+    end
   end
 
   function prototype:nextPick()
@@ -413,151 +371,7 @@ local define_pick = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups(
-      "pick_item_check_start",
-      "pick_item_check_done",
-      "pick_sell_check_start",
-      "pick_sell_check_done",
-      "pick_money_check_start",
-      "pick_money_check_done",
-      "pick_picking"
-    )
-    -- item check triggers
-    helper.addTrigger {
-      group = "pick_item_check_start",
-      regexp = helper.settingRegexp("pick", "itemcheck_start"),
-      response = function()
-        self:debug("激活载重检测")
-        helper.enableTriggerGroups("pick_item_check_done")
-      end
-    }
-    helper.addTrigger {
-      group = "pick_item_check_done",
-      regexp = REGEXP.WEIGHT_RATE,
-      response = function(name, line, wildcards)
-        self:debug("载重查看触发", wildcards[1], wildcards[2])
-        self.itemCount = helper.ch2number(wildcards[1])
-        self.weightPercent = tonumber(wildcards[2])
-      end
-    }
-    helper.addTrigger {
-      group = "pick_item_check_done",
-      regexp = helper.settingRegexp("pick", "itemcheck_done"),
-      response = function()
-        self:debug("身上物品数目：", self.itemCount)
-        self:debug("升上物品重量百分比：", self.weightPercent)
-        if self.weightPercent >= self.weightThreshold or self.itemCount >= self.itemThreshold then
-          return self:fire(Events.ENOUGH_ITEMS)
-        else
-          return self:fire(Events.NOT_ENOUGH_ITEMS)
-        end
-      end
-    }
-    -- sell check triggers
-    helper.addTrigger {
-      group = "pick_sell_check_start",
-      regexp = helper.settingRegexp("pick", "sellcheck_start"),
-      response = function()
-        helper.enableTriggerGroups("pick_sell_check_done")
-      end
-    }
-    helper.addTrigger {
-      group = "pick_sell_check_done",
-      regexp = REGEXP.ITEM_ID,
-      response = function(name, line, wildcards)
-        local itemNameCN = wildcards[1]
-        local itemIds = wildcards[2]
-        local itemId = string.lower(utils.split(itemIds, ",")[1])
-        if not self.itemsToSell then
-          self.itemsToSell = {}
-        end
-        if not self.itemsExcluded[itemNameCN] then
-          table.insert(self.itemsToSell, itemId)
-        end
-      end
-    }
-    helper.addTrigger {
-      sequence = 5, -- must be higher than item_id
-      group = "pick_sell_check_done",
-      regexp = helper.settingRegexp("pick", "sellcheck_done"),
-      response = function()
-        helper.disableTriggerGroups("pick_sell_check_done")
-        if self.itemsToSell and #(self.itemsToSell) > 0 then
-          self:debug("需要售卖东西有：", table.concat(self.itemsToSell, ","))
-          -- 扬州当铺30
-          return travel:walkto(30, function()
-            while #(self.itemsToSell) > 0 do
-              local item = table.remove(self.itemsToSell)
-              while true do
-                helper.assureNotBusy()
-                SendNoEcho("sell " .. item)
-                local line = wait.regexp(REGEXP.CANNOT_SELL_ITEM, 2)
-                if line then
-                  -- SendNoEcho("drop " .. item)
-                  break
-                end
-              end
-            end
-            return self:fire(Events.NOT_ENOUGH_ITEMS)
-          end)
-        else
-          self:debug("无东西可卖")
-          return self:fire(Events.NOT_ENOUGH_ITEMS)
-        end
-      end
-    }
-    -- money check triggers
-    helper.addTrigger {
-      group = "pick_money_check_start",
-      regexp = helper.settingRegexp("pick", "moneycheck_start"),
-      response = function()
-        helper.enableTriggerGroups("pick_money_check_done")
-      end
-    }
-    helper.addTrigger {
-      group = "pick_money_check_done",
-      regexp = helper.settingRegexp("pick", "moneycheck_done"),
-      response = function()
-        if self.moneyCheckCoins > self.coinThreshold
-          or self.moneyCheckSilvers > self.silverThreshold
-          or self.moneyCheckGolds > self.goldThreshold then
-          self:debug(
-            "身上金钱超过限额：",
-            "gold:" .. self.moneyCheckGolds,
-            "silver:" .. self.moneyCheckSilvers,
-            "coins:" .. self.moneyCheckCoins)
-          return self:fire(Events.ENOUGH_MONEY)
-        else
-          self:debug(
-            "身上金钱未超过限额：",
-            "gold:" .. self.moneyCheckGolds,
-            "silver:" .. self.moneyCheckSilvers,
-            "coins:" .. self.moneyCheckCoins)
-          return self:fire(Events.NOT_ENOUGH_MONEY)
-        end
-      end
-    }
-    helper.addTrigger {
-      group = "pick_money_check_done",
-      regexp = REGEXP.COINS_DESC,
-      response = function(name, line, wildcards)
-        self.moneyCheckCoins = helper.ch2number(wildcards[1])
-      end
-    }
-    helper.addTrigger {
-      group = "pick_money_check_done",
-      regexp = REGEXP.SILVERS_DESC,
-      response = function(name, line, wildcards)
-        self.moneyCheckSilvers = helper.ch2number(wildcards[1])
-      end
-    }
-    helper.addTrigger {
-      group = "pick_money_check_done",
-      regexp = REGEXP.GOLDS_DESC,
-      response = function(name, line, wildcards)
-        self.moneyCheckGolds = helper.ch2number(wildcards[1])
-      end
-    }
+    helper.removeTriggerGroups("pick")
     -- picking triggers
     self:addPickingTriggers {
       -- 黄金，白银
@@ -614,7 +428,7 @@ local define_pick = function()
   function prototype:addPickingTriggers(patterns)
     for _, pattern in ipairs(patterns) do
       helper.addTrigger {
-        group = "pick_picking",
+        group = "pick",
         regexp = pattern,
         response = function(name, line, wildcards)
           local name = string.lower(wildcards[1])
@@ -636,12 +450,30 @@ local define_pick = function()
   function prototype:doStatusCheck()
     wait.time(1)
     helper.assureNotBusy()
+
+    -- 检查食物饮水是否充足
     status:hpbrief()
     if status.food < 100 or status.drink < 100 then
       return self:fire(Events.HUNGRY)
-    else
-      return self:fire(Events.FULL)
     end
+    -- 检查负重与物品数量是否足够售卖
+    status:inventory()
+    if status.weightPercent >= self.weightThreshold or status.itemCount >= self.itemThreshold then
+      return self:fire(Events.ENOUGH_ITEMS)
+    end
+    -- 检查金额是否足够存储
+    if status.coins > self.coinThreshold
+      or status.silvers > self.silverThreshold
+      or status.golds > self.goldThreshold then
+      self:debug(
+        "身上金钱超过限额：",
+        "gold:" .. self.moneyCheckGolds,
+        "silver:" .. self.moneyCheckSilvers,
+        "coins:" .. self.moneyCheckCoins)
+      return self:fire(Events.ENOUGH_MONEY)
+    end
+    self:debug("状态检查完毕，准备行走计划")
+    return self:fire(Events.PREPARE_PLAN)
   end
 
   function prototype:doEat()
@@ -656,36 +488,56 @@ local define_pick = function()
     end)
   end
 
-  function prototype:doItemsCheck()
-    self:debug("1秒后检查身上物品")
-    wait.time(1)
-    helper.assureNotBusy()
-    SendNoEcho("set pick itemcheck_start")
-    SendNoEcho("i")
-    SendNoEcho("set pick itemcheck_done")
-  end
-
   function prototype:doSell()
     self:debug("1秒后检查身上可售卖物品")
     wait.time(1)
     helper.assureNotBusy()
-    SendNoEcho("set pick sellcheck_start")
-    SendNoEcho("id")
-    SendNoEcho("set pick sellcheck_done")
-  end
-
-  function prototype:doMoneyCheck()
-    self:debug("1秒后检查身上金额")
-    wait.time(1)
-    helper.assureNotBusy()
-    SendNoEcho("set pick moneycheck_start")
-    SendNoEcho("get coin")
-    SendNoEcho("l coin")
-    SendNoEcho("get silver")
-    SendNoEcho("l silver")
-    SendNoEcho("get gold")
-    SendNoEcho("l gold")
-    SendNoEcho("set pick moneycheck_done")
+    status:id()
+    if not status.items then
+      error("出错，无法捕捉身上物品")
+    end
+    if not self.itemsToSell then
+      self.itemsToSell = {}
+    end
+    for _, item in pairs(status.items) do
+      if not self.itemsExcluded[item.name] then
+        table.insert(self.itemsToSell, item)
+      end
+    end
+    if #(self.itemsToSell) > 0 then
+      if self.DEBUG then
+        self:debug("需要售卖的东西有：")
+        for _, item in pairs(self.itemsToSell) do
+          self:debug(item.id, item.name)
+        end
+      end
+      -- todo 未来可优化为在就近的当铺进行出售
+      return travel:walkto(30, function()
+        while #(self.itemsToSell) > 0 do
+          local item = table.remove(self.itemsToSell)
+          local sellRetries = 0
+          -- 尝试卖出三次，如果仍不成功
+          while sellRetries <= 3 do
+            helper.assureNotBusy()
+            SendNoEcho("sell " .. item.id)
+            local line = wait.regexp(REGEXP.CANNOT_SELL_ITEM, 2)
+            if line then
+              -- 检查是否该物品不能买卖
+              if string.find(line, "不值钱") or string.find(line, "不能买卖") then
+                helper.assureNotBusy()
+                SendNoEcho("drop " .. item)
+              end
+              break
+            end
+            sellRetries = sellRetries + 1
+          end
+        end
+        return self:fire(Events.NOT_ENOUGH_ITEMS)
+      end)
+    else
+      self:debug("无东西可卖")
+      return self:fire(Events.NOT_ENOUGH_ITEMS)
+    end
   end
 
   function prototype:doStore()
@@ -706,7 +558,12 @@ local define_pick = function()
         helper.assureNotBusy()
         SendNoEcho("cun " .. self.goldThreshold .. " gold")
       end
-      return self:fire(Events.NOT_ENOUGH_MONEY)
+      local line = wait.regexp(REGEXP.CANNOT_STORE_MONEY, 3)
+      if line then
+        return self:fire(Events.MAX_MONEY_STORED)
+      else
+        return self:fire(Events.NOT_ENOUGH_MONEY)
+      end
     end)
   end
 
