@@ -176,9 +176,6 @@ local define_pick = function()
     self.pickPlan = nil -- include the startid and the rooms
     self.itemsFull = false
     self.moneyFull = false
-    self.moneyCheckCoins = 0
-    self.moneyCheckSilvers = 0
-    self.moneyCheckGolds = 0
     self.stopPick = true
   end
 
@@ -456,22 +453,26 @@ local define_pick = function()
     if status.food < 100 or status.drink < 100 then
       return self:fire(Events.HUNGRY)
     end
+    self:debug("食物饮水充足", status.food, status.drink)
     -- 检查负重与物品数量是否足够售卖
     status:inventory()
     if status.weightPercent >= self.weightThreshold or status.itemCount >= self.itemThreshold then
       return self:fire(Events.ENOUGH_ITEMS)
     end
+    self:debug("物品数量不满足售卖条件", status.weightPercent, status.itemCount)
     -- 检查金额是否足够存储
+  status:money()
     if status.coins > self.coinThreshold
       or status.silvers > self.silverThreshold
       or status.golds > self.goldThreshold then
       self:debug(
         "身上金钱超过限额：",
-        "gold:" .. self.moneyCheckGolds,
-        "silver:" .. self.moneyCheckSilvers,
-        "coins:" .. self.moneyCheckCoins)
+        "gold:" .. status.coins,
+        "silver:" .. status.silvers,
+        "coins:" .. status.coins)
       return self:fire(Events.ENOUGH_MONEY)
     end
+    self:debug("身上金额不满足存储条件", status.golds, status.silvers, status.coins)
     self:debug("状态检查完毕，准备行走计划")
     return self:fire(Events.PREPARE_PLAN)
   end
@@ -525,7 +526,7 @@ local define_pick = function()
               -- 检查是否该物品不能买卖
               if string.find(line, "不值钱") or string.find(line, "不能买卖") then
                 helper.assureNotBusy()
-                SendNoEcho("drop " .. item)
+                SendNoEcho("drop " .. item.id)
               end
               break
             end
@@ -546,15 +547,20 @@ local define_pick = function()
     helper.assureNotBusy()
     return travel:walkto(91, function()
       wait.time(1)
-      if self.moneyCheckCoins > self.coinThreshold then
+      status:money()
+      if status.coins > self.coinThreshold then
         helper.assureNotBusy()
         SendNoEcho("convert " .. self.coinThreshold .. " coin to silver")
+        wait.time(2)
+        status:money()
       end
-      if self.moneyCheckSilvers > self.silverThreshold then
+      if status.silvers > self.silverThreshold then
         helper.assureNotBusy()
         SendNoEcho("convert " .. self.silverThreshold .. " silver to gold")
+        wait.time(2)
+        status:money()
       end
-      if self.moneyCheckGolds > self.goldThreshold then
+      if status.golds > self.goldThreshold then
         helper.assureNotBusy()
         SendNoEcho("cun " .. self.goldThreshold .. " gold")
       end

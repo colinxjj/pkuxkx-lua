@@ -60,6 +60,7 @@ local define_status = function()
     SILVERS_DESC = "^[ >]*(.*)两白银\\((Silver)\\)$",
     GOLDS_DESC = "^[ >]*(.*)两黄金\\((Gold)\\)$",
     MONEY_MISS_STOP_EVALUATION = "^[ >]*你要看什么？$",
+    SYSTEM_BUSY = "^[ >]*等等，系统喘气中......$",
   }
 
   function prototype:FSM()
@@ -97,6 +98,7 @@ local define_status = function()
     self.food = nil
     self.drink = nil
     -- id / id here
+    self.systemBusy = false
     self.items = nil
     -- inventory
     self.itemCount = 0
@@ -129,6 +131,7 @@ local define_status = function()
     self:addState {
       state = States.id,
       enter = function()
+        self.systemBusy = false
         helper.enableTriggerGroups("status_id_start")
       end,
       exit = function()
@@ -345,6 +348,13 @@ local define_status = function()
         })
       end
     }
+    helper.addTrigger {
+      group = "status_id_done",
+      regexp = REGEXP.SYSTEM_BUSY,
+      response = function()
+        self.systemBusy = true
+      end
+    }
     -- inventory check
     helper.addTrigger {
       group = "status_inventory_start",
@@ -507,14 +517,27 @@ local define_status = function()
       error("Previous thread is not disposed")
     end
     self.waitThread = assert(coroutine.running(), "Must be in coroutine")
-    SendNoEcho("set status id_start")
-    if isHere then
-      SendNoEcho("id here")
-    else
-      SendNoEcho("id")
+
+    while true do
+      SendNoEcho("set status id_start")
+      if isHere then
+        SendNoEcho("id here")
+      else
+        SendNoEcho("id")
+      end
+      SendNoEcho("set status id_done")
+      -- ignore arguments
+      coroutine.yield()
+      if self.systemBusy then
+        -- reset
+        self.systemBusy = false
+        self:debug("等待2秒重试")
+        wait.time(2)
+      else
+        break
+      end
     end
-    SendNoEcho("set status id_done")
-    return coroutine.yield()
+
   end
 
   function prototype:doInventory()
