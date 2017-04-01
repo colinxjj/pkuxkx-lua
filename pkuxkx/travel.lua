@@ -311,7 +311,6 @@ local define_travel = function()
   -- 获取指定房间的附近N格房间列表
 
 
-
   ----------- Alias-only API ----------
   -- below functions are only used
   -- in alias
@@ -553,6 +552,44 @@ local define_travel = function()
         }
         self:fire(Events.START)
       end
+    end
+  end
+
+  -- 通过给定名称查找房间列表
+  -- 1. 通过全名查找
+  -- 2. 通过区域名，房间名查找
+  function prototype:getMatchedRooms(args)
+    if args.fullname then
+      local results = {}
+      for zoneName, zone in pairs(self.zonesByName) do
+        local idxStart, idxEnd = string.find(fullname, zoneName)
+        -- 首字符匹配
+        if idxStart == 1 then
+          local roomName = string.sub(fullname, idxEnd + 1)
+          for _, room in pairs(zone.rooms) do
+            if room.name == roomName then
+              table.insert(results, room)
+            end
+          end
+          -- 不用再查其他区域了
+          break
+        end
+      end
+      return results
+    else
+      assert(args.name, "name cannot be nil")
+      assert(args.zone, "zone cannot be nil")
+      local results = {}
+      local zone = self.zonesByName[args.zone]
+      if not zone then
+        return results
+      end
+      for _, room in pairs(zone.rooms) do
+        if room.name == args.name then
+          table.insert(results, room)
+        end
+      end
+      return results
     end
   end
 
@@ -1857,6 +1894,7 @@ local define_travel = function()
 
   return prototype
 end
+
 return define_travel():FSM()
 
 --local travel = define_travel():FSM()

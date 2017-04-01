@@ -6,6 +6,40 @@
 -- To change this template use File | Settings | File Templates.
 --
 
+local pattern = [[
+≡━◎个人档案◎━━━━━━━━━━━━━━━━━━━━━━━━≡
+
+【 剑  童 】华山派剑士 撸啊(Luar)
+
+ 你是一位十六岁的未婚男性人类，丙申年十二月二十一日巳时一刻生。
+
+ 膂力：[ 35]  悟性：[ 45]  根骨：[ 18]  身法：[ 18]
+
+ 你是华山派第二十代弟子， 你的师父是梁发。
+
+
+ 你曾经结束过九个生命，其中有零个是其他玩家，零个是宠物。
+ 你共经历过零次死亡的痛苦，其中有零次是命丧其他玩家之手。
+
+ 杀    气：  正常
+ 银行存款：  一百二十四两黄金
+
+ 国    籍：  无国籍                              国家积分：  0
+
+ 等    级：   0/5
+ 实战经验：  六年功力■□□□□
+■■■■■■■■■■■■■■■■■■■■■■■■■□□□□□□□□□□□□□□□(63.25%)
+
+ 道    德：  0                                   潜    能：  1.10万
+ 师门忠诚：  0                                   江湖声望：  7486
+ 愿    望：  0                                   武 学 点：  0
+ 战斗评价：  不足挂齿
+
+≡━━━━━━━━━━━━━━━━━━━━━━◎北大侠客行◎━━≡
+
+]]
+
+
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local Item = require "pkuxkx.Item"
@@ -18,10 +52,12 @@ local Item = require "pkuxkx.Item"
 -- status:idhere() 当前房间物品/人物捕捉，与id()共用列表
 -- status:inventory() 自身携带物品重量与个数捕捉
 -- status:money() 自身携带金钱数目捕捉
+-- status:score() 自身信息捕捉
 -- status:showHp() 显示自身状态
 -- status:showItems() 显示物品列表（自身，或者房间，互斥）
 -- status:showInventory() 显示负重情况
 -- status:showMoney() 显示携带金钱情况
+-- status:showScore() 显示自身信息
 --------------------------------------------------------------
 
 local define_status = function()
@@ -32,7 +68,8 @@ local define_status = function()
     hpbrief = "hpbrief",
     id = "id",
     inventory = "inventory",
-    money = "money"
+    money = "money",
+    score = "score",
   }
   local Events = {
     STOP = "stop",
@@ -40,27 +77,30 @@ local define_status = function()
     ID = "id",
     IDHERE = "idhere",
     INVENTORY = "inventory",
-    MONEY = "money"
+    MONEY = "money",
+    SCORE = "score",
   }
-
   local REGEXP = {
+    ALIAS_STATUS_HP = "^status\\s+hp\\s*$",
+    ALIAS_STATUS_MONEY = "^status\\s+money\\s*$",
+    ALIAS_STATUS_ID = "^status\\s+(id|idhere)\\s*$",
+    ALIAS_STATUS_INVENTORY = "^status\\s+i\\s*$",
+    ALIAS_STATUS_SCORE = "^status\\s+sc\\s*$",
+    ALIAS_STATUS_SHOW = "^status\\s+show\\s+(hp|money|items|weight)\\s*$",
     -- 经验，潜能，最大内力，当前内力，最大精力，当前精力
     -- 最大气血，有效气血，当前气血，最大精神，有效精神，当前精神
     HPBRIEF_LINE = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
     -- 真气，真元，食物，饮水
     HPBRIEF_LINE_EX = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
     ITEM_ID = "([^ ]+)\\s+\\=\\s+([^\"]+)$",
-    ALIAS_STATUS_HP = "^status\\s+hp\\s*$",
-    ALIAS_STATUS_MONEY = "^status\\s+money\\s*$",
-    ALIAS_STATUS_ID = "^status\\s+(id|idhere)\\s*$",
-    ALIAS_STATUS_INVENTORY = "^status\\s+i\\s*$",
-    ALIAS_STATUS_SHOW = "^status\\s+show\\s+(hp|money|items|weight)\\s*$",
     WEIGHT_RATE = "^│\\s+你身上带着(.*?)件东西\\s+\\(负重\\s*(-?\\d+)%\\)：.*",
     COINS_DESC = "^[ >]*(.*)文铜板\\((Coin)\\)",
     SILVERS_DESC = "^[ >]*(.*)两白银\\((Silver)\\)$",
     GOLDS_DESC = "^[ >]*(.*)两黄金\\((Gold)\\)$",
     MONEY_MISS_STOP_EVALUATION = "^[ >]*你要看什么？$",
     SYSTEM_BUSY = "^[ >]*等等，系统喘气中......$",
+    TITLE_DESC = "^\\s*【\\s*(.*?)\\s*】([^ ]+) (.*?)\\(([A-Z][a-z]*)\\)$",
+    MURDEROUS_LEVEL = "^\\s*杀    气：\\s*(.+)$",
   }
 
   function prototype:FSM()
@@ -107,6 +147,12 @@ local define_status = function()
     self.golds = 0
     self.silvers = 0
     self.coins = 0
+    -- score
+    self.id = nil
+    self.name = nil
+    self.rank = nil
+    self.title = nil
+    self.murderousLevel = 0
   end
 
   function prototype:initStates()
@@ -221,6 +267,20 @@ local define_status = function()
         return self:fire(Events.STOP)
       end
     }
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.score,
+      event = Events.SCORE,
+      action = function()
+        self.id = nil
+        self.name = nil
+        self.title = nil
+        self.rank = nil
+        self.murderousLevel = 0
+        self:doScore()
+        return self:fire(Events.STOP)
+      end
+    }
     self:addTransitionToStop(States.stop)
     -- transition from state<hpbrief>
     self:addTransitionToStop(States.hpbrief)
@@ -237,7 +297,8 @@ local define_status = function()
       "status_hpbrief_start", "status_hpbrief_done",
       "status_id_start", "status_id_done",
       "status_inventory_start", "status_inventory_done",
-      "status_money_start", "status_money_done")
+      "status_money_start", "status_money_done",
+      "status_score_start", "status_score_done")
     -- hpbrief check
     helper.addTrigger {
       group = "status_hpbrief_start",
@@ -444,6 +505,52 @@ local define_status = function()
       sequence = 1,  -- very high priority
       stopEvaluation = true  --
     }
+    -- score check
+    helper.addTrigger {
+      group = "status_score_start",
+      regexp = helper.settingRegexp("status", "score_start"),
+      response = function()
+        helper.enableTriggerGroups("status_score_done")
+      end
+    }
+    helper.addTrigger {
+      group = "status_score_done",
+      regexp = helper.settingRegexp("status", "score_done"),
+      response = function()
+        helper.disableTriggerGroups("status_score_done")
+        local thread = self.waitThread
+        if thread then
+          self.waitThread = nil
+          local ok, err = coroutine.resume(thread)
+          if not ok then
+            ColourNote ("deeppink", "black", "Error raised in trigger function (in wait module)")
+            ColourNote ("darkorange", "black", debug.traceback (thread))
+            error (err)
+          end -- if
+        end
+      end
+    }
+    helper.addTrigger {
+      gorup = "status_score_done",
+      regexp = REGEXP.TITLE_DESC,
+      response = function(name, line, wildcards)
+        self.title = string.gsub(wildcards[1], " ", "")
+        self.rank = wildcards[2]
+        self.name = wildcards[3]
+        self.id = string.lower(wildcards[4])
+      end
+    }
+    helper.addTrigger {
+      group = "status_score_done",
+      regexp = REGEXP.MURDEROUS_LEVEL,
+      response = function(name, line, wildcards)
+        if wildcards[1] == "正常" then
+          self.murderousLevel = 0
+        else
+          self.murderousLevel = 1
+        end
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -479,6 +586,13 @@ local define_status = function()
       regexp = REGEXP.ALIAS_STATUS_INVENTORY,
       response = function()
         return self:inventory()
+      end
+    }
+    helper.addAlias {
+      gorup = "status",
+      regexp = REGEXP.ALIAS_STATUS_SCORE,
+      response = function()
+        return self:score()
       end
     }
     helper.addAlias {
@@ -537,7 +651,6 @@ local define_status = function()
         break
       end
     end
-
   end
 
   function prototype:doInventory()
@@ -561,6 +674,17 @@ local define_status = function()
     SendNoEcho("look silver")
     SendNoEcho("look coin")
     SendNoEcho("set status money_done")
+    return coroutine.yield()
+  end
+
+  function prototype:doScore()
+    if self.waitThread then
+      error("Previous thread is not disposed")
+    end
+    self.waitThread = assert(coroutine.running(), "Must be in coroutine")
+    SendNoEcho("set status score_start")
+    SendNoEcho("score")
+    SendNoEcho("set status score_done")
     return coroutine.yield()
   end
 
@@ -596,6 +720,14 @@ local define_status = function()
     print("负重百分比：", self.weightPercent)
   end
 
+  function prototype:showScore()
+    print("ID：", self.id)
+    print("姓名：", self.name)
+    print("阶级：", self.rank)
+    print("头衔：", self.title)
+    print("杀气：", self.murderousLevel)
+  end
+
   function prototype:hpbrief()
     return self:fire(Events.HPBRIEF)
   end
@@ -614,6 +746,10 @@ local define_status = function()
 
   function prototype:inventory()
     return self:fire(Events.INVENTORY)
+  end
+
+  function prototype:score()
+    return self:fire(Events.SCORE)
   end
 
   return prototype

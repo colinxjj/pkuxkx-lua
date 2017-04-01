@@ -86,7 +86,7 @@ values
   ('suzhou', '苏州', 'suzhoubaodaiqiao'),
   ('zhenjiang', '镇江', 'zhenjiangguangchang'),
   ('dufu', '都府', 'dufudating'),
-  ('jiankang', '建康', 'jiankangzhongcheng'),
+  ('jiankang', '建康府', 'jiankangzhongcheng'),
   ('linan', '临安府', 'linanfudalisi'),
   ('changjiangnan', '长江南岸', 'changjiangnanyanziji'),
   ('lingzhou', '灵州', 'lingzhouchengzhongxin'),

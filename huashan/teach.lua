@@ -11,6 +11,7 @@ local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
 local wenhao = require "huashan.wenhao"
+local Player = require "pkuxkx.Player"
 
 local p2 = [[
 > 你向宁中则打听有关『job』的消息。
@@ -467,7 +468,7 @@ local define_teach = function()
           local str = utils.split(pattern, "(") -- the utils.split implementatin is not different
           local name = str[1]
           local id = string.gsub(str[2], "%)", "")
-          table.insert(players, {name=name, id=id})
+          table.insert(players, Player:decorate {name=name, id=id})
         end
         self.wenhaoList = players
         self.jobType = "wenhao"
@@ -724,7 +725,15 @@ local define_teach = function()
   end
 
   function prototype:doWenhao()
-    print("请手动执行问好任务")
+    assert(self.wenhaoList, "wenhaoList cannot be nil")
+    print("使用wenhao模块")
+    local players = {}
+    for i = 1, #(self.wenhaoList) do
+      table.insert(players, self.wenhaoList[i])
+    end
+    wenhao:startWithPlayers(players)
+    wenhao:waitUntilDone()
+    return self:fire(Events.WENHAO_DONE)
   end
 
   function prototype:doBeg()

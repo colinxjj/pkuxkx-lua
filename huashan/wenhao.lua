@@ -16,10 +16,6 @@ local Player = require "pkuxkx.Player"
 local define_wenhao = function()
   local prototype = FSM.inheritedMeta()
 
-  local SpecialZone = {
-
-  }
-
   local States = {
     stop = "stop",
     helpme = "helpme",
@@ -255,30 +251,20 @@ local define_wenhao = function()
 
   function prototype:doSearchRooms()
     -- todo 有可能需要转换区域名称
-    local adjustedZoneName = SpecialZone[self.locatedPlayer.zone] or self.locatedPlayer.zone
-
-    local zone = travel.zonesByName[self.locatedPlayer.zone]
-    if not zone then
-      print("无法找到区域", self.locatedPlayer.zone)
+    local rooms = travel:getMatchedRooms {
+      zone = self.locatedPlayer.zone,
+      name = self.locatedPlayer.location
+    }
+    if #rooms > 5 then
+      print("需要到达的房间数大于5，放弃问好该玩家")
       return self:fire(Events.ROOM_NOT_EXISTS)
+    elseif #rooms > 0 then
+      self:debug("准备前往问好玩家", self.locatedPlayer.id, "该玩家可能的地点数", #(rooms))
+      self.searchRooms = rooms
+      return self:fire(Events.GO_NEXT_ROOM)
     else
-      -- clear the search Rooms
-      self.searchRooms = {}
-      for _, room in pairs(zone.rooms) do
-        if room.name == self.locatedPlayer.location then
-          table.insert(self.searchRooms, room)
-        end
-      end
-      if #(self.searchRooms) > 5 then
-        print("需要到达的房间数大于5，放弃问好该玩家")
-        return self:fire(Events.ROOM_NOT_EXISTS)
-      elseif #(self.searchRooms) > 0 then
-        self:debug("准备前往问好玩家", self.locatedPlayer.id, "该玩家可能的地点数", #(self.searchRooms))
-        return self:fire(Events.GO_NEXT_ROOM)
-      else
-        print("在区域", zone.name, "无法查找到房间", self.locatedPlayer.location)
-        return self:fire(Events.ROOM_NOT_EXISTS)
-      end
+      print("无法找到房间：", self.locatedPlayer.zone, self.locatedPlayer.location)
+      return self:fire(Events.ROOM_NOT_EXISTS)
     end
   end
 
@@ -319,7 +305,7 @@ local define_wenhao = function()
       local line = wait.regexp(REGEXP.SUBMITTED, 3)
       if not line then
         print("没有完成任务？尝试取消任务！")
-        -- SendNoEcho("fail")
+        SendNoEcho("fail")
       end
       return self:fire(Events.STOP)
     end)
@@ -327,6 +313,25 @@ local define_wenhao = function()
 
   function prototype:setPlayers(players)
     self.players = players
+  end
+
+  -- exposed API
+  -- should be in coroutine
+  function prototype:start()
+    assert(self.currState == States.stop, "Must start from stop state")
+    assert(coroutine.running(), "Must be in coroutine")
+    return self:fire(Events.START)
+  end
+
+  function prototype:stop()
+    return self:fire(Events.STOP)
+  end
+
+  function prototype:startWithPlayers(players)
+    assert(self.currState == States.stop, "Must start from stop state")
+    assert(coroutine.running(), "Must be in coroutine")
+    self:setPlayers(players)
+    return self:fire(Events.START)
   end
 
   function prototype:waitUntilDone()
