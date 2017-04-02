@@ -89,7 +89,7 @@ local define_status = function()
     ALIAS_STATUS_SHOW = "^status\\s+show\\s+(hp|money|items|weight)\\s*$",
     -- 经验，潜能，最大内力，当前内力，最大精力，当前精力
     -- 最大气血，有效气血，当前气血，最大精神，有效精神，当前精神
-    HPBRIEF_LINE = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
+    HPBRIEF_LINE = "^[ >]*#(-?[0-9\\.]+[KMB]?),(-?[0-9\\.]+[KMB]?),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
     -- 真气，真元，食物，饮水
     HPBRIEF_LINE_EX = "^[ >]*#(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
     ITEM_ID = "([^ ]+)\\s+\\=\\s+([^\"]+)$",
@@ -202,6 +202,15 @@ local define_status = function()
         helper.disableTriggerGroups("status_money_start", "status_money_done")
       end
     }
+    self:addState {
+      state = States.score,
+      enter = function()
+        helper.enableTriggerGroups("status_score_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("status_score_start", "status_score_done")
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -290,6 +299,8 @@ local define_status = function()
     self:addTransitionToStop(States.inventory)
     -- transition from state<money>
     self:addTransitionToStop(States.money)
+    -- transition from state<score>
+    self:addTransitionToStop(States.score)
   end
 
   function prototype:initTriggers()
@@ -332,8 +343,10 @@ local define_status = function()
       response = function(name, line, wildcards)
         local hpbriefNum = self.hpbriefNum
         if hpbriefNum == 1 then
-          self.exp = tonumber(wildcards[1])
-          self.pot = tonumber(wildcards[2])
+--          self.exp = tonumber(wildcards[1])
+          self.exp = helper.convertAbbrNumber(wildcards[1])
+--          self.pot = tonumber(wildcards[2])
+          self.pot = helper.convertAbbrNumber(wildcards[2])
           self.maxNeili = tonumber(wildcards[3])
           self.currNeili = tonumber(wildcards[4])
           self.maxJingli = tonumber(wildcards[5])
@@ -531,7 +544,7 @@ local define_status = function()
       end
     }
     helper.addTrigger {
-      gorup = "status_score_done",
+      group = "status_score_done",
       regexp = REGEXP.TITLE_DESC,
       response = function(name, line, wildcards)
         self.title = string.gsub(wildcards[1], " ", "")
@@ -589,7 +602,7 @@ local define_status = function()
       end
     }
     helper.addAlias {
-      gorup = "status",
+      group = "status",
       regexp = REGEXP.ALIAS_STATUS_SCORE,
       response = function()
         return self:score()

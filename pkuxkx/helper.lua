@@ -100,15 +100,11 @@ local define_helper = function()
         trigger_flag.Temporary,
         trigger_flag.Replace,
         trigger_flag.OneShot),
-        custom_color.NoChange,
+        custom_colour.NoChange,
         COPY_WILDCARDS_NONE, SOUND_FILE_NONE, name, sendto.script, sequence))
     else
       error("response type is unexpected " .. type(response))
     end
-    if args.timerInterval and args.timerCheck then
-
-    end
-
     check(SetTriggerOption(name, "group", group))
   end
 
@@ -268,6 +264,22 @@ local define_helper = function()
       cnt = cnt + 1
     end
     return cnt
+  end
+
+  helper.convertAbbrNumber = function(abbr)
+    local unit = string.sub(abbr, -1)
+    if unit == "K" then
+      local base = tonumber(string.sub(abbr, 1, -2))
+      return base * 1000
+    elseif unit == "M" then
+      local base = tonumber(string.sub(abbr, 1, -2))
+      return base * 1000000
+    elseif unit == "B" then
+      local base = tonumber(string.sub(abbr, 1, -2))
+      return base * 1000000000
+    else
+      return tonumber(abbr)
+    end
   end
 
   -- convert chinese string to number

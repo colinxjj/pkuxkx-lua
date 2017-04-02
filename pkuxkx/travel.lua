@@ -154,9 +154,9 @@ local define_travel = function()
     ALIAS_LOC_SHOW = "^loc\\s+show\\s*$",
     ALIAS_LOC_LMU_ID = "^loc\\s+lmu\\s+(\\d+)\\s*$",
     -- triggers
-    ROOM_NAME_WITH_AREA = "^[ >]{0,12}([^ ]+) \\- \\[[^ ]+\\]$",
-    ROOM_NAME_WITHOUT_AREA = "^[ >]{0,12}([^ ]+) \\- $",
-    ROOM_DESC = "^ {0,12}([^ ].*?) *$",
+    ROOM_NAME_WITH_AREA = "^[ >]{0,14}([^ ]+) {1,2}\\- \\[[^ ]+\\]$",
+    ROOM_NAME_WITHOUT_AREA = "^[ >]{0,14}([^ ]+) {1,2}\\- $",
+    ROOM_DESC = "^ {0,14}([^ ].*?) *$",
     SEASON_TIME_DESC = "^    「([^\\\\x00-\\\\xff]+?)」: (.*)$",
     EXITS_DESC = "^\\s{0,12}这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
     BUSY_LOOK = "^[> ]*风景要慢慢的看。$",
@@ -166,7 +166,8 @@ local define_travel = function()
     ARRIVED = "^[ >]*设定环境变量：travel_walk = \"arrived\"$",
     WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你反应迅速，急忙双手抱头，身体蜷曲。眼前昏天黑地，顺着山路直滚了下去。)$",
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
-    WALK_BUSY = "^[ >]*(吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的。|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*)$",
+    -- 添加武当沼泽busy
+    WALK_BUSY = "^[ >]*(吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的。|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*|你的动作还没有完成，不能移动。)$",
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
     WALK_BREAK = "^[ >]*设定环境变量：travel_walk = \"break\"$",
     WALK_STEP = "^[ >]*设定环境变量：travel_walk = \"step\"$",
@@ -182,6 +183,17 @@ local define_travel = function()
   local DESC_DISPLAY_LINE_WIDTH = 30
   -- quick模式下休息间隔步数
   local INTERVAL = 12
+
+  local SpecialRoomDesc = "这里遭受蒙古兵的洗劫后，已经惨不忍睹。尸横遍野，往日的景象已经荡然无存...."
+
+  local SpecialRenamedZones = {
+    ["建康府北城"] = "建康",
+    ["建康府南城"] = "建康",
+    ["长江"] = "长江南岸",
+    ["湟中"] = "丝绸之路",
+    ["大理城中"] = "大理"
+  }
+  -- room 3185 has 2-line exits descriptions
 
   -- 区域最短路径搜索算法
   local zonesearch = Algo.dijkstra
@@ -376,6 +388,7 @@ local define_travel = function()
     for _, tgtPath in pairs(tgtPaths) do
       tgtPathCnt = tgtPathCnt + 1
       if not currExits[helper.expandDirection(tgtPath.path)] then
+        self:debug("路径" .. tgtPath.path .. "未找到")
         pathIdentical = false
         break
       end
@@ -562,10 +575,10 @@ local define_travel = function()
     if args.fullname then
       local results = {}
       for zoneName, zone in pairs(self.zonesByName) do
-        local idxStart, idxEnd = string.find(fullname, zoneName)
+        local idxStart, idxEnd = string.find(args.fullname, zoneName)
         -- 首字符匹配
         if idxStart == 1 then
-          local roomName = string.sub(fullname, idxEnd + 1)
+          local roomName = string.sub(args.fullname, idxEnd + 1)
           for _, room in pairs(zone.rooms) do
             if room.name == roomName then
               table.insert(results, room)
@@ -575,12 +588,31 @@ local define_travel = function()
           break
         end
       end
+      -- 二次查询，查找重命名区域列表
+      if #results == 0 then
+        -- check renamed zone
+        for zoneName, renamed in pairs(SpecialRenamedZones) do
+          local idxStart, idxEnd = string.find(args.fullname, zoneName)
+          if idxStart == 1 then
+            self:debug("重命名区域匹配成功")
+            local zone = self.zonesByName[renamed]
+            local roomName = string.sub(args.fullname, idxEnd + 1)
+            for _, room in pairs(zone.rooms) do
+              if room.name == roomName then
+                table.insert(results, room)
+              end
+            end
+            break
+          end
+        end
+      end
       return results
     else
       assert(args.name, "name cannot be nil")
       assert(args.zone, "zone cannot be nil")
       local results = {}
-      local zone = self.zonesByName[args.zone]
+      local zoneName = SpecialRenamedZones[args.zone] or args.zone
+      local zone = self.zonesByName[zoneName]
       if not zone then
         return results
       end
@@ -1898,8 +1930,13 @@ end
 return define_travel():FSM()
 
 --local travel = define_travel():FSM()
---local rooms = travel.zonesByCode["changan"].rooms
+--local rooms = travel.zonesByCode["beijing"].rooms
 --print(helper.countElements(rooms))
+--travel:debugOn()
+--travel.currRoomId = 147
+--travel.targetRoomId = 38
+--local plan = travel:generateWalkPlan()
+--print(#plan)
 --travel.traverseRooms = rooms
 --travel.currRoomId = 110
 --local plan = travel:generateTraversePlan()

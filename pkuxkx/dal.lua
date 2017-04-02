@@ -183,7 +183,9 @@ local define_dal = function()
     else
       local chr = seq[n]
       local pys = dict[chr]
-      if not pys then error("cannot find pinyin of char:" .. chr, 2) end
+      if not pys then
+        error("cannot find pinyin of char:" .. chr, 2)
+      end
       for i = 1, #pys do
         pys[1], pys[i] = pys[i], pys[1]
         pinyinPerm(seq, dict, n - 1)
@@ -198,7 +200,8 @@ local define_dal = function()
     return function()
       local retCode, result = coroutine.resume(co)
       if not retCode then -- error
-        error(result)
+        --error(result)
+        return nil
       end
       return result
     end

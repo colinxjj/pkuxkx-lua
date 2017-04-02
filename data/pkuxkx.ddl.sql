@@ -68,7 +68,7 @@ values
   ('qufu', '曲阜', 'qufukongmiao'),
   ('xinyang', '信阳', 'xinyangxiaoguangchang'),
   ('quanzhen', '全真', 'quanzhenchongxuantai'),
-  ('changjiangbei', '长江北岸', 'changjiangbeichangjiangdukou1'),
+  ('changjiangbei', '长江北岸', 'changjiangbeichangjiangdukou3'),
   ('huanghenan', '黄河南岸', 'huanghenanmengjindu'),
   ('luoyang', '洛阳', 'luoyangzhongxingguangchang'),
   ('changan', '长安', 'changanzhuquedajie'),
@@ -101,7 +101,11 @@ values
   ('jinyang', '晋阳', 'jinyangchaoximenneijie'),
   ('zhangjiakou', '张家口', 'zhangjiakouguangchang'),
   ('lingxiao', '凌霄城', 'lingxiaobingjieguangchang'),
-  ('sichouzhilu', '丝绸之路', 'sichouzhilusichouzhilu')
+  ('sichouzhilu', '丝绸之路', 'sichouzhilusichouzhilu'),
+  ('taoyuan', '桃源', 'taoyuantaoyuanxianjing'),
+  ('xiangyang', '襄阳', 'xiangyangchengzhongxin'),
+  ('beijing', '北京', 'beijingyonganmen'),
+  ('wudang', '武当', 'wudangwudangguangchang')
 ;
 
 create table if not exists zone_connectivity (
@@ -230,7 +234,24 @@ values
   ('dalunsi', 'lingxiao', 16),
   ('lingxiao', 'dalunsi', 16),
   ('huanghebei', 'sichouzhilu', 20),
-  ('sichouzhilu', 'huanghebei', 20)
+  ('sichouzhilu', 'huanghebei', 20),
+  ('yueyang', 'taoyuan', 8),
+  ('taoyuan', 'yueyang', 8),
+  ('xinyang', 'xiangyang', 9),
+  ('xiangyang', 'xinyang', 9),
+  ('xiangyang', 'changjiangbei', 31),
+  ('changjiangbei', 'xiangyang', 31),
+  ('huanghebei', 'beijing', 9),
+  ('beijing', 'huanghebei', 9),
+  ('beijing', 'jinyang', 6),
+  ('jinyang', 'beijing', 6),
+  ('zhangjiakou', 'beijing', 7),
+  ('beijing', 'zhangjiakou', 7),
+  ('xiaoshancun', 'wudang', 13),
+  ('wudang', 'xiaoshancun', 13),
+  ('wudang', 'xiangyang', 21),
+  ('xiangyang', 'wudang', 21)
+
 ;
 
 update zone_connectivity set boat = 1
