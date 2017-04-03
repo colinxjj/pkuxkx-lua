@@ -44,12 +44,13 @@ local define_fsm = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.learnCmd = "du shu for 10"
+    self.learnCmd = nil
     self.lianCmd = nil
     self.tunaCmd = nil
     self.tunaNum = 0
     self.dazuoCmd = nil
     self.dazuoNum = 0
+    self.requireNeili = true
   end
 
   function prototype:disableAllTriggers()
@@ -240,11 +241,25 @@ local define_fsm = function()
         end
         wait.regexp(REGEXP.DAZUO_FINISH, 6)
       else  -- learn mode
-        if status.currJing > 50 and self.learnCmd then
-          SendNoEcho(self.learnCmd)
+--        if cnt % 10 == 0 and self.lianCmd then
+--          SendNoEcho("yun qi")
+--        end
+        if status.currNeili < 100 then
+          self.requireNeili = true
+        elseif status.currNeili >= status.maxNeili then
+          self.requireNeili = false
         end
-        if status.currQi > 50 and self.lianCmd then
-          SendNoEcho(self.lianCmd)
+
+        if self.requireNeili then
+          SendNoEcho("dazuo 150")
+          wait.regexp(REGEXP.DAZUO_FINISH, 6)
+        else
+          if status.currJing > 50 and self.learnCmd then
+            SendNoEcho(self.learnCmd)
+          end
+          if status.currQi > 50 and self.lianCmd then
+            SendNoEcho(self.lianCmd)
+          end
         end
       end
     end

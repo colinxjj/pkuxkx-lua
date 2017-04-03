@@ -105,7 +105,13 @@ values
   ('taoyuan', '桃源', 'taoyuantaoyuanxianjing'),
   ('xiangyang', '襄阳', 'xiangyangchengzhongxin'),
   ('beijing', '北京', 'beijingyonganmen'),
-  ('wudang', '武当', 'wudangwudangguangchang')
+  ('wudang', '武当', 'wudangwudangguangchang'),
+  ('lanzhou', '兰州', 'lanzhoufuqianguangchang'),
+  ('huangzhong', '湟中', 'huangzhonghuangzhongzhongxin'),
+  ('xingxiu', '星宿', 'xingxiujuyan'),
+  ('mingjiao', '明教', 'mingjiaoshanmen'),
+  ('gumu', '古墓', 'gumuduanlongshi'),
+  ('shaolin', '少林', 'shaolinguangchang')
 ;
 
 create table if not exists zone_connectivity (
@@ -250,8 +256,23 @@ values
   ('xiaoshancun', 'wudang', 13),
   ('wudang', 'xiaoshancun', 13),
   ('wudang', 'xiangyang', 21),
-  ('xiangyang', 'wudang', 21)
-
+  ('xiangyang', 'wudang', 21),
+  ('huanghebei', 'lanzhou', 19),
+  ('lanzhou', 'huanghebei', 19),
+  ('lanzhou', 'huangzhong', 9),
+  ('huangzhong', 'lanzhou', 9),
+  ('huangzhong', 'xingxiu', 4),
+  ('xingxiu', 'huangzhong', 4),
+  ('huanghebei', 'mingjiao', 33),
+  ('mingjiao', 'huanghebei', 33),
+  ('quanzhen', 'gumu', 17),
+  ('gumu', 'quanzhen', 17),
+  ('gumu', 'changan', 12),
+  ('changan', 'gumu', 12),
+  ('zhongyuan', 'shaolin', 6),
+  ('shaolin', 'zhongyuan', 6),
+  ('shaolin', 'gumu', 10),
+  ('gumu', 'shaolin', 10)
 ;
 
 update zone_connectivity set boat = 1
