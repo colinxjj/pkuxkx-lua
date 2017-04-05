@@ -528,7 +528,7 @@ local define_pick = function()
               -- 检查是否该物品不能买卖
               if string.find(line, "不值钱") or string.find(line, "不能买卖") then
                 helper.assureNotBusy()
-                if not self.itemExcluded[item.name] then
+                if not self.itemsExcluded[item.name] then
                   SendNoEcho("drop " .. item.id)
                 end
               end

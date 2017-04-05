@@ -29,6 +29,10 @@ local define_fsm = function()
   local REGEXP = {
     TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
     DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
+    NOT_ENOUGH_JING = "^[ >]*你现在精不足，无法修行精力.*$",
+    JINGLI_MAX = "^[ >]*你现在精力接近圆满状态。$",
+    NOT_ENOUGH_QI = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉.*",
+    NEILI_MAX = "^[ >]*你现在内力接近圆满状态。$",
   }
 
   function prototype:new()
@@ -47,14 +51,16 @@ local define_fsm = function()
     self.learnCmd = nil
     self.lianCmd = nil
     self.tunaCmd = nil
-    self.tunaNum = 0
     self.dazuoCmd = nil
-    self.dazuoNum = 0
     self.requireNeili = true
+    self.notEnoughJing = false
+    self.notEnoughQi = false
+    self.jingliMax = false
+    self.neiliMax = false
   end
 
   function prototype:disableAllTriggers()
-
+    helper.disableTriggerGroups("kkndlearn_wait")
   end
 
   function prototype:initStates()
@@ -67,8 +73,12 @@ local define_fsm = function()
     }
     self:addState {
       state = States.wait,
-      enter = function() end,
-      exit = function() end
+      enter = function()
+        helper.enableTriggerGroups("kkndlearn_wait")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("kkndlearn_wait")
+      end
     }
     self:addState {
       state = States.dining,
@@ -123,7 +133,56 @@ local define_fsm = function()
   end
 
   function prototype:initTriggers()
+    helper.removeTriggerGroups("kkndlearn_wait")
 
+    helper.addTrigger {
+      group = "kkndlearn_wait",
+      regexp = REGEXP.NOT_ENOUGH_JING,
+      response = function(name, line, wildcards)
+        self.notEnoughJing = true
+        wait.time(5)
+        return self:doWait()
+      end
+    }
+    helper.addTrigger {
+      group = "kkndlearn_wait",
+      regexp = REGEXP.TUNA_FINISH,
+      response = function()
+        self.notEnoughJing = false
+        return self:doWait()
+      end
+    }
+    helper.addTrigger {
+      group = "kkndlearn_wait",
+      regexp = REGEXP.JINGLI_MAX,
+      response = function()
+        SendNoEcho("tuna 10")
+      end
+    }
+    helper.addTrigger {
+      group = "kkndlearn_wait",
+      regexp = REGEXP.NOT_ENOUGH_QI,
+      response = function(name, line, wildcards)
+        self.notEnoughQi = true
+        wait.time(5)
+        return self:doWait()
+      end
+    }
+    helper.addTrigger {
+      group = "kkndlearn_wait",
+      regexp = REGEXP.DAZUO_FINISH,
+      response = function()
+        self.notEnoughQi = false
+        return self:doWait()
+      end
+    }
+    helper.addTrigger {
+      group = "kkndlearn_wait",
+      regexp = REGEXP.NEILI_MAX,
+      response = function()
+        SendNoEcho("dazuo 10")
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -178,18 +237,16 @@ local define_fsm = function()
     }
     helper.addAlias {
       group = "kkndlearn",
-      regexp = "^kkndlearn\\s+(tuna|dazuo)\\s+(\\d+)\\s*$",
+      regexp = "^kkndlearn\\s+(tuna|dazuo)\\s*$",
       response = function(name, line, wildcards)
-        local cmd, num = wildcards[1], wildcards[2]
+        local cmd = wildcards[1]
         if cmd == "tuna" then
-          self.tunaCmd = "tuna " .. num
-          self.tunaNum = tonumber(num)
+          self.tunaCmd = "tuna max"
           self.dazuoCmd = nil
           self.learnCmd = nil
           self.lianCmd = nil
         elseif cmd == "dazuo" then
-          self.dazuoCmd = "dazuo " .. num
-          self.dazuoNum = tonumber(num)
+          self.dazuoCmd = "dazuo max"
           self.tunaCmd = nil
           self.learnCmd = nil
           self.lianCmd = nil
@@ -210,46 +267,28 @@ local define_fsm = function()
   end
 
   -- learn/tuna/dazuo
+  -- tuna,dazuo do not need loop, will recurisvely called via trigger
   function prototype:doWait()
     local cnt = 0
     while self.currState == States.wait do
       cnt = cnt + 1
-      wait.time(1)
       status:hpbrief()
       if status.food < 100 or status.drink < 100 then
         return self:fire(Events.HUNGRY)
       end
       if self.tunaCmd then  -- tuna mode
-        if status.currJing < self.tunaNum + 10 then
-          SendNoEcho("yun regenerate")
-          status:hpbrief()
-        end
-        -- 计算吐纳值
-        local tunaNum = status.maxJingli * 2 - status.currJingli
-        if tunaNum < self.tunaNum then
-          SendNoEcho("tuna " .. math.max(10, tunaNum))
-        else
-          SendNoEcho(self.tunaCmd)
-        end
-        wait.regexp(REGEXP.TUNA_FINISH, 6)
+        SendNoEcho(self.tunaCmd)
+        return
       elseif self.dazuoCmd then  -- dazuo mode
-        local dazuoNum = status.maxNeili * 2 - status.currNeili
-        if dazuoNum < self.dazuoNum then
-          SendNoEcho("dazuo " .. math.max(10, dazuoNum))
-        else
-          SendNoEcho(self.dazuoCmd)
-        end
-        wait.regexp(REGEXP.DAZUO_FINISH, 6)
+        SendNoEcho(self.dazuoCmd)
+        return
       else  -- learn mode
---        if cnt % 10 == 0 and self.lianCmd then
---          SendNoEcho("yun qi")
---        end
+        wait.time(1)
         if status.currNeili < 100 then
           self.requireNeili = true
         elseif status.currNeili >= status.maxNeili then
           self.requireNeili = false
         end
-
         if self.requireNeili then
           SendNoEcho("dazuo 150")
           wait.regexp(REGEXP.DAZUO_FINISH, 6)
