@@ -161,7 +161,9 @@ local define_pick = function()
       ["锦囊"] = true,
       ["侠客行战靴"] = true,
       ["蓝马褂"] = true,
-      ["短打劲装"] = true
+      ["短打劲装"] = true,
+      ["布衣"] = true,
+      ["紫蟒袍"] = true,
     }
     self.coinThreshold = 2000
     self.silverThreshold = 200
@@ -526,7 +528,9 @@ local define_pick = function()
               -- 检查是否该物品不能买卖
               if string.find(line, "不值钱") or string.find(line, "不能买卖") then
                 helper.assureNotBusy()
-                SendNoEcho("drop " .. item.id)
+                if not self.itemExcluded[item.name] then
+                  SendNoEcho("drop " .. item.id)
+                end
               end
               break
             end

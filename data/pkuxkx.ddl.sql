@@ -111,7 +111,9 @@ values
   ('xingxiu', '星宿', 'xingxiujuyan'),
   ('mingjiao', '明教', 'mingjiaoshanmen'),
   ('gumu', '古墓', 'gumuduanlongshi'),
-  ('shaolin', '少林', 'shaolinguangchang')
+  ('shaolin', '少林', 'shaolinguangchang'),
+  ('lingjiu', '灵鹫', 'lingjiubaizhangjian'),
+  ('emei', '峨眉', 'emeishanmen')
 ;
 
 create table if not exists zone_connectivity (
@@ -272,7 +274,13 @@ values
   ('zhongyuan', 'shaolin', 6),
   ('shaolin', 'zhongyuan', 6),
   ('shaolin', 'gumu', 10),
-  ('gumu', 'shaolin', 10)
+  ('gumu', 'shaolin', 10),
+  ('lingzhou', 'lingjiu', 8),
+  ('lingjiu', 'lingzhou', 8),
+  ('lingjiu', 'huizuxiaozhen', 5),
+  ('huizuxiaozhen', 'lingjiu', 5),
+  ('chengdu', 'emei', 13),
+  ('emei', 'chengdu', 13)
 ;
 
 update zone_connectivity set boat = 1
