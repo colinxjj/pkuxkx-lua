@@ -287,7 +287,6 @@ local define_learn = function()
     while self.masterExists do
       status:hpbrief()
       status:show()
-      --print("currNeili", status.currNeili)
       if status.currNeili > 80 then
         SendNoEcho("yun regenerate")
         SendNoEcho("xue yue for " .. self.skill .. " 50")

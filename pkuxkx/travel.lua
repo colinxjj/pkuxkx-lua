@@ -573,6 +573,14 @@ local define_travel = function()
   -- 2. 通过区域名，房间名查找
   function prototype:getMatchedRooms(args)
     if args.fullname then
+      -- check if the fullname match pattern <zone>的<room>
+      local delimStart, delimEnd = string.find(args.fullname, "的")
+      if delimStart then
+        return self:getMatchedRooms {
+          zone = string.sub(args.fullname, 1, delimStart - 1),
+          name = string.sub(args.fullname, delimEnd + 1)
+        }
+      end
       local results = {}
       for zoneName, zone in pairs(self.zonesByName) do
         local idxStart, idxEnd = string.find(args.fullname, zoneName)
