@@ -24,7 +24,10 @@ local define_FSM = function()
     obj.states = {}
     obj.transitions = {}
     obj.DEBUG = false
-    setmetatable(obj, self or prototype)
+    -- the direct access to super class
+    obj.super = self or prototype
+    -- also act as metatable
+    setmetatable(obj, obj.super)
     return obj
   end
 

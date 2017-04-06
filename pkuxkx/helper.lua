@@ -258,6 +258,26 @@ local define_helper = function()
     end
   end
 
+  helper.addOneShotTimer = function(args)
+    local interval = assert(args.interval, "interval in timer cannot be nil")
+    local group = assert(args.group, "group in timer cannot be empty")
+    local response = assert(type(args.response) == "function" and args.response, "response in timer must be function")
+    local name = args.name or "auto_added_timer_" .. GetUniqueID()
+    _G.world[name] = helper.repeatedRunnableWithCo(response)
+    _global_timer_callbacks[name] = true
+    local hours = math.floor(interval / 3600)
+    local minutes = math.floor((interval - hours * 3600) / 60)
+    local seconds = interval - hours * 3600 - minutes * 60
+    check(AddTimer(name, hours, minutes, seconds, "-- added by helper", bit.bor (0,
+      timer_flag.Enabled,
+      timer_flag.OneShot,
+      trigger_flag.Temporary,
+      timer_flag.Replace,
+      timer_flag.Temporary), name))
+    check(SetTimerOption(name, "send_to", "12"))
+    check(SetTimerOption(name, "group", group))
+  end
+
   helper.countElements = function(tb)
     local cnt = 0
     for _ in pairs(tb) do

@@ -65,6 +65,16 @@ alias_flag.AliasQueue = 4096
 alias_flag.AliasMenu = 8192
 alias_flag.Temporary = 16384
 
+timer_flag = {}
+timer_flag.Enabled = 1
+timer_flag.AtTime = 2
+timer_flag.OneShot = 4
+timer_flag.TimerSpeedWalk = 8
+timer_flag.TimerNote = 16
+timer_flag.ActiveWhenClosed = 32
+timer_flag.Replace = 1024
+timer_flag.Temporary = 16384
+
 -- error code
 eOK = 0; -- No error
 eWorldOpen = 30001; -- The world is already open
