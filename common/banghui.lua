@@ -35,10 +35,10 @@ local define_fsm = function()
     TARGET_LINE = "^(.*?)★.*$",
     SOURCE_LINE = "^(.*?)♀.*$",
     EMPTY_LINE = "^[^ ]+$",
-    NOT_FOUND = "^[ >]*$",
+    NOT_FOUND = "^[ >]*这里不是你要寻找帮派资材的地方。$",
     -- todo ready
-    MOVE_FINISH = "^ready to bhgather",
-    MOVE_BUSY = "^move busy$",
+    MOVE_FINISH = "^[ >]*你现在搜索的位置似乎有些帮派资材，可以用bhgather命令采集。$",
+    MOVE_BUSY = "^[ >]*看你手忙脚乱的！不用这么着急的。$",
   }
 
   function prototype:FSM()
@@ -122,6 +122,7 @@ local define_fsm = function()
       newState = States.move,
       event = Events.FIND_SUCCESS,
       action = function()
+        self:clearMoveInfo()
         return self:fire(Events.MOVE_CONTINUE)
       end
     }
@@ -169,8 +170,9 @@ local define_fsm = function()
       response = function()
         helper.disableTriggerGroups("banghui_find_done")
         if self.notFound then
-          print("地点错误")
-          return self:fire(Events.stop)
+          return self:fire(Events.FIND_FAIL)
+        else
+          return self:fire(Events.FIND_SUCCESS)
         end
       end
     }
@@ -193,7 +195,7 @@ local define_fsm = function()
       group = "banghui_move_done",
       regexp = helper.settingRegexp("banghui", "move_done"),
       response = function()
-        helper.disableTriggerGroup("banghui_move_done")
+        helper.disableTriggerGroups("banghui_move_done")
         if self.moveFinish then
           return self:fire(Events.MOVE_FINISH)
         elseif self.moveBusy then
@@ -225,28 +227,45 @@ local define_fsm = function()
       group = "banghui_move_done",
       regexp = REGEXP.EMPTY_LINE,
       response = function()
+        self:debug("EMPTY_LINE triggered")
         if not self.srcCaught then
           self.srcTop = self.srcTop + 1
         end
         if not self.tgtCaught then
           self.tgtTop = self.tgtTop + 1
         end
-      end
+      end,
+      sequence = 100,  -- lower priority
     }
     helper.addTrigger {
       group = "banghui_move_done",
       regexp = REGEXP.SOURCE_LINE,
       response = function(name, line, wildcards)
-        self.srcLeft = string.len(wildcards[1])
-        self.srcCaught = true
+        if not self.srcCaught then
+          self:debug("SOURCE_LINE triggered")
+          self.srcLeft = string.len(wildcards[1])
+          self:debug(self.srcLeft)
+          self.srcCaught = true
+        end
       end
     }
     helper.addTrigger {
       group = "banghui_move_done",
       regexp = REGEXP.TARGET_LINE,
       response = function(name, line, wildcards)
-        self.tgtLeft = string.len(wildcards[1])
-        self.tgtLeft = true
+        if not self.tgtCaught then
+          self:debug("TARGET_LINE triggered")
+          self.tgtLeft = string.len(wildcards[1])
+          self:debug(self.tgtLeft)
+          self.tgtCaught = true
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "banghui_move_done",
+      regexp = REGEXP.MOVE_FINISH,
+      response = function(name, line, wildcards)
+        self.moveFinish = true
       end
     }
   end
@@ -343,7 +362,7 @@ local define_fsm = function()
     -- 优先左右，然后上下
     if self.srcLeft < self.tgtLeft then
       self.moveDirection = "e"
-    elseif self.srcLeft > self.targetLeft then
+    elseif self.srcLeft > self.tgtLeft then
       self.moveDirection = "w"
     elseif self.srcTop < self.tgtTop then
       self.moveDirection = "s"

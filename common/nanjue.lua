@@ -39,6 +39,13 @@ local define_nanjue = function()
     JOB_INFO = "^\\s+([0-9_]+?)\\s+(.*?)「(.*?)」\\s+(\\d+:\\d+:\\d+)\\s+(\\d+:\\d+:\\d+)\\s+(.*?)\\s+(.*?)\\s+(\\d+)$",
 
   }
+  local Locations = {
+    ["小雁塔"] = 2322,
+    ["大雁塔"] = 2314,
+    ["长乐坊"] = 2350,
+    ["东市"] = 2330,
+  }
+
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -90,6 +97,13 @@ local define_nanjue = function()
         end)
       end
     }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<record>
+    self:addTransition {
+      oldState = States.record,
+      newState = States.collect,
+      event = Eventsski
+    }
   end
 
   function prototype:initTriggers()
@@ -110,8 +124,19 @@ local define_nanjue = function()
         if #(self.jobs) == 0 then
           return self:fire(Events.NO_JOB_AVAILABLE)
         else
-          -- todo
-          -- 确定接哪个任务
+          self.selectedJob = nil
+          for _, job in ipairs(self.jobs) do
+            if job.level == "简单" and Locations[job.location] then
+              self.selectedJob = job
+              break
+            end
+          end
+          if self.selectedJob then
+            SendNoEcho("record " .. self.selectedJob.id)
+            return self:fire(Events.JOB_RECORDED)
+          else
+            return self:fire(Events.NO_JOB_AVAILABLE)
+          end
         end
       end
     }
