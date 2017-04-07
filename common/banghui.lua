@@ -32,6 +32,7 @@ local define_fsm = function()
     ALIAS_START = "^banghui\\s+start\\s+(.+?)\\s*$",
     ALIAS_STOP = "^banghui\\s+stop\\s*$",
     ALIAS_DEBUG = "^banghui\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_MOVE = "^banghui\\s+move\\s*$",
     TARGET_LINE = "^(.*?)★.*$",
     SOURCE_LINE = "^(.*?)♀.*$",
     EMPTY_LINE = "^[^ ]+$",
@@ -102,6 +103,7 @@ local define_fsm = function()
       action = function()
         assert(self.targetRoomId, "target room id cannot be nil")
         return travel:walkto(self.targetRoomId, function()
+            self.moveDirection = nil
             return self:doFind()
         end)
       end
@@ -308,6 +310,15 @@ local define_fsm = function()
         else
           self:debugOff()
         end
+      end
+    }
+    -- 增加手动开始move的别名
+    helper.addAlias {
+      group = "banghui",
+      regexp = REGEXP.ALIAS_MOVE,
+      response = function()
+        self:setState(States.find)
+        return self:fire(Events.FIND_SUCCESS)
       end
     }
   end

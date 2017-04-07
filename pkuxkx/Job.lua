@@ -16,12 +16,21 @@ local define_Job = function()
 
   function prototype:new(args)
     local obj = {}
+    obj.def = assert(args.def, "definition of job cannot be nil")
+    local impl = assert(args.impl, "implementation cannot be nil")
+    assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
+    assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
+    assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
+    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
+    assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
+    obj.impl = impl
     setmetatable(obj, self or prototype)
+    self:postConstruct()
     return obj
   end
 
   function prototype:decorate(obj)
-    local def = assert(obj.def, "definition of job cannot be nil")
+    assert(obj.def, "definition of job cannot be nil")
     local impl = assert(obj.impl, "implementation cannot be nil")
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
     assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
@@ -65,7 +74,7 @@ local define_Job = function()
         end
         if not self.stopped then
           local nextCheck = antiIdle()
-          helper.addTimer {
+          helper.addOneShotTimer {
             group = "jobs_one_shot",
             interval = 60,
             response = function()
@@ -77,7 +86,7 @@ local define_Job = function()
     end
 
     local nextCheck = antiIdle()
-    helper.addTimer {
+    helper.addOneShotTimer {
       group = "jobs_one_shot",
       interval = 60,
       response = function()

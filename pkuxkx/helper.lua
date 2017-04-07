@@ -278,6 +278,18 @@ local define_helper = function()
     check(SetTimerOption(name, "group", group))
   end
 
+  helper.enableTimerGroups = function(...)
+    for _, group in ipairs({...}) do
+      EnableTimerGroup(group, true)
+    end
+  end
+
+  helper.disableTimerGroups = function(...)
+    for _, group in ipairs({...}) do
+      EnableTimerGroup(group, false)
+    end
+  end
+
   helper.countElements = function(tb)
     local cnt = 0
     for _ in pairs(tb) do
