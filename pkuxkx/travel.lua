@@ -1721,14 +1721,15 @@ local define_travel = function()
       end
       -- 当遍历时，先执行遍历检查函数
       if self.traverseCheck then
-        -- 设置遍历房间号
-        self.traverseRoomId = move.endid
+        -- 设置遍历房间号为当前房间号
+        self.traverseRoomId = move.startid
         local checked, msg = self.traverseCheck()
         self:debug("遍历检测结果", checked, msg)
         if checked then
-          -- 将遍历房间号设置回当前房间
-          self.traverseRoomId = move.startid
           return self:fire(Events.ARRIVED)
+        else
+          -- 当检查不通过时，将遍历房间号设置为下一个房间的编号，以保证路径走完时，遍历房间号等于最终目标房间号
+          self.traverseRoomId = move.endid
         end
       end
       -- 执行路径
@@ -1872,6 +1873,7 @@ local define_travel = function()
   function prototype:generateTraversePlan()
     local plan = traversal {
       rooms = self.traverseRooms,
+      fallbackRooms = self.roomsById,
       startid = self.currRoomId
     }
     -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path

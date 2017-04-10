@@ -59,6 +59,7 @@ local define_songxin = function()
     ROBBER_ASSIST = "^[ >]*(.*)笑道：「(.*)你别逞能，点子爪子硬，老子来帮你！」$",
     ROBBER_DEFEATED = "^[ >]*你战胜了(.*)!$",
     ROBBER_ESCAPED = "^[ >]*你一眨眼间，(.*)已经不知去向。$",
+    ROBBER_DISAPPEARED = "^[ >]*(.*)纵身远远的去了。$",
     ROBBER_DEAD = "^[ >]*(.*)死了。$",
     MAIL_MISS = "^[ >]*你伸手向怀中一摸，发现密函已经不翼而飞！$",
     SONGXIN_FINISH = "^[ >]*你的任务完成，快回去复命吧。$",
@@ -520,7 +521,7 @@ local define_songxin = function()
         local robber = wildcards[1]
         if self.robbers[robber] then
           self.defeated = self.defeated + 1
-          if self.robberCnt == self.defeated then
+          if self.robberCnt == self.defeated + self.escaped then
             print("所有强盗都打败了，直接开杀")
             status:idhere()
             for _, npc in pairs(status.items) do
@@ -548,20 +549,37 @@ local define_songxin = function()
         end
       end
     }
+    local onEscaped = function(name, line, wildcards)
+      local robber = wildcards[1]
+      if self.robbers[robber] then
+        self.robbersEscaped[robber] = true
+        self.escaped = self.escaped + 1
+        if self.killed + self.escaped == self.robberCnt then
+          print("所有强盗都被杀死或已逃走，开始搜尸体")
+          return self:fire(Events.ROBBER_KILLED)
+        elseif self.defeated + self.escaped == self.robberCnt then
+          print("所有强盗都打败了，直接开杀")
+          status:idhere()
+          for _, npc in pairs(status.items) do
+            if self.robbers[npc.name] then
+              table.insert(self.robbersToKill, npc)
+            end
+          end
+          return self:doKill()
+        else
+          print("仍然有强盗在战斗中")
+        end
+      end
+    end
     helper.addTrigger {
       group = "songxin_killing",
       regexp = REGEXP.ROBBER_ESCAPED,
-      response = function(name, line, wildcards)
-        local robber = wildcards[1]
-        if self.robbers[robber] then
-          self.robbersEscaped[robber] = true
-          self.escaped = self.escaped + 1
-          if self.killed + self.escaped == self.robberCnt then
-            print("所有强盗都被杀死或已逃走，开始搜尸体")
-            return self:fire(Events.ROBBER_KILLED)
-          end
-        end
-      end
+      response = onEscaped
+    }
+    helper.addTrigger {
+      group = "songxin_killing",
+      regexp = REGEXP.ROBBER_DISAPPEARED,
+      response = onEscaped
     }
     helper.addTrigger {
       group = "songxin_killing",
@@ -721,15 +739,15 @@ local define_songxin = function()
     return self:fire(Events.START)
   end
 
-  function prototype:doWaitUntilDone()
-    local currCo = assert(coroutine.running(), "Must be in coroutine")
-    helper.addOneShotTrigger {
-      group = "jobs_one_shot",
-      regexp = helper.settingRegexp("jobs", "job_done"),
-      response = helper.resumeCoRunnable(currCo)
-    }
-    return coroutine.yield()
-  end
+--  function prototype:doWaitUntilDone()
+--    local currCo = assert(coroutine.running(), "Must be in coroutine")
+--    helper.addOneShotTrigger {
+--      group = "jobs_one_shot",
+--      regexp = helper.settingRegexp("jobs", "job_done"),
+--      response = helper.resumeCoRunnable(currCo)
+--    }
+--    return coroutine.yield()
+--  end
 
   function prototype:doKill()
     for _, robber in pairs(self.robbersToKill) do

@@ -55,19 +55,19 @@ local define_helper = function()
     local func = func
     if oneshot then
       -- oneshot we must clean up the global name space after the action is called
-      local oneshotFunc = function(name, line, wildcards)
-        func(name, line, wildcards)
+      local oneshotFunc = function(name, line, wildcards, styles)
+        func(name, line, wildcards, styles)
         _global_trigger_callbacks = nil
         _global_alias_callbacks = nil
         _global_timer_callbacks = nil
         _G.world[name] = nil
       end
-      return function(name, line, wildcards)
-        return coroutine.wrap(oneshotFunc)(name, line, wildcards)
+      return function(name, line, wildcards, styles)
+        return coroutine.wrap(oneshotFunc)(name, line, wildcards, styles)
       end
     else
-      return function(name, line, wildcards)
-        return coroutine.wrap(func)(name, line, wildcards)
+      return function(name, line, wildcards, styles)
+        return coroutine.wrap(func)(name, line, wildcards, styles)
       end
     end
   end

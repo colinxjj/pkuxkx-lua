@@ -3,7 +3,8 @@
 -- User: zhe.jiang
 -- Date: 2017/4/6
 -- Desc:
--- 任务接口
+-- 任务接口，要求必须实现doStart, doCancel, getLastUpdateTime方法
+-- 同时必须符合契约（任务完成或失败后设置set jobs job_done）
 --
 -- Change:
 -- 2017/4/6 - created
@@ -19,7 +20,7 @@ local define_Job = function()
     obj.def = assert(args.def, "definition of job cannot be nil")
     local impl = assert(args.impl, "implementation cannot be nil")
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
-    assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
+--    assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
 --    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
@@ -33,7 +34,7 @@ local define_Job = function()
     assert(obj.def, "definition of job cannot be nil")
     local impl = assert(obj.impl, "implementation cannot be nil")
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
-    assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
+--    assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
 --    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
@@ -94,7 +95,13 @@ local define_Job = function()
       end
     }
 
-    self.impl.doWaitUntilDone() -- this is a long-time yield and before this we need to periodically check status
+    local currCo = assert(coroutine.running(), "Must be in coroutine")
+    helper.addOneShotTrigger {
+      group = "jobs_one_shot",
+      regexp = helper.settingRegexp("jobs", "job_done"),
+      response = helper.resumeCoRunnable(currCo)
+    }
+    return coroutine.yield()  -- this is a long-time yield and before this we need to periodically check status
   end
 
   function prototype:getLastUpdateTime()

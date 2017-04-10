@@ -169,6 +169,7 @@ local define_Algo = function()
 
   Algo.traversal = function(args)
     local rooms = assert(args.rooms, "rooms for traveral cannot be nil")
+    local fallbackRooms = assert(args.fallbackRooms, "fallback rooms is required for traversal")
     local startid = args.startid or next(rooms)
     local dfs = Algo.dfs {
       rooms = rooms,
@@ -193,8 +194,17 @@ local define_Algo = function()
           for _, room in pairs(rooms) do
             table.insert(roomIds, room.id)
           end
-          print("rooms: ", table.concat(roomIds, ","))
-          error("cannot find path from " .. prevRoomId .. " to " .. roomId)
+          -- print("rooms: ", table.concat(roomIds, ","))
+          -- error("cannot find path from " .. prevRoomId .. " to " .. roomId)
+          print("无法从当前房间列表找寻到从" .. prevRoomId .. "到" .. roomId .. "的路径，使用全局搜索")
+          astar = Algo.astar {
+            rooms = fallbackRooms,
+            startid = prevRoomId,
+            targetid = roomId
+          }
+          if not astar then
+            error("错误，使用备用全局房间列表仍无法找到从" .. prevRoomId .. "到" .. roomId .. "的可用路径")
+          end
         end
         while #astar > 0 do
           local path = table.remove(astar)
