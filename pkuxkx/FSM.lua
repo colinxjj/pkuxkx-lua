@@ -24,6 +24,7 @@ local define_FSM = function()
     obj.states = {}
     obj.transitions = {}
     obj.DEBUG = false
+    obj.lastUpdateTime = os.time()
     -- the direct access to super class
     obj.super = self or prototype
     -- also act as metatable
@@ -86,6 +87,10 @@ local define_FSM = function()
 
   function prototype:getState() return self.currState end
 
+  function prototype:getLastUpdateTime()
+    return self.lastUpdateTime
+  end
+
   function prototype:fire(event)
     assert(coroutine.running(), "fire function must be called within coroutine")
     self:debug("状态", self.currState, "事件", event)
@@ -94,6 +99,7 @@ local define_FSM = function()
     if not transition then
       print(string.format("当前状态[%s]不接受事件[%s]", self.currState or "nil", event or "nil"))
     else
+      self.lastUpdateTime = os.time()
       if transition.beforeExit then
         self:debug("执行退出前转换")
         transition.beforeExit()

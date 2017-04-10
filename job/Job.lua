@@ -21,7 +21,7 @@ local define_Job = function()
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
     assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
-    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
+--    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
     obj.impl = impl
     setmetatable(obj, self or prototype)
@@ -35,7 +35,7 @@ local define_Job = function()
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
     assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
-    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
+--    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
     setmetatable(obj, self or prototype)
     self:postConstruct()
@@ -64,10 +64,10 @@ local define_Job = function()
     antiIdle = function()
       return coroutine.wrap(function()
         local currTime = os.time()
-        if currTime - self:getLastUpdateTime >= 300 then
+        if currTime - self:getLastUpdateTime() >= 300 then
           ColourNote("red", "", "停顿超过5分钟，强制取消任务")
           return self:cancel()
-        elseif currTime - self:getLastUpdateTime >= 180 then
+        elseif currTime - self:getLastUpdateTime() >= 180 then
           ColourNote("yellow", "", "停顿超过3分钟，警告")
         else
           print("等待60秒后继续查看状态")
@@ -103,4 +103,4 @@ local define_Job = function()
 
   return prototype
 end
---return define_AbstractJob()
+return define_Job()

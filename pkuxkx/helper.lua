@@ -46,10 +46,29 @@ local define_helper = function()
     return DIRECTIONS[path] or path
   end
 
-  helper.repeatedRunnableWithCo = function(func)
+  -- the global namespace to store the functions used in trigger, alias and timer
+  local _global_trigger_callbacks = {}
+  local _global_alias_callbacks = {}
+  local _global_timer_callbacks = {}
+
+  helper.repeatedRunnableWithCo = function(func, oneshot)
     local func = func
-    return function(name, line, wildcards)
-      return coroutine.wrap(func)(name, line, wildcards)
+    if oneshot then
+      -- oneshot we must clean up the global name space after the action is called
+      local oneshotFunc = function(name, line, wildcards)
+        func(name, line, wildcards)
+        _global_trigger_callbacks = nil
+        _global_alias_callbacks = nil
+        _global_timer_callbacks = nil
+        _G.world[name] = nil
+      end
+      return function(name, line, wildcards)
+        return coroutine.wrap(oneshotFunc)(name, line, wildcards)
+      end
+    else
+      return function(name, line, wildcards)
+        return coroutine.wrap(func)(name, line, wildcards)
+      end
     end
   end
 
@@ -57,7 +76,7 @@ local define_helper = function()
   local SOUND_FILE_NONE = ""
 
   -- make sure name is unique
-  local _global_trigger_callbacks = {}
+
   helper.addTrigger = function(args)
     local regexp = assert(type(args.regexp) == "string" and args.regexp, "regexp in trigger must be string")
     local group = assert(args.group, "group in trigger cannot be empty")
@@ -155,7 +174,6 @@ local define_helper = function()
     end
   end
 
-  local _global_alias_callbacks = {}
   local ALIAS_BASE_FLAG = alias_flag.Enabled + alias_flag.RegularExpression + alias_flag.Replace
   helper.addAlias = function(args)
     local regexp = assert(args.regexp, "regexp of alias cannot be empty")
@@ -217,7 +235,6 @@ local define_helper = function()
     end
   end
 
-  local _global_timer_callbacks = {}
   helper.addTimer = function(args)
     local interval = assert(args.interval, "interval of timer cannot be nil")
     local response = assert(type(args.response) == "function" and args.response, "response of timer must be function")
@@ -287,6 +304,18 @@ local define_helper = function()
   helper.disableTimerGroups = function(...)
     for _, group in ipairs({...}) do
       EnableTimerGroup(group, false)
+    end
+  end
+
+  helper.resumeCoRunnable = function(co)
+    local co = co
+    return function()
+      local ok, err = coroutine.resume(co)
+      if not ok then
+        ColourNote ("deeppink", "black", "Error raised in timer function (in wait module).")
+        ColourNote ("darkorange", "black", debug.traceback(co))
+        error (err)
+      end -- if
     end
   end
 

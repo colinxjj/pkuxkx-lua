@@ -1,128 +1,52 @@
 --
 -- Created by IntelliJ IDEA.
 -- User: Administrator
--- Date: 2017/3/20
--- Time: 22:24
--- To change this template use File | Settings | File Templates.
+-- Date: 2017/4/9
+-- Time: 20:39
 --
-
+--
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
-local status = require "pkuxkx.status"
-local Player = require "pkuxkx.Player"
-local wenhao = require "huashan.wenhao"
 
-local patterns = [[
-
-岳不群道：「多谢小兄弟，你赶紧把它送到岳阳东大街附近的戴景风手中。」
-
-岳不群说道：「多谢小兄弟，请将这封密函火速送到洛阳观音堂附近的林群永手上。」
-
-岳不群对你道：「我这里正好有封密函，麻烦你跑一趟，交给洛阳小舍附近的廉敬彩。」
-
-岳不群对你道：「我这里正好有封密函，麻烦你跑一趟，交给南昌计氏马车总行附近的危捷。」
-
-岳不群道：「多谢小兄弟，你赶紧把它送到襄阳富贵小吃部附近的何水九手中。」
-
-岳不群脸一沉道：「上次交给小兄弟的任务才失败不久，还是等等吧。」
-
-密函(Mi han)
-这是一封盖着火漆印戳的密函，封面上却没有写是谁寄出的。
-
-           收信人：孙六康(Sun liukang)
-
-
-你伸手向怀中一摸，发现密函已经不翼而飞！
-
-时贵杰仰首狂笑道：「你，把密函给我乖乖交出来吧！」
-pu
-什么？
-> 时贵杰说道：「嘿嘿，让本大爷来教训教训你！」
-樊彪羽笑道：「时贵杰你别逞能，点子爪子硬，老子来帮你！」
-
-樊彪羽死了。
-
-你伸手向怀中一摸，发现密函已经不翼而飞！
-凌雪说道：「既然甘当岳不群那老贼的走狗，就别怪本大爷不客气了！」
-看起来凌雪想杀死你！
-
-你战胜了凌雪!
-
-余梅仰首狂笑道：「你，把密函给我乖乖交出来吧！」
-余梅说道：「既然甘当岳不群那老贼的走狗，就别怪本大爷不客气了！」
-看起来余梅想杀死你！
-
-
-无事忙 媒婆(Mei_po)
-
-峨嵋派第四代弟子「我不是NPC」费柯(Fei ke)
-
-你从怀中掏出信交给白雕，道：「这是岳不群先生托在下送给您的信，请收好。」
-你的任务完成，快回去复命吧。
-
-
-你从怀中掏出信交给危捷，道：「这是岳不群先生托在下送给您的信，请收好。」
-危捷拆开信浏览了一遍，对你笑道：「多谢多谢，辛苦你了。」
-你的任务完成，快回去复命吧。
-
-完成任务后，你被奖励了：
-
-
-陈顺顺突然手中兵器一震，剑尖飞鹰扑兔般点向你手腕要害。
-陈顺顺卸除了你的兵器青锋剑。
-陈顺顺卸除了你的兵器青锋剑。
-你只觉得手腕一麻，一阵无力地垂了下去，显然已经受伤！
-
-★♀
-
-]]
-
-local define_songxin = function()
+local define_toumingzhuang = function()
   local prototype = FSM.inheritedMeta()
 
   local States = {
     stop = "stop",
     ask = "ask",
-    wenhao = "wenhao",
-    dining = "dining",
     recover = "recover",
-    wait_robber = "wait_robber",
+    treasure = "treasure",
     killing = "killing",
-    songxin = "songxin",
+    beauty = "beauty",
+    robbing = "robbing",
+    submit = "submit",
   }
   local Events = {
     STOP = "stop",  --  any state -> stop
-    DRAWALL = "drawall",  --  stop -> ask (with all newbie gears)
     START = "start",  --  stop -> ask
-    HUNGRY = "hungry",  --  ask -> dining
-    FULL = "full",  --  dining -> ask
     NOT_ENOUGH_NEILI = "not_enough_neili",  --  ask -> recover
     ENOUGH_NEILI = "enough_neili",  --  recover -> ask
     NO_JOB_AVAILABLE = "no_job_available",  --  ask -> ask
     PREV_JOB_NOT_FINISH = "prev_job_not_finish",  --  ask -> ask
-    NEW_JOB_WENHAO = "new_job_wenhao",  --  ask -> wenhao
-    WENHAO_DONE = "wenhao_done",  -- wenhao -> ask
-    NEW_JOB_SONGXIN = "new_job_songxin",  --  ask -> ask
-    SONGXIN_ROOM_REACHABLE = "songxin_room_reachable",  --  ask -> wait_robber
-    SONGXIN_ROOM_NOT_REACHABLE = "songxin_room_not_reachable",  --  ask -> ask 
-    ROBBER_FOUND = "robber_found",  -- wait_robber -> killing
-    ROBBER_KILLED = "robber_killed",  -- killing -> killing
-    MAIL_MISS = "mail_miss",  -- killing -> ask (cancel first)
-    SONGXIN_NEXT_ROOM = "songxin_next_room",  --  killing -> songxin
-    SONGXIN_FINISH = "songxin_finish",  -- songxin -> ask (submit first)
-    SONGXIN_FAIL = "songxin_fail",  -- songxin -> ask (cancel first)
+    NEW_JOB_TREASURE = "new_job_treasure",  --  ask -> treasure
+    NEW_JOB_KILLING = "new_job_killing",  -- ask -> killing
+    NEW_JOB_BEAUTY = "new_job_beauty",  -- ask -> beauty
+    NEW_JOB_ROBBING = "new_job_robbing",  -- ask -> robbing
+    TREASURE_FINISH = "treasure_found",  -- treasure -> submit
+    KILLING_FINISH = "killing_finish",  -- killing -> submit
+    BEAUTY_FINISH = "beauty_finish",  -- beauty -> submit
+    ROBBING_FINISH = "robbing_finish",  -- robbing -> submit
+    JOB_FAIL = "job_fail",  -- treasure, killing, beauty, robbing -> submit
   }
   local REGEXP = {
-    ALIAS_START = "^songxin\\s+start\\s*$",
-    ALIAS_STOP = "^songxin\\s+stop\\s*$",
-    ALIAS_DEBUG = "^songxin\\s+debug\\s+(on|off)\\s*$",
---    NO_JOB_AVAILABLE = "^[ >]*岳不群说道：「你刚刚做过任务，先去休息一会吧。」$",
-    NO_JOB_AVAILABLE = "^[ >]*(岳不群说道：「.*先下去休息休息吧。」|岳不群脸一沉道：「上次交给小兄弟的任务才失败不久，还是等等吧。」)$",
---    PREV_JOB_NOT_FINISH = "^[ >]*岳不群说道：「你上次任务还没有完成呢！」$",
+    ALIAS_START = "^toumingzhuang\\s+start\\s*$",
+    ALIAS_STOP = "^toumingzhuang\\s+stop\\s*$",
+    ALIAS_DEBUG = "^toumingzhuang\\s+debug\\s+(on|off)\\s*$",
+    NO_JOB_AVAILABLE = "^[ >]*(岳不群说道：「.*先下去休息休息吧。」|岳不群脸一沉道：「上次交给小兄弟的任务才失败不久，还是等等吧。」.*)$",
     PREV_JOB_NOT_FINISH = "^[ >]*岳不群说道：「你不是要过任务了吗？快去完成它吧。」$",
     NEW_JOB_WENHAO = "^[ >]*岳不群看着你，道：好久没有见过(.*?) 这些人了，你在江湖中，如果遇到这些前辈中的一个，代我向他问个好\\(wenhao\\)吧，并把礼品带给他。\\s*$",
-    NEW_JOB_SONGXIN = "^[ >]*岳不群(?=说道|道)：「多谢.*送到(.*)附近的(.*)手上。」$";
+    NEW_JOB_SONGXIN = "^[ >]*岳不群(?:说道|道)：「多谢.*送到(.*)附近的(.*)手(上|中)。」$";
     NEW_JOB_SONGXIN_PUBLIC = "岳不群对你道：「我这里正好有封密函，麻烦你跑一趟，交给(.*)附近的(.*)。」$",
     ROBBER_HIT = "^[ >]*(.*)说道：「嘿嘿，让本大爷来教训教训你！」$",
     ROBBER_AUTOKILL = "^[ >]*(.*)说道：「既然甘当岳不群那老贼的走狗，就别怪本大爷不客气了！」$",
@@ -146,6 +70,7 @@ local define_songxin = function()
   end
 
   function prototype:postConstruct()
+    self.lastUpdateTime = os.time()
     self:initStates()
     self:initTransitions()
     self:initTriggers()
@@ -164,6 +89,7 @@ local define_songxin = function()
       state = States.stop,
       enter = function()
         self:disableAllTriggers()
+        SendNoEcho("set jobs job_done")  -- cooperate with other module
       end,
       exit = function() end
     }
@@ -191,17 +117,14 @@ local define_songxin = function()
     }
     self:addState {
       state = States.wenhao,
-      enter = function() end,
-      exit = function() end
-    }
-    self:addState {
-      state = States.dining,
-      enter = function() end,
+      enter = function()
+      end,
       exit = function() end
     }
     self:addState {
       state = States.recover,
-      enter = function() end,
+      enter = function()
+      end,
       exit = function() end
     }
     self:addState {
@@ -281,22 +204,6 @@ local define_songxin = function()
     -- transition from state<ask>
     self:addTransition {
       oldState = States.ask,
-      newState = States.dining,
-      event = Events.HUNGRY,
-      action = function()
-        helper.assureNotBusy()
-        travel:walkto(3798)
-        travel:waitUntilArrived()
-        SendNoEcho("do 2 eat")
-        helper.assureNotBusy()
-        SendNoEcho("do 2 drink")
-        helper.assureNotBusy()
-        wait.time(1)
-        return self:fire(Events.FULL)
-      end
-    }
-    self:addTransition {
-      oldState = States.ask,
       newState = States.recover,
       event = Events.NOT_ENOUGH_NEILI,
       action = function()
@@ -335,11 +242,11 @@ local define_songxin = function()
       newState = States.ask,
       event = Events.PREV_JOB_NOT_FINISH,
       action = function()
-        print("放弃后等待10秒再询问")
+        print("放弃当前任务")
         SendNoEcho("ask yue about fail")
         SendNoEcho("fail")
-        wait.time(10)
-        return self:doAsk()
+        helper.assureNotBusy()
+        return self:fire(Events.STOP)
       end
     }
     self:addTransition {
@@ -365,8 +272,7 @@ local define_songxin = function()
       event = Events.SONGXIN_ROOM_NOT_REACHABLE,
       action = function()
         helper.assureNotBusy()
-        self:doCancel()
-        return self:doAsk()
+        return self:doCancel()
       end
     }
     self:addTransitionToStop(States.ask)
@@ -381,16 +287,6 @@ local define_songxin = function()
       end
     }
     self:addTransitionToStop(States.recover)
-    -- transition from state<dining>
-    self:addTransition {
-      oldState = States.dining,
-      newState = States.ask,
-      event = Events.FULL,
-      action = function()
-        return self:doAsk()
-      end
-    }
-    self:addTransitionToStop(States.dining)
     -- transition from state<wait_robber>
     self:addTransition {
       oldState = States.wait_robber,
@@ -415,9 +311,7 @@ local define_songxin = function()
       newState = States.ask,
       event = Events.MAIL_MISS,
       action = function()
-        self:doCancel()
-        wait.time(10)
-        return self:doAsk()
+        return self:doCancel()
       end
     }
     self:addTransition {
@@ -446,8 +340,7 @@ local define_songxin = function()
       event = Events.SONGXIN_FAIL,
       action = function()
         helper.assureNotBusy()
-        self:doCancel()
-        return self:doAsk()
+        return self:doCancel()
       end
     }
     self:addTransition {
@@ -457,8 +350,8 @@ local define_songxin = function()
       action = function()
         helper.assureNotBusy()
         self:doSubmit()
-        wait.time(2)
-        return self:doAsk()
+        helper.assureNotBusy()
+        return self:fire(Events.STOP)
       end
     }
     self:addTransitionToStop(States.songxin)
@@ -468,16 +361,19 @@ local define_songxin = function()
       newState = States.ask,
       event = Events.WENHAO_DONE,
       action = function()
-        wait.time(3)
+        wait.time(2)
         helper.assureNotBusy()
-        return self:doAsk()
+        return self:fire(Events.STOP)
       end
     }
+    self:addTransitionToStop(States.wenhao)
   end
 
   function prototype:initTriggers()
     helper.removeTriggerGroups(
-      "songxin_ask_start", "songxin_ask_done")
+      "songxin_ask_start", "songxin_ask_done",
+      "songxin_wait_robber", "songxin_killing",
+      "songxin_songxin")
     -- 询问任务
     helper.addTrigger {
       group = "songxin_ask_start",
@@ -732,24 +628,22 @@ local define_songxin = function()
   function prototype:doAsk()
     travel:walkto(66)
     travel:waitUntilArrived()
-    
+
     -- 检查食物饮水
     status:hpbrief()
-    if status.food < 150 or status.drink < 150 then
-      return self:fire(Events.HUNGRY)
-    end
     -- 简单起见，仅检查当前内力，不考虑受伤，精力等问题
     if status.currNeili < status.maxNeili * self.neiliThreshold then
       print("恢复内力至超过上限")
       return self:fire(Events.NOT_ENOUGH_NEILI)
     end
-    
+
     -- 询问任务
     SendNoEcho("set songxin ask_start")
     SendNoEcho("ask yue about job")
+    SendNoEcho("set songxin ask_newline")
     SendNoEcho("set songxin ask_done")  -- will trigger next step
   end
-  
+
   function prototype:doRecover(threshold)
     SendNoEcho("yun recover")
     status:hpbrief()
@@ -802,7 +696,7 @@ local define_songxin = function()
     self:doRecover(self.neiliWaitThreshold)
     travel:walkto(208)
     travel:waitUntilArrived()
-    SendNoEcho("jiali max")
+    -- SendNoEcho("jiali max")
     SendNoEcho("unwield sword")
     SendNoEcho("wield sword")
     DoAfter(20, "yun powerup")
@@ -813,6 +707,22 @@ local define_songxin = function()
     travel:walkto(66)
     travel:waitUntilArrived()
     SendNoEcho("ask yue about fail")
+    helper.assureNotBusy()
+    return self:fire(Events.STOP)
+  end
+
+  function prototype:doStart()
+    return self:fire(Events.START)
+  end
+
+  function prototype:doWaitUntilDone()
+    local currCo = assert(coroutine.running(), "Must be in coroutine")
+    helper.addOneShotTrigger {
+      group = "jobs_one_shot",
+      regexp = helper.settingRegexp("jobs", "job_done"),
+      response = helper.resumeCoRunnable(currCo)
+    }
+    return coroutine.yield()
   end
 
   function prototype:doKill()
@@ -895,4 +805,4 @@ local define_songxin = function()
 
   return prototype
 end
-return define_songxin():FSM()
+return define_toumingzhuang():FSM()

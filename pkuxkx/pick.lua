@@ -164,6 +164,7 @@ local define_pick = function()
       ["短打劲装"] = true,
       ["布衣"] = true,
       ["紫蟒袍"] = true,
+      ["天蓝长袍"] = true,
     }
     self.coinThreshold = 2000
     self.silverThreshold = 200
@@ -463,13 +464,13 @@ local define_pick = function()
     end
     self:debug("物品数量不满足售卖条件", status.weightPercent, status.itemCount)
     -- 检查金额是否足够存储
-  status:money()
+    status:money()
     if status.coins > self.coinThreshold
       or status.silvers > self.silverThreshold
       or status.golds > self.goldThreshold then
       self:debug(
         "身上金钱超过限额：",
-        "gold:" .. status.coins,
+        "gold:" .. status.golds,
         "silver:" .. status.silvers,
         "coins:" .. status.coins)
       return self:fire(Events.ENOUGH_MONEY)

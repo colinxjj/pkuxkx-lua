@@ -188,7 +188,14 @@ local define_Algo = function()
           startid = prevRoomId,
           targetid = roomId
         }
-        if not astar then error("cannot find path from " .. prevRoomId .. " to " .. roomId) end
+        if not astar then
+          local roomIds = {}
+          for _, room in pairs(rooms) do
+            table.insert(roomIds, room.id)
+          end
+          print("rooms: ", table.concat(roomIds, ","))
+          error("cannot find path from " .. prevRoomId .. " to " .. roomId)
+        end
         while #astar > 0 do
           local path = table.remove(astar)
           table.insert(fullTraversal, path.endid)

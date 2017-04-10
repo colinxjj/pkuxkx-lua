@@ -187,11 +187,11 @@ local define_travel = function()
   local SpecialRoomDesc = "这里遭受蒙古兵的洗劫后，已经惨不忍睹。尸横遍野，往日的景象已经荡然无存...."
 
   local SpecialRenamedZones = {
-    ["建康府北城"] = "建康",
-    ["建康府南城"] = "建康",
+    ["建康府北城"] = "建康府",
+    ["建康府南城"] = "建康府",
     ["长江"] = "长江南岸",
-    ["湟中"] = "丝绸之路",
-    ["大理城中"] = "大理"
+    ["大理城中"] = "大理",
+    ["武当山"] = "武当"
   }
   -- room 3185 has 2-line exits descriptions
 
@@ -294,18 +294,10 @@ local define_travel = function()
         if check() then break end
       end
     else
-      local resumeCo = function()
-        local ok, err = coroutine.resume(currCo)
-        if not ok then
-          ColourNote ("deeppink", "black", "Error raised in timer function (in wait module).")
-          ColourNote ("darkorange", "black", debug.traceback(currCo))
-          error (err)
-        end -- if
-      end
       helper.addOneShotTrigger {
         group = "travel_one_shot",
         regexp = waitPattern,
-        response = resumeCo
+        response = helper.resumeCoRunnable(currCo)
       }
       return coroutine.yield()
     end
@@ -555,6 +547,8 @@ local define_travel = function()
       print("失败。当前房间未定位，无法进行范围内自动遍历")
     else
       local traverseRooms = self:getNearbyRooms(depth)
+    -- todo need to consider situation that rooms in maze may not be bi-directional reachable
+--      local RoomsInZone = self.zonesByCode[self.roomsById[self.currRoomId].zone].rooms
       if not traverseRooms then
         print("失败。无法获取附近房间列表")
       else
@@ -576,9 +570,13 @@ local define_travel = function()
       -- check if the fullname match pattern <zone>的<room>
       local delimStart, delimEnd = string.find(args.fullname, "的")
       if delimStart then
+        local zone = string.sub(args.fullname, 1, delimStart - 1)
+        local name = string.sub(args.fullname, delimEnd + 1)
+        self:debug("解析后区域名：", zone)
+        self:debug("解析后房间名：", name)
         return self:getMatchedRooms {
-          zone = string.sub(args.fullname, 1, delimStart - 1),
-          name = string.sub(args.fullname, delimEnd + 1)
+          zone = zone,
+          name = name
         }
       end
       local results = {}

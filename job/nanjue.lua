@@ -16,7 +16,7 @@
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
-local NanjueJob = require "pkuxkx.NanjueJob"
+local NanjueJob = require "job.NanjueJob"
 
 local define_nanjue = function()
   local prototype = FSM.inheritedMeta()
@@ -37,6 +37,7 @@ local define_nanjue = function()
   local REGEXP = {
     -- 任务表示 任务名称 任务状态 发布时间 截止时间 任务地点 资质要求 认领玩家
     JOB_INFO = "^\\s+([0-9_]+?)\\s+(.*?)「(.*?)」\\s+(\\d+:\\d+:\\d+)\\s+(\\d+:\\d+:\\d+)\\s+(.*?)\\s+(.*?)\\s+(\\d+)$",
+    GENDER_AGE = "^[ >]*(他|她)看起来约(.*)多岁。$",
 
   }
   local Locations = {
