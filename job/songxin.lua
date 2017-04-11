@@ -702,8 +702,8 @@ local define_songxin = function()
     self.songxinRooms = travel:getMatchedRooms {
       fullname = self.songxinOrigLocation
     }
-    if #(self.songxinRooms) > 5 then
-      print("送信同名地点超过5个，放弃该任务")
+    if #(self.songxinRooms) > 8 then
+      print("送信同名地点超过8个，放弃该任务")
       return self:fire(Events.SONGXIN_ROOM_NOT_REACHABLE)
     elseif #(self.songxinRooms) == 0 then
       -- todo: 查找不到的地点记录日志

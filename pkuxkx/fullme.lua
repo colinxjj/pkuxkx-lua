@@ -145,5 +145,7 @@ local define_fullme = function()
 
   return prototype
 end
-return define_fullme():new()
+-- return define_fullme():new()
+
+
 

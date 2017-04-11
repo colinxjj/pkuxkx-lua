@@ -1,84 +1,105 @@
-require  "world"
-require "tprint"
 
---local cstr = "你好"
---
---local define_gb2312 = function()
---  local gb2312 = {}
---  gb2312.len = function(s)
---    if not s or type(s) ~= "string" then error("string required", 2) end
---    return string.len(s) / 2
---  end
---
---  gb2312.code = function(s, ci)
---    local first = ci * 2 - 1
---    return string.byte(s, first, first) * 256 + string.byte(s, first + 1, first + 1)
---  end
---
---  gb2312.char = function(chrcode)
---    local first = math.floor(chrcode / 256)
---    local second = chrcode - first * 256
---    return string.char(first) .. string.char(second)
---  end
---
---  return gb2312
---end
---local gb2312 = define_gb2312()
---
---print(cstr, string.len(cstr), gb2312.len(cstr), gb2312.code(cstr, 1), gb2312.code(cstr,2))
---
---print(gb2312.char(47811), gb2312.code(gb2312.char(47811), 1))
---
---
---local define_A = function()
---  local prototype = {
---    __eq = function(a, b) return a.value == b.value end,
---    __lt = function(a, b) return a.value < b.value end,
---    __le = function(a, b) return a.value <= b.value end
---  }
---  prototype.__index = prototype
---
---  function prototype:new(args)
---    local obj = {}
---    obj.value = args.value
---    setmetatable(obj, prototype)
---    return obj
---  end
---
---  return prototype
---end
---local A = define_A()
---
---local a1 = A:new {value = 100}
---local a2 = A:new {value = 200}
---print (a1 < a2)
---
---local define_B = function()
---  local prototype = {
---    __eq = A.__eq,
---    __lt = A.__lt,
---    __le = A.__le
---  }
---  setmetatable(prototype, {
---    __index = A
---  })
---
---  function prototype:new(args)
---    local obj = A:new(args)
---    obj.code = args.code
---    setmetatable(obj, self or prototype)
---    return obj
---  end
---
---  return prototype
---end
---local B = define_B()
---local b1 = B:new {value = 100, code = 'B1'}
---local b2 = B:new {value = 200, code = 'B2'}
---print(b1 < b2)
+local gd = require "gd"
 
-local http = require "socket.http"
+--local http = require "socket.http"
+--
+--local pngStr = http.request("http://i3.sinaimg.cn/home/2013/0331/U586P30DT20130331093840.png")
+--
+--print(gd.createFromPngStr(pngStr))
 
-http.TIMEOUT = 1
-local responseText = http.request("http://www.baidu.com")
-print(responseText)
+local filename = "b2evo_captcha_800BADCA351CB69D1565AA40BB66838B.jpg"
+
+local file = assert(io.open(filename, "rb"))
+local jpgStr = file:read("*a")
+file:close()
+local im = gd.createFromJpegStr(jpgStr)
+
+local distribution = {}
+
+for x = 1, im:sizeX() do
+  for y = 1, im:sizeY() do
+    local color = im:getPixel(x, y)
+    local red = im:red(color)
+    -- 仅以R替代RGB去除红字
+    local avg = math.floor(red)
+    local newColor = im:colorAllocate(avg, avg, avg)
+    im:setPixel(x, y, newColor)
+
+    local c = distribution[newColor]
+    if c then
+      c.count = c.count + 1
+    else
+      distribution[newColor] = {red = avg, count = 1}
+    end
+  end
+end
+
+local newIm = gd.createFromPngStr(im:pngStr())
+--
+---- 中值滤波去噪
+--local margin = {
+--  x = 1, y = 1
+--}
+--
+--local clearNoise = function(im, newIm)
+--  for x = 1 + margin.x, im:sizeX() - margin.x do
+--    for y = 1 + margin.y, im:sizeY() - margin.y do
+--      local pixels = {}
+--      for i = x - margin.x, x + margin.x do
+--        for j = y - margin.y, y + margin.y do
+--          table.insert(pixels, im:red(im:getPixel(i, j)))
+--        end
+--      end
+--      table.sort(pixels)
+--      local mid = pixels[5]
+--      local color = newIm:colorAllocate(mid, mid, mid)
+--      newIm:setPixel(x, y, color)
+--    end
+--  end
+--end
+--clearNoise(im, newIm)
+
+
+local smoothList = {}
+for _, c in pairs(distribution) do
+  table.insert(smoothList, c)
+end
+table.sort(smoothList, function(a, b) return a.red < b.red end)
+
+local prevList = smoothList
+
+for i = 1, 100 do
+  local currList = {}
+  table.insert(currList, prevList[1])
+  for i = 2, #prevList - 1 do
+    local avg = {red = prevList[i].red, count = (prevList[i-1].count + prevList[i].count + prevList[i+1].count) / 3}
+    table.insert(currList, avg)
+  end
+  table.insert(currList, prevList[#prevList])
+  prevList = currList
+end
+
+
+local black = im:colorAllocate(0, 0, 0)
+local white = im:colorAllocate(255, 255, 255)
+
+for x = 1, im:sizeX() do
+  for y = 1, im:sizeY() do
+    local red = im:red(im:getPixel(x, y))
+    if red < 110 then
+      im:setPixel(x, y, black)
+    else
+      im:setPixel(x, y, white)
+    end
+  end
+end
+
+
+local newFile = io.open("new1.png", "wb")
+newFile:write(im:pngStr())
+newFile:close()
+
+
+--83	31.757328647138
+--144	89.593528277346
+--202	858.16509116016
