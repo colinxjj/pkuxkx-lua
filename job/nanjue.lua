@@ -57,23 +57,28 @@ local define_nanjue = function()
   local REGEXP = {
     -- 任务表示 任务名称 任务状态 发布时间 截止时间 任务地点 资质要求 认领玩家
     JOB_INFO = "^\\s+([0-9_]+?)\\s+(.*?)「(.*?)」\\s+(\\d+:\\d+:\\d+)\\s+(\\d+:\\d+:\\d+)\\s+(.*?)\\s+(.*?)\\s+(\\d+)$",
+    RECORD_FAIL = "^[ >]*怎么又是你！我看你是机器人吧。$",
     GENDER_AGE = "^[ >]*(他|她)看起来约(.*)多岁。$",
     CLOTH = "^\\s*□身穿一件(.*?)\\(.*$",
     SHOE = "^\\s*□脚穿一双(.*?)\\(.*$",
     FIGURE = "^这是一(?:位|个)(.*?)的行人。$",
     IDENTIFY_GENDER = "^.*(男|女|流浪汉).*",
     -- todo
-    IDENTIFY_CLOTH = "^.*identify cloth$",
-    IDENTIFY_SHOE = "^.*identify shoe$",
+    IDENTIFY_FEATURE = "^.*(深色衣服|深色鞋子|身穿布衣|身穿夹袄|一双布鞋|浅色鞋子|流浪汉|男|女|矮个子|高个子|白发苍苍|有点发胖).*$",
     CRIMINAL_AUTOKILL = "^[ >]*你发现了正准备潜逃的罪犯，拦住了罪犯的去路。$",
     CRINIMAL_TESTIFIED = "^[ >]*你发现了正准备潜逃的罪犯，向附近巡街的金吾卫举报了，可以去衙门领奖了。$",
+    TESTIFY_FAIL = "^[ >]*你向附近的金吾卫错误地指证上铺的盗劫犯，惊动了真正的盗贼，使得他立即逃离长安城。$",
+    CONFIRM_FAIL = "^[ >]*你寻找线索消耗了太多的时间，引起了盗贼的怀疑，盗贼逃离了长安城。$",
   }
-  local Locations = {
-    ["小雁塔"] = 2322,
-    ["大雁塔"] = 2314,
+  -- 中心，辐射1格
+  local Centers = {
+    ["小雁塔"] = 2321,  -- ok
+    ["大雁塔"] = 2313,  -- 中心
     ["长乐坊"] = 2350,
     ["东市"] = 2330,
-    ["国子监"] = 0,
+    ["国子监"] = 2323, -- ok
+    ["西市"] = 1405,  -- ok
+    ["通化门大街"] = 2284,  -- ok
   }
   local ClothType = {
     ["丝织长衫"] = "silk",
@@ -202,10 +207,14 @@ local define_nanjue = function()
     self:addState {
       state = States.record,
       enter = function()
-        helper.enableTriggerGroups("nanjue_info_start")
+        self.recordSuccess = nil
+        helper.enableTriggerGroups("nanjue_info_start", "nanjue_record_start")
       end,
       exit = function()
-        helper.disableTriggerGroups("nanjue_info_start", "nanjue_info_done")
+        self.recordSuccess = nil
+        helper.disableTriggerGroups(
+          "nanjue_info_start", "nanjue_info_done",
+          "nanjue_record_start", "nanjue_record_done")
       end
     }
   end
@@ -232,6 +241,16 @@ local define_nanjue = function()
         return self:doCollect()
       end
     }
+    self:addTransitionToStop(States.record)
+    -- transition from state<collect>
+    self:addTransition {
+      oldState = States.collect,
+      newState = States.collect,
+      event = Events.CRIMINAL_ANALYZED,
+      action = function()
+        return self:doTestify()
+      end
+    }
   end
 
   function prototype:initTriggers()
@@ -239,7 +258,7 @@ local define_nanjue = function()
       "nanjue_info_start", "nanjue_info_done",
       "nanjue_look_start", "nanjue_look_done"
     )
-
+    -- trigger for info
     helper.addTrigger {
       group = "nanjue_info_start",
       regexp = helper.settingRegexp("nanjue", "info_start"),
@@ -257,14 +276,13 @@ local define_nanjue = function()
         else
           self.selectedJob = nil
           for _, job in ipairs(self.jobs) do
-            if job.level == "简单" and Locations[job.location] then
+            if job.level == "简单" and Centers[job.location] then
               self.selectedJob = job
               break
             end
           end
           if self.selectedJob then
-            SendNoEcho("record " .. self.selectedJob.id)
-            return self:fire(Events.JOB_RECORDED)
+            return self:doRecord()
           else
             return self:fire(Events.NO_JOB_AVAILABLE)
           end
@@ -285,7 +303,6 @@ local define_nanjue = function()
         local jobLocation = wildcards[7]
         local jobRequirement = wildcards[8]
         local jobPlayers = tonumber(wildcards[9])
-
         local currTime = os.date("*t")
         local ss = utils.split(jobStartTime, ":")
         local startTime = os.time {
@@ -323,6 +340,34 @@ local define_nanjue = function()
         end
       end
     }
+    -- trigger for record
+    helper.addTrigger {
+      group = "nanjue_record_start",
+      regexp = helper.settingRegexp("nanjue", "record_start"),
+      response = function()
+        helper.enableTriggerGroups("nanjue_record_done")
+      end
+    }
+    helper.addTrigger {
+      group = "nanjue_record_done",
+      regexp = helper.settingRegexp("nanjue", "record_done"),
+      response = function()
+        helper.disableTriggerGroups("nanjue_record_done")
+        if self.recordSuccess then
+          return self:fire(Events.JOB_RECORDED)
+        else
+          return self:fire(Events.NO_JOB_AVAILABLE)
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "nanjue_record_done",
+      regexp = REGEXP.RECORD_FAIL,
+      response = function()
+        self.recordSuccess = false
+      end
+    }
+
     -- trigger for looking
     helper.addTrigger {
       group = "nanjue_look_start",
@@ -501,6 +546,13 @@ local define_nanjue = function()
     }
   end
 
+  function prototype:doRecord()
+    self.recordSuccess = true
+    SendNoEcho("set nanjue record_start")
+    SendNoEcho("record " .. self.selectedJob.id)
+    SendNoEcho("set nanjue record_done")
+  end
+
   function prototype:doAskInfo()
     self.jobsInfo = {}
     SendNoEcho("set nanjue info_start")
@@ -518,6 +570,19 @@ local define_nanjue = function()
     SendNoEcho("set nanjue ask_start")
     SendNoEcho("ask " .. id .. " about 消息")
     SendNoEcho("set nanjue ask_done")
+  end
+
+  function prototype:doCollect()
+    travel:walkto(self.targetRoomId)
+    travel:waitUntilArrived()
+    helper.assureNotBusy()
+    local onEachStep = function()
+      return self:doCollectWhenTraverse()
+    end
+    local onArrive = function()
+      return self:analyzeCriminalAfterTraverse()
+    end
+    return travel:traverseNearby(1, onEachStep, onArrive)
   end
 
   function prototype:doCollectWhenTraverse()
@@ -680,24 +745,30 @@ local define_nanjue = function()
     return remainedFeatures
   end
 
-  function prototype:doCatchCriminal()
+  function prototype:doTestify()
     if #(self.suspects) == 0 then
       print("没有发现任何嫌疑人，在证人中随机挑选一个")
       local randomCrinimal = self.witness[math.random(#(self.witnesses))]
       table.insert(self.suspects, randomCrinimal)
     end
-
     self.currSuspect = nil
     self.currCriminal = nil
     for i = 1, #(self.suspects) do
       self.currSuspect = self.suspects[i]
-      self:doTestify()
-
+      if self.selectedJob.level == "简单" then
+        print("简单模式，可以直接逮捕")
+        travel:walkto(self.currSuspect.roomId)
+        travel:waitUntilArrived()
+        wait.time(2)
+        SendNoEcho("ask " .. self.currSuspect.id .. " about 盗贼")
+        -- todo
+      else
+        print("其他模式，只testify，不战斗")
+      end
     end
   end
 
   function prototype:doTestify()
-
 
   end
 
