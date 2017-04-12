@@ -59,14 +59,15 @@ local define_nanjue = function()
     ALIAS_STOP = "^nanjue\\s+stop\\s*$",
     ALIAS_DEBUG = "^nanjue\\s+debug\\s+(on|off)\\s*$",
     -- 任务标识 任务名称 任务状态 发布时间 截止时间 任务地点 资质要求 认领玩家
-    JOB_INFO = "^\\s*([0-9_]+?)\\s+(.*?)「(.*?)」\\s+(.*)\\s+(\\d+:\\d+:\\d+)\\s+(\\d+:\\d+:\\d+)\\s+(.*?)\\s+(.*?)\\s+(\\d+)$",
+    JOB_INFO = "^\\s*([0-9_]+?)\\s+(.*?)「(.*?)」\\s+(.*?)\\s+(\\d+:\\d+:\\d+)\\s+(\\d+:\\d+:\\d+)\\s+(.*?)\\s+(.*?)\\s+(\\d+)$",
+    RECORD_SUCCESS = "^[ >]*最近长安城内出现不少盗窃事件，有人报告.*$",
     RECORD_FAIL = "^[ >]*怎么又是你！我看你是机器人吧。$",
     GENDER_AGE = "^[ >]*(他|她)看起来约(.*)多岁。$",
     CLOTH = "^\\s*□身穿一件(.*?)\\(.*$",
     SHOE = "^\\s*□脚穿一双(.*?)\\(.*$",
     FIGURE = "^这是一(?:位|个)(.*?)的行人。$",
-    CRIMINAL_AUTOKILL = "^[ >]*你发现了正准备潜逃的罪犯，拦住了罪犯的去路。$",
-    CRIMINAL_TESTIFIED = "^[ >]*你发现了正准备潜逃的罪犯，向附近巡街的金吾卫举报了，可以去衙门领奖了。$",
+    -- CRIMINAL_AUTOKILL = "^[ >]*你发现了正准备潜逃的罪犯，拦住了罪犯的去路。$",
+    TESTIFY_SUCCESS = "^[ >]*你发现了正准备潜逃的罪犯，向附近巡街的金吾卫举报了，可以去衙门领奖了。$",
     TESTIFY_FAIL = "^[ >]*你向附近的金吾卫错误地指证上铺的盗劫犯，惊动了真正的盗贼，使得他立即逃离长安城。$",
     CONFIRM_FAIL = "^[ >]*你寻找线索消耗了太多的时间，引起了盗贼的怀疑，盗贼逃离了长安城。$",
   }
@@ -226,6 +227,10 @@ local define_nanjue = function()
       k = "age",
       v = "medium"
     },
+    ["老大不小"] = {
+      k = "age",
+      v = "medium"
+    },
     ["有点发胖"] = {
       k = "weight",
       v = "fat"
@@ -233,9 +238,12 @@ local define_nanjue = function()
     ["有点胖"] = {
       k = "weight",
       v = "fat"
+    },
+    ["微微发福"] = {
+      k = "weight",
+      v = "fat"
     }
   }
-
 
   local TraverseDepth = 1
 
@@ -265,7 +273,9 @@ local define_nanjue = function()
   function prototype:disableAllTriggers()
     helper.disableTriggerGroups(
       "nanjue_info_start", "nanjue_info_done",
+      "nanjue_record_start", "nanjue_record_done",
       "nanjue_look_start", "nanjue_look_done",
+      "nanjue_ask_start", "nanjue_ask_done",
       "nanjue_testify_start", "nanjue_testify_done",
       "nanjue_submit_start", "nanjue_submit_done"
     )
@@ -346,7 +356,6 @@ local define_nanjue = function()
       event = Events.NO_JOB_AVAILABLE,
       action = function()
         print("没有可用的任务")
-        return self:fire(Events.STOP)
       end
     }
     self:addTransition {
@@ -389,12 +398,15 @@ local define_nanjue = function()
       regexp = helper.settingRegexp("nanjue", "info_done"),
       response = function()
         helper.disableTriggerGroups("nanjue_info_done")
+        self:debug("目前可用任务数：", #(self.jobs))
         if #(self.jobs) == 0 then
           return self:fire(Events.NO_JOB_AVAILABLE)
         else
           self.selectedJob = nil
           for _, job in ipairs(self.jobs) do
-            if Center[job.location] then
+            local targetRoomId = Center[job.location]
+            if targetRoomId then
+              self.targetRoomId = targetRoomId
               self.selectedJob = job
               break
             end
@@ -419,9 +431,10 @@ local define_nanjue = function()
         local jobStartTime = wildcards[5]
         local jobEndTime = wildcards[6]
         local jobLocation = wildcards[7]
-        local jobRequirement = wildcards[8]
+        local jobRequirements = wildcards[8]
         local jobPlayers = tonumber(wildcards[9])
         local currTime = os.date("*t")
+        local currTs = os.time()
         local ss = utils.split(jobStartTime, ":")
         local startTime = os.time {
           year = currTime.year,
@@ -443,7 +456,10 @@ local define_nanjue = function()
         -- 只做5分钟内的任务
         -- 只做没有人认领的任务
         -- 只做新的任务
-        if endTime - currTime >= 5 * 60 and jobPlayers == 0 and jobStatus == "新建" then
+        local restTime = endTime - currTs
+        self:debug("任务剩余时间：", restTime, "接任务玩家数：", jobPlayers, "任务状态", jobStatus)
+        if restTime >= 5 * 60 and jobPlayers == 0 and jobStatus == "新建" then
+          self:debug("添加进入可选列表")
           table.insert(self.jobs, NanjueJob:decorate {
             code = jobCode,
             name = jobName,
@@ -452,10 +468,11 @@ local define_nanjue = function()
             startTime = startTime,
             endTime = endTime,
             location = jobLocation,
-            requirement = jobRequirement,
+            requirements = jobRequirements,
             players = jobPlayers
           })
         end
+
       end
     }
     -- trigger for record
@@ -485,7 +502,14 @@ local define_nanjue = function()
         self.recordSuccess = false
       end
     }
-    -- trigger for looking
+    helper.addTrigger {
+      group = "nanjue_record_done",
+      regexp = REGEXP.RECORD_SUCCESS,
+      response = function()
+        self.recordSuccess = true
+      end
+    }
+    -- trigger for look
     helper.addTrigger {
       group = "nanjue_look_start",
       regexp = helper.settingRegexp("nanjue", "look_start"),
@@ -587,7 +611,7 @@ local define_nanjue = function()
         self:debug("鞋子类型：", shoeType, "鞋子颜色：", color)
       end
     }
-    -- trigger for asking
+    -- trigger for ask
     helper.addTrigger {
       group = "nanjue_ask_start",
       regexp = helper.settingRegexp("nanjue", "ask_start"),
@@ -609,7 +633,33 @@ local define_nanjue = function()
         local feature = wildcards[1]
       end
     }
-    -- trigger for testifying
+    -- trigger for testify
+    helper.addTrigger {
+      group = "nanjue_testify_start",
+      regexp = helper.settingRegexp("nanjue", "testify_start"),
+      response = function()
+        helper.enableTriggerGroups("nanjue_testify_done")
+      end
+    }
+    helper.addTrigger {
+      group = "nanjue_testify_done",
+      regexp = helper.settingRegexp("nanjue", "testify_done"),
+      response = function()
+        helper.disableTriggerGroups("nanjue_testify_done")
+        if self.testifySuccess then
+          return self:fire(Events.TESTIFY_SUCCESS)
+        else
+          return self:fire(Events.TESTIFY_FAIL)
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "nanjue_testify_done",
+      regexp = REGEXP.TESTIFY_SUCCESS,
+      response = function()
+        self.testifySuccess = true
+      end
+    }
   end
 
   function prototype:identifyFeatureRegexp()
@@ -664,7 +714,7 @@ local define_nanjue = function()
   function prototype:doRecord()
     self.recordSuccess = true
     SendNoEcho("set nanjue record_start")
-    SendNoEcho("record " .. self.selectedJob.id)
+    SendNoEcho("record " .. self.selectedJob.code)
     SendNoEcho("set nanjue record_done")
   end
 
@@ -686,6 +736,8 @@ local define_nanjue = function()
     SendNoEcho("ask " .. id .. " about 消息")
     SendNoEcho("set nanjue ask_done")
   end
+
+
 
   function prototype:doCollect()
     travel:walkto(self.targetRoomId)
@@ -847,7 +899,8 @@ local define_nanjue = function()
 
     if #(self.suspects) == 0 then
       self:debug("所有路人都被排除嫌疑，判定过程有错误！")
-      error("所有路人都被排除嫌疑，判定过程有错误！")
+      print("所有路人都被排除嫌疑，判定过程有错误！随机了……")
+      return self:fire(Events.CRIMINAL_ANALYZED)
     elseif #(self.suspects) == 1 then
       self:debug("仅剩1人有嫌疑，确定为罪犯")
       return self:fire(Events.CRIMINAL_ANALYZED)
@@ -865,117 +918,6 @@ local define_nanjue = function()
       end
       return self:fire(Events.CRIMINAL_ANALYZED)
     end
-
---    if #(self.suspects) == 0 then
---      -- 随机选取
---      return self:fire(Events.CRIMINAL_ANALYZED)
---    elseif #(self.suspects) == 1 then
---      return self:fire(Events.CRIMINAL_ANALYZED)
---    else
---      -- 判断证词是否有矛盾
---      local conflicts = {}
---      local conflictDict = {}
---      for i = 1, #(self.witnesses) - 1 do
---        for j = i + 1, #(self.witnesses) - 1 do
---          local this = self.witnesses[i]
---          local that = self.witnesses[j]
---          for featureName, featureValue in paris(this.identifyFeature) do
---            if that.identifyFeature[featureName] and that.identifyFeature[featureName] ~= featureValue then
---              self:debug("发现证词矛盾：", featureName)
---              self:debug("路人：", this.name, "证词：", featureValue)
---              self:debug("路人：", that.name, "证词：", that.identifyFeature[featureName])
---              table.insert(conflicts, {
---                this = this,
---                that = that
---              })
---              -- 如果某人与多个人证词都有矛盾，则该人必为凶手
---              if conflictDict[this] then
-----                table.insert(self.suspects, this)
---                self.suspects = {this}
---                print("路人" .. this.name .. "与超过1个其他路人存在矛盾证词，必为凶手")
---                return self:fire(Events.CRIMINAL_ANALYZED)
---              else
---                conflictDict[this] = true
---              end
---              if conflictDict[that] then
-----                table.insert(self.suspects, that)
---                self.suspects = {this}
---                print("路人" .. that.name .. "与超过1个其他路人存在矛盾证词，必为凶手")
---                return self:fire(Events.CRIMINAL_ANALYZED)
---              else
---                conflictDict[that] = true
---              end
---            end
---          end
---        end
---      end
---      if #conflicts > 0 then
---        print("证词中存在矛盾，嫌疑人在证人中")
---        for _, conflict in ipairs(conflicts) do
---          -- 假设this正确
---          local featuresExcludedThat = self:featuresExcluded(self.witnesses, conflict.that)
---          -- 检查that是否符合条件
---          local thatFit = true
---          for k, v in pairs(featuresExcludedThat) do
---            if conflict.that[k] ~= v then
---              thatFit = false
---              break
---            end
---          end
---          if thatFit then
---            print("路人" .. conflict.that.name .. "有可能为嫌疑人")
---            table.insert(self.suspects, conflict.that)
---          end
---          -- 假设that正确
---          local featuresExcludedThis = self:featuresExcluded(self.witnesses, conflict.this)
---          -- 检查this是否符合条件
---          local thisFit = true
---          for k, v in pairs(featuresExcludedThis) do
---            if conflict.this[k] ~= v then
---              thisFit = false
---              break
---            end
---          end
---          if thisFit then
---            print("路人" .. conflict.this.name .. "有可能为嫌疑人")
---            table.insert(self.suspects, conflict.this)
---          end
---        end
---      else
---        print("证人的证词是一致的，有可能罪犯在非证人中，也有可能罪犯在证人中而所说证词为假")
---        -- 检查非证人
---        local features = self:featuresExcluded(self.witnesses)
---        for _, silent in ipairs(self.silents) do
---          local fit = true
---          for k, v in pairs(features) do
---            if silent[k] ~= v then
---              fit = false
---              break
---            end
---          end
---          if fit then
---            print("路人" .. silent.name .. "符合所有证人的描述，列为嫌疑人")
---            table.insert(self.suspects, silent)
---          end
---        end
---        -- 检查证人
---        for _, witness in ipairs(self.witnesses) do
---          local features = self:featuresExcluded(self.witnesses, witness)
---          local fit = true
---          for k, v in pairs(features) do
---            if witness[k] ~= v then
---              fit = false
---              break
---            end
---          end
---          if fit then
---            print("路人" .. witness.name .. "有证词，但该人符合其他证人的所有证词，列为嫌疑人")
---            table.insert(self.suspects, witness)
---          end
---        end
---      end
---      return self:fire(Events.CRIMINAL_ANALYZED)
---    end
   end
 
   function prototype:featuresExcluded(witnesses, excluded)
@@ -1009,6 +951,7 @@ local define_nanjue = function()
     travel:walkto(self.currSuspect.roomId)
     travel:waitUntilArrived()
     wait.time(2)
+    self.testifySuccess = false
     SendNoEcho("set nanjue testify_start")
     SendNoEcho("testify " .. self.currSuspect.id)
     SendNoEcho("set nanjue testify_done")
