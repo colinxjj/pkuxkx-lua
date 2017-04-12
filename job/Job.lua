@@ -20,9 +20,7 @@ local define_Job = function()
     obj.def = assert(args.def, "definition of job cannot be nil")
     local impl = assert(args.impl, "implementation cannot be nil")
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
---    assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
---    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
     obj.impl = impl
     setmetatable(obj, self or prototype)
@@ -34,9 +32,7 @@ local define_Job = function()
     assert(obj.def, "definition of job cannot be nil")
     local impl = assert(obj.impl, "implementation cannot be nil")
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
---    assert(type(impl.doWaitUntilDone) == "function", "notifyDone() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
---    assert(type(impl.doWait) == "function", "doWait() of job implmeentation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
     setmetatable(obj, self or prototype)
     self:postConstruct()
@@ -45,18 +41,19 @@ local define_Job = function()
 
   function prototype:postConstruct()
     self.waitThread = nil
-    self.stopped = false
+    self.stopped = true
   end
 
   function prototype:start()
     assert(self.stopped, "stopped flag must be true before start")
     self.stopped = false
-    self.impl.doStart()  -- must be an async call
+    self.impl:doStart()  -- must be an async call
   end
 
   function prototype:stop()
-    self.impl.doCancel()
+    self.impl:doCancel()
     self.stopped = true
+    helper.removeTimerGroups("jobs_one_shot")
   end
 
   function prototype:waitUntilDone()
@@ -101,11 +98,13 @@ local define_Job = function()
       regexp = helper.settingRegexp("jobs", "job_done"),
       response = helper.resumeCoRunnable(currCo)
     }
-    return coroutine.yield()  -- this is a long-time yield and before this we need to periodically check status
+    coroutine.yield()  -- this is a long-time yield and before this we need to periodically check status
+    self.stopped = true
+    helper.removeTimerGroups("jobs_one_shot")
   end
 
   function prototype:getLastUpdateTime()
-    return self.impl.getLastUpdateTime()
+    return self.impl:getLastUpdateTime()
   end
 
   return prototype

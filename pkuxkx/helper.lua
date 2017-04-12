@@ -301,6 +301,15 @@ local define_helper = function()
     end
   end
 
+  helper.removeAllTimers = function()
+    local timerList = GetTimerList()
+    if timerList then
+      for i, timer in ipairs(timerList) do
+        helper.removeTimer(timer)
+      end
+    end
+  end
+
   helper.disableTimerGroups = function(...)
     for _, group in ipairs({...}) do
       EnableTimerGroup(group, false)
@@ -588,6 +597,16 @@ local define_helper = function()
   -- 删除所有触发与别名
   helper.removeAllTriggers()
   helper.removeAllAliases()
+  helper.removeAllTimers()
+  -- 添加定时器防止掉线
+  helper.addTimer {
+    group = "heartbeat",
+    interval = 30,
+    response = function()
+      SendNoEcho("set heartbeat on")
+    end
+  }
+  helper.enableTimerGroups("heartbeat")
 
   return helper
 end

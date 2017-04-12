@@ -192,8 +192,8 @@ local define_fsm = function()
       event = Events.JOB_READY,
       action = function()
         assert(self.currJob, "current job cannot be nil")
-        self.currJob.impl:doStart()
-        self.currJob.impl:doWaitUntilDone()
+        self.currJob:start()
+        self.currJob:waitUntilDone()
         self:fire(Events.JOB_FINISH)
       end
     }

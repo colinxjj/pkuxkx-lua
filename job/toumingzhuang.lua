@@ -715,16 +715,6 @@ local define_toumingzhuang = function()
     return self:fire(Events.START)
   end
 
-  function prototype:doWaitUntilDone()
-    local currCo = assert(coroutine.running(), "Must be in coroutine")
-    helper.addOneShotTrigger {
-      group = "jobs_one_shot",
-      regexp = helper.settingRegexp("jobs", "job_done"),
-      response = helper.resumeCoRunnable(currCo)
-    }
-    return coroutine.yield()
-  end
-
   function prototype:doKill()
     for _, robber in pairs(self.robbersToKill) do
       if not self.robbersKilled[robber.name] then
