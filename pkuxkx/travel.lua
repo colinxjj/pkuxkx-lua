@@ -161,16 +161,15 @@ local define_travel = function()
     EXITS_DESC = "^\\s{0,12}这里(明显|唯一)的出口是(.*)$|^\\s*这里没有任何明显的出路\\w*",
     BUSY_LOOK = "^[> ]*风景要慢慢的看。$",
     NOT_BUSY = "^[ >]*你现在不忙。$",
-    LOOK_START = "^[ >]*设定环境变量：travel_look = \"start\"$",
-    LOOK_DONE = "^[ >]*设定环境变量：travel_look = \"done\"$",
-    ARRIVED = "^[ >]*设定环境变量：travel_walk = \"arrived\"$",
     WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你反应迅速，急忙双手抱头，身体蜷曲。眼前昏天黑地，顺着山路直滚了下去。)$",
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
     WALK_RESUME = "^[ >]*(你终于来到了对面，心里的石头终于落地.*|突然间蓬一声，屁股撞上了什么物事，.*|你终于一步步的终于挨到了桥头.*|不知过了多久，船终于靠岸了，你累得满头大汗.*|小舟终于划到近岸，你从船上走了出来.*|小舟终于划到近岸，你从船上走了出来.*|你沿着踏板走了上去.*)$",
     -- 添加武当沼泽busy
     WALK_BUSY = "^[ >]*(吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的。|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*|你的动作还没有完成，不能移动。|沙石地几乎没有路了，你走不了那么快。)$",
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
-    WALK_STEP = "^[ >]*设定环境变量：travel_walk = \"step\"$",
+    WALK_STEP = helper.settingRegexp("travel", "walk_step"),
+    ARRIVED = helper.settingRegexp("travel", "arrived"),
+    LOOK_DONE = helper.settingRegexp("travel", "look_done"),
     JIANG = "江百胜伸手拦住你说道：盟主很忙，现在不见外客，你下山去吧！",
     strange = "你不小心被什么东西绊了一下，差点摔个大跟头。",
     FLOOD_OCCURRED = "^[ >]*(你刚要前行，忽然发现江水决堤，不由暗自庆幸，还好没过去。|你正要前行，有人大喝：黄河决堤啦，快跑啊！)$",
@@ -283,7 +282,7 @@ local define_travel = function()
   -- 有可能产生并发问题，建议不要同时使用该方法和walkto中的action
   function prototype:waitUntilArrived(timer)
     local currCo = assert(coroutine.running(), "Must be in coroutine")
-    local waitPattern = helper.settingRegexp("travel_walk", "arrived")
+    local waitPattern = REGEXP.ARRIVED
     if timer then
       -- timer means we need to check the status periodically
       local interval = assert(timer.interval, "interval of timer cannot be nil")
@@ -867,7 +866,7 @@ local define_travel = function()
           self.currRoomId = self.targetRoomId
           self:refreshRoomInfo()
         end
-        SendNoEcho("set travel_walk arrived")  -- this is for
+        SendNoEcho("set travel arrived")  -- this is for
         if self.targetAction then
           return self.targetAction()
         end
@@ -1079,7 +1078,7 @@ local define_travel = function()
     -- 初始触发
     helper.addTrigger {
       group = "travel_look_start",
-      regexp = REGEXP.LOOK_START,
+      regexp = helper.settingRegexp("travel", "look_start"),
       response = function()
         self:debug("LOOK_START triggered")
         self:clearRoomInfo()
@@ -1602,9 +1601,9 @@ local define_travel = function()
     while true do
       helper.enableTriggerGroups("travel_look_start")
       self.busyLook = false
-      SendNoEcho("set travel_look start")
+      SendNoEcho("set travel look_start")
       SendNoEcho("look")
-      SendNoEcho("set travel_look done")
+      SendNoEcho("set travel look_done")
       local line = wait.regexp(REGEXP.LOOK_DONE, 3)
       helper.disableTriggerGroups(
         "travel_look_start",
@@ -1819,7 +1818,7 @@ local define_travel = function()
 
   function prototype:assureStepResponsive(extraWaitTime)
     while true do
-      SendNoEcho("set travel_walk step")
+      SendNoEcho("set travel walk_step")
       local line = wait.regexp(REGEXP.WALK_STEP, 5)
       if not line then
         print("系统反应超时，等待5秒重试")

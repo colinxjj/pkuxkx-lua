@@ -34,6 +34,8 @@ local define_fsm = function()
     NOT_ENOUGH_QI = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉.*",
     NEILI_MAX = "^[ >]*你现在内力接近圆满状态。$",
   }
+  
+  local KkndRoomId = 1305
 
   function prototype:new()
     local obj = FSM:new()
@@ -94,7 +96,7 @@ local define_fsm = function()
       newState = States.wait,
       event = Events.START,
       action = function()
-        travel:walkto(1304, function()
+        travel:walkto(KkndRoomId, function()
           helper.assureNotBusy()
           SendNoEcho("follow kknd")
           self:doWait()
@@ -113,7 +115,7 @@ local define_fsm = function()
           SendNoEcho("do 2 eat")
           SendNoEcho("do 2 drink")
           helper.assureNotBusy()
-          return travel:walkto(1304, function()
+          return travel:walkto(KkndRoomId, function()
             return self:fire(Events.FULL)
           end)
         end)
