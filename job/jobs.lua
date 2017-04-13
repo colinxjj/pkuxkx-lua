@@ -53,15 +53,18 @@ local define_fsm = function()
     dining = "dining",
     store = "store",
     equip = "equip",
+    recover = "recover",
     job = "job",
   }
   local Events = {
     STOP = "stop",  -- any state -> stop
     START = "start",  -- stop -> prepare
     HUNGRY = "hungry",  -- prepare -> dining
-    FULL = "full",  -- dining -> wait
+    FULL = "full",  -- dining -> prepare
     RICH = "rich",  -- prepare -> store
-    POOR = "poor",  -- store -> poor
+    POOR = "poor",  -- store -> prepare
+    TO_RECOVER = "to_recover",  -- prepare -> recover
+    RECOVERED = "recovered",  -- recover -> prepare
     TO_EQUIP = "to_equip", -- prepare -> equip
     EQUIPPED = "equipped",  -- equip -> prepare
     JOB_READY = "job_ready",  -- prepare -> job
@@ -74,6 +77,10 @@ local define_fsm = function()
     ALIAS_STOP = "^jobs\\s+stop\\s*$",
     ALIAS_DEBUG = "^jobs\\s+debug\\s+(on|off)\\s*$",
     CANNOT_STORE_MONEY = "^[ >]*您目前已有存款.*，再存那么多的钱，我们小号可难保管了。$",
+    CANNOT_DAZUO = "^[ >]*你正在运行内功加速全身气血恢复，无法静下心来搬运真气。$",
+    CANNOT_RECOVER = "^[ >]*你正在运行真气加速气血恢复，无法再分出内力来。$",
+    TUNA_BEGIN = "^[ >]*你盘膝坐下，开始吐纳炼精。$",
+    DAZUO_BEGIN = "^[ >]*你坐下来运气用功，一股内息开始在体内流动。$",
   }
 
   function prototype:FSM()
@@ -144,6 +151,11 @@ local define_fsm = function()
       exit = function() end
     }
     self:addState {
+      state = States.recover,
+      enter = function() end,
+      exit = function() end
+    }
+    self:addState {
       state = States.job,
       enter = function() end,
       exit = function() end
@@ -188,6 +200,14 @@ local define_fsm = function()
     }
     self:addTransition {
       oldState = States.prepare,
+      newState = States.recover,
+      event = Events.TO_RECOVER,
+      action = function()
+        return self:doRecover()
+      end
+    }
+    self:addTransition {
+      oldState = States.prepare,
       newState = States.job,
       event = Events.JOB_READY,
       action = function()
@@ -217,6 +237,16 @@ local define_fsm = function()
       end
     }
     self:addTransitionToStop(States.store)
+    -- transition from state<recover>
+    self:addTransition {
+      oldState = States.recover,
+      newState = States.prepare,
+      event = Events.RECOVERED,
+      action = function()
+        return self:doPrepare()
+      end
+    }
+    self:addTransitionToStop(States.recover)
     -- transition from state<job>
     self:addTransition {
       oldState = States.job,
@@ -291,13 +321,6 @@ local define_fsm = function()
     -- check status
     print("准备任务")
     wait.time(1)
-    helper.assureNotBusy()
-    status:hpbrief()
-    if status.food < 120 or status.drink < 120 then
-      return self:fire(Events.HUNGRY)
-    end
-    print("食物饮水检查完毕")
-    wait.time(1)
     status:money()
     if status.silvers > self.silverThreshold
       or status.golds > self.goldThreshold then
@@ -307,7 +330,7 @@ local define_fsm = function()
         "silver:" .. status.silvers)
       return self:fire(Events.RICH)
     end
-
+    print("携带金钱检查完毕")
     wait.time(1)
     helper.assureNotBusy()
     self:doCheckWeapons()
@@ -317,6 +340,22 @@ local define_fsm = function()
     print("任务信息检查完毕（待完善）")
     -- 确定任务
     self.currJob = self.jobs["songxin"]
+    print("确定当前任务类型：", self.currJob.name)
+    wait.time(1)
+    helper.assureNotBusy()
+    status:hpbrief()
+    if status.food < 120 or status.drink < 120 then
+      return self:fire(Events.HUNGRY)
+    end
+    print("食物饮水检查完毕")
+    local precondition = self.currJob:getPrecondition()
+    if status.effJing < precondition.jingPercent * status.maxJing - 1
+      or status.currJingli < precondition.jingPercent * status.maxJingli - 1
+      or status.effQi < precondition.qiPercent * status.maxQi - 1
+      or status.currNeili < precondition.neiliPercent * status.maxNeili - 1 then
+      return self:fire(Events.RECOVER)
+    end
+    print("身体状态检查完毕")
     return self:fire(Events.JOB_READY)
   end
 
@@ -371,6 +410,61 @@ local define_fsm = function()
         return self:fire(Events.POOR)
       end
     end)
+  end
+
+  function prototype:doRecover()
+    local pct = self.currJob:getPrecondition()
+    status:hpbrief()
+    -- 先恢复精
+    local neiliUsed = false
+    if status.effJing < status.maxJing * pct.jing - 1 then
+      SendNoEcho("do 2 yun inspire")
+      neiliUsed = true
+    end
+    -- 再恢复气
+    if status.effQi < status.maxQi * pct.qi - 1 then
+      SendNoEcho("do 2 yun heal")
+      neiliUsed = true
+    end
+    -- 先恢复内力
+    if neiliUsed then status:hpbrief() end
+    if status.currNeili < status.maxNeili * pct.neili - 1 then
+      local diff = status.maxNeili * pct.neili - status.currNeili
+      if diff > status.currQi - status.maxQi * 0.2 then
+        SendNoEcho("dazuo max")
+        local line = wait.regexp(REGEXP.DAZUO_BEGIN, 4)
+        if not line then
+          -- todo
+          return self:doRecover()
+        end
+      else
+        SendNoEcho("dazuo " .. math.floor(diff))
+        local line = wait.regexp(REGEXP.DAZUO_BEGIN, 4)
+        if not line then
+          -- todo
+          return self:doRecover()
+        end
+      end
+      -- 再恢复精力
+    elseif status.currJingli < status.maxJingli * pct.jingli - 1 then
+      local diff = status.maxJingli * pct.jingli - status.currJingli
+      if diff > status.currJing - status.maxJing * 0.2 then
+        SendNoEcho("tuna max")
+        local line = wait.regexp(REGEXP.TUNA_BEGIN, 4)
+        if not line then
+          -- todo
+          return self:doRecover()
+        end
+      else
+        SendNoEcho("tuna " .. math.floor(diff))
+        local line = wait.regexp(REGEXP.TUNA_BEGIN, 4)
+        if not line then
+          -- todo
+          return self:doRecover()
+        end
+      end
+    end
+    return self:fire(Events.RECOVERED)
   end
 
   return prototype

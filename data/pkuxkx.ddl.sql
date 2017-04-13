@@ -44,14 +44,6 @@ create table if not exists chr2pinyin (
 );
 create index if not exists idx_chr2pinyin on chr2pinyin (unicode);
 
--- insert into rooms (id, name, code, description, exits, zone, mapinfo)
--- select nodeno, nodename, nodeid, description, exits, zone, relation
--- from mud_node;
---
--- insert into paths (startid, endid, path, endcode)
--- select nodeno, linknodeno, path, linknodeid
--- from mud_links;
-
 create table if not exists zones (
   id integer primary key AUTOINCREMENT,
   code text unique,
@@ -114,7 +106,9 @@ values
   ('shaolin', 'ÉÙÁÖ', 'shaolinguangchang'),
   ('lingjiu', 'ÁéğÕ', 'lingjiubaizhangjian'),
   ('emei', '¶ëÃ¼', 'emeishanmen'),
-  ('xihu', 'Î÷ºş', 'xihuhangzhoufenduodamen')
+  ('xihu', 'Î÷ºş', 'xihuhangzhoufenduodamen'),
+  ('yuewangmu', 'ÔÀÍõÄ¹', 'yuewangmumuqianxiaodao'),
+  ('murong', '¹ÃËÕÄ½Èİ', 'muronghubian')
 ;
 
 create table if not exists zone_connectivity (
@@ -283,7 +277,11 @@ values
   ('chengdu', 'emei', 13),
   ('emei', 'chengdu', 13),
   ('linan', 'xihu', 7),
-  ('xihu', 'linan', 7)
+  ('xihu', 'linan', 7),
+  ('quanzhou', 'yuewangmu', 6),
+  ('yuewangmu', 'quanzhou', 6),
+  ('suzhou', 'murong', 7),
+  ('murong', 'suzhou', 7)
 ;
 
 update zone_connectivity set boat = 1

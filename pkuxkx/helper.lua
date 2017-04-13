@@ -13,6 +13,7 @@ local define_helper = function()
 
   local REGEXP = {
     NOT_BUSY = "^[ >]*你现在不忙。$",
+    CHECKED_NOT_BUSY = "^[ >]*你不忙$",
     SETTING = "^[ >]*设定环境变量：__SETTING_NAME__ = \"__SETTING_VALUE__\"$",
   }
 
@@ -523,6 +524,15 @@ local define_helper = function()
       SendNoEcho("halt")
       -- busy or wait for 3 seconds to resend
       local line = wait.regexp(REGEXP.NOT_BUSY, 3)
+      if line then break end
+    end
+  end
+
+  -- 检查直到不busy，必须在coroutine中
+  helper.checkUntilNotBusy = function()
+    while true do
+      SendNoEcho("checkbusy")
+      local line = wait.regexp(REGEXP.CHECKED_NOT_BUSY, 3)
       if line then break end
     end
   end

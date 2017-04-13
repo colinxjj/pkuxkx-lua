@@ -22,6 +22,8 @@ local define_Job = function()
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
+    assert(type(impl.precondition) == "table",
+      "precondition of job implementation must be table, containing fields 'jing', 'qi', 'neili', 'jingli'")
     obj.impl = impl
     setmetatable(obj, self or prototype)
     self:postConstruct()
@@ -34,9 +36,15 @@ local define_Job = function()
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
     assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
+    assert(type(impl.precondition) == "table",
+      "precondition of job implementation must be table, containing fields 'jing', 'qi', 'neili', 'jingli'")
     setmetatable(obj, self or prototype)
     self:postConstruct()
     return obj
+  end
+
+  function prototype:getPrecondition()
+    return self.impl.precondition
   end
 
   function prototype:postConstruct()

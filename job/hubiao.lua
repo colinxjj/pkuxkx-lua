@@ -151,3 +151,129 @@ getesc 34934
 
 
 ]]}
+
+local helper = require "pkuxkx.helper"
+local FSM = require "pkuxkx.FSM"
+local travel = require "pkuxkx.travel"
+local status = require "pkuxkx.status"
+
+local define_fsm = function()
+  local prototype = FSM.inheritedMeta()
+
+  local States = {
+    stop = "stop",  -- 终止状态，与jobs模块整合，提供waitDone触发
+    prepare = "prepare",  -- 准备任务，查看任务
+    prefetch = "prefetch",  -- 预先前往查找目的地
+    transfer = "transfer",  -- 运输中
+    lost = "lost",  -- 迷路中（很大可能被强盗推至相邻房间）
+    submit = "submit",  -- 提交
+  }
+  local Events = {
+    STOP = "stop",  -- 任何状态下停止
+    START = "start",  -- stop -> prepare
+    RECOVER = "recover",  -- prepare -> prepare
+  }
+  local REGEXP = {
+
+  }
+
+  -- 福州福威镖局
+  local StartRoomId = 26
+
+  function prototype:FSM()
+    local obj = FSM:new()
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
+  end
+
+  function prototype:postConstruct()
+    self:initStates()
+    self:initTransitions()
+    self:initTriggers()
+    self:initAliases()
+    self:setState(States.stop)
+    self.maxRound = 8
+    self.round = 0
+
+    -- precondition
+    self.precondition = {
+      jing = 0.96,
+      qi = 0.96,
+      jingli = 1,
+      neili = 1.8
+    }
+  end
+
+  function prototype:disableAllTriggers()
+
+  end
+
+  function prototype:initStates()
+    self:addState {
+      state = States.stop,
+      enter = function()
+        self:disableAllTriggers()
+        SendNoEcho("set jobs done")  -- 为jobs提供结束触发
+      end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.prepare,
+      enter = function() end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.prefetch,
+      enter = function() end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.transfer,
+      enter = function() end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.submit,
+      enter = function() end,
+      exit = function() end
+    }
+  end
+
+  function prototype:initTransitions()
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.prepare,
+      event = Events.START,
+      action = function()
+        return self:doPrepare()
+      end
+    }
+  end
+
+  function prototype:initTriggers()
+
+  end
+
+  function prototype:initAliases()
+
+  end
+
+  function prototype:addTransitionToStop(fromState)
+    self:addTransition {
+      oldState = fromState,
+      newState = States.stop,
+      event = Events.STOP,
+      action = function()
+        print("停止 - 当前状态", self.currState)
+      end
+    }
+  end
+
+
+
+
+  return prototype
+end
+return define_fsm():FSM()
+

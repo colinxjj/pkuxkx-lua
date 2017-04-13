@@ -87,6 +87,7 @@ local define_status = function()
     ALIAS_STATUS_INVENTORY = "^status\\s+i\\s*$",
     ALIAS_STATUS_SCORE = "^status\\s+sc\\s*$",
     ALIAS_STATUS_SHOW = "^status\\s+show\\s+(hp|money|items|weight)\\s*$",
+    ALIAS_DEBUG = "^status\\s+debug\\s+(on|off)\\s*$",
     -- 经验，潜能，最大内力，当前内力，最大精力，当前精力
     -- 最大气血，有效气血，当前气血，最大精神，有效精神，当前精神
     HPBRIEF_LINE = "^[ >]*#(-?[0-9\\.]+[KMB]?),(-?[0-9\\.]+[KMB]?),(-?\\d+),(-?\\d+),(-?\\d+),(-?\\d+)$",
@@ -341,6 +342,7 @@ local define_status = function()
       group = "status_hpbrief_done",
       regexp = REGEXP.HPBRIEF_LINE,
       response = function(name, line, wildcards)
+        self:debug("HPBRIEF_LINE triggered")
         local hpbriefNum = self.hpbriefNum
         if hpbriefNum == 1 then
 --          self.exp = tonumber(wildcards[1])
@@ -369,6 +371,7 @@ local define_status = function()
       group = "status_hpbrief_done",
       regexp = REGEXP.HPBRIEF_LINE_EX,
       response = function(name, line, wildcards)
+        self:debug("HPBRIEF_LINE_EX triggered")
         if self.hpbriefNum == 3 then
           self.zhenqi = tonumber(wildcards[1])
           self.zhenyuan = tonumber(wildcards[2])
@@ -623,6 +626,18 @@ local define_status = function()
           self:showInventory()
         else
           error("unknown command:" .. cmd, 2)
+        end
+      end
+    }
+    helper.addAlias {
+      group = "status",
+      regexp = REGEXP.ALIAS_DEBUG,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self:debugOn()
+        else
+          self:debugOff()
         end
       end
     }

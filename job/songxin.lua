@@ -20,7 +20,6 @@ local define_songxin = function()
     stop = "stop",
     ask = "ask",
     wenhao = "wenhao",
-    recover = "recover",
     wait_robber = "wait_robber",
     killing = "killing",
     songxin = "songxin",
@@ -29,8 +28,6 @@ local define_songxin = function()
     STOP = "stop",  --  any state -> stop
     DRAWALL = "drawall",  --  stop -> ask (with all newbie gears)
     START = "start",  --  stop -> ask
-    NOT_ENOUGH_NEILI = "not_enough_neili",  --  ask -> recover
-    ENOUGH_NEILI = "enough_neili",  --  recover -> ask
     NO_JOB_AVAILABLE = "no_job_available",  --  ask -> ask
     PREV_JOB_NOT_FINISH = "prev_job_not_finish",  --  ask -> ask
     NEW_JOB_WENHAO = "new_job_wenhao",  --  ask -> wenhao
@@ -85,10 +82,13 @@ local define_songxin = function()
     self:setState(States.stop)
     -- the depth to traverse to find songxin npc
     self.traverseDepth = 6
-    -- the threshold of neili to start a new job
-    self.neiliThreshold = 1.2
-    -- the threshold of neili to start to wait robber
-    self.neiliWaitThreshold = 1.4
+    -- threshold of jing, jingli, qi, neili
+    self.precondition = {
+      jing = 0.96,
+      qi = 0.96,
+      jingli = 0.96,
+      neili = 1.2
+    }
   end
 
   function prototype:initStates()
@@ -124,12 +124,6 @@ local define_songxin = function()
     }
     self:addState {
       state = States.wenhao,
-      enter = function()
-      end,
-      exit = function() end
-    }
-    self:addState {
-      state = States.recover,
       enter = function()
       end,
       exit = function() end
@@ -211,15 +205,6 @@ local define_songxin = function()
     -- transition from state<ask>
     self:addTransition {
       oldState = States.ask,
-      newState = States.recover,
-      event = Events.NOT_ENOUGH_NEILI,
-      action = function()
-        self:doRecover(self.neiliThreshold)
-        return self:fire(Events.ENOUGH_NEILI)
-      end
-    }
-    self:addTransition {
-      oldState = States.ask,
       newState = States.wenhao,
       event = Events.NEW_JOB_WENHAO,
       action = function()
@@ -283,17 +268,6 @@ local define_songxin = function()
       end
     }
     self:addTransitionToStop(States.ask)
-    -- transition from state<recover>
-    self:addTransition {
-      oldState = States.recover,
-      newState = States.ask,
-      event = Events.ENOUGH_NEILI,
-      action = function()
-        wait.time(1)
-        return self:doAsk()
-      end
-    }
-    self:addTransitionToStop(States.recover)
     -- transition from state<wait_robber>
     self:addTransition {
       oldState = States.wait_robber,
@@ -653,41 +627,11 @@ local define_songxin = function()
     travel:walkto(66)
     travel:waitUntilArrived()
     
-    -- 检查食物饮水
-    status:hpbrief()
-    -- 简单起见，仅检查当前内力，不考虑受伤，精力等问题
-    if status.currNeili < status.maxNeili * self.neiliThreshold then
-      print("恢复内力至超过上限")
-      return self:fire(Events.NOT_ENOUGH_NEILI)
-    end
-    
     -- 询问任务
     SendNoEcho("set songxin ask_start")
     SendNoEcho("ask yue about job")
     SendNoEcho("set songxin ask_newline")
     SendNoEcho("set songxin ask_done")  -- will trigger next step
-  end
-  
-  function prototype:doRecover(threshold)
-    SendNoEcho("yun recover")
-    status:hpbrief()
-    if status.currNeili < status.maxNeili * threshold then
-      SendNoEcho("dazuo 150")
-      local startDazuo = wait.regexp(REGEXP.DAZUO_BEGIN, 5)
-      if not startDazuo then
-        print("身体状态太差无法打坐，等待5秒后重试")
-        wait.time(5)
-        return self:doRecover(threshold)
-      end
-      local endDazuo = wait.regexp(REGEXP.DAZUO_FINISH, 20)
-      if not endDazuo then
-        print("未知原因导致无法打坐，直接退出")
-        return self:fire(Events.STOP)
-      end
-      -- 继续打坐
-      return self:doRecover(threshold)
-    end
-    print("内力满足要求")
   end
 
   function prototype:doConfirmTarget()
@@ -717,7 +661,6 @@ local define_songxin = function()
 
   function prototype:doWaitRobber()
     -- 假死地点
-    self:doRecover(self.neiliWaitThreshold)
     travel:walkto(208)
     travel:waitUntilArrived()
     -- SendNoEcho("jiali max")
