@@ -234,7 +234,7 @@ local define_looksnow = function()
 
   function prototype:doLook()
     self.lookCnt = self.lookCnt + 1
-    if self.lookCnt % 10 == 0 then
+    if self.lookCnt % 5 == 0 then
       -- 尝试运气
       SendNoEcho("yun qi")
       -- 检查食物饮水
@@ -244,6 +244,13 @@ local define_looksnow = function()
       end
       if status.drink < 200 then
         SendNoEcho("do 5 drink jiudai")
+      end
+      if status.currJing > status.maxJing * 0.5 then
+        SendNoEcho("read tianlong 50")
+      end
+      if status.currQi > status.maxQi * 0.5 then
+        SendNoEcho("yun qi")
+        SendNoEcho("lian dodge 50")
       end
     end
     SendNoEcho("look snow")

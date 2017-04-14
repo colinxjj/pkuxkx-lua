@@ -20,6 +20,7 @@ local define_mingxiang = function()
     FAIL = "^[ >]*你现在无法冥想佛家的真理!$",
     TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
     GIFT = "^[ >]*你觉得冥冥中自己的(.*)有所提高!$",
+
   }
 
   function prototype:new()
@@ -47,12 +48,12 @@ local define_mingxiang = function()
       if status.drink < 150 then
         SendNoEcho("do 3 drink jiudai")
       end
-      if status.currNeili > 1000 then
-        SendNoEcho("lian parry 2")
+      if status.currQi > status.maxQi * 0.7 and status.currNeili > 500 then
+        SendNoEcho("lian sword 2")
       end
       if status.currJing > status.maxJing * 0.8 then
         SendNoEcho("north")
-        SendNoEcho("read tianlong 10")
+        SendNoEcho("read shediao 10")
         SendNoEcho("enter hole")
       end
       if status.currJingli < 1000 then

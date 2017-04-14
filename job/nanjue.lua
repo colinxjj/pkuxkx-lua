@@ -62,6 +62,7 @@ local define_nanjue = function()
     JOB_INFO = "^\\s*([0-9_]+?)\\s+(.*?)「(.*?)」\\s+(.*?)\\s+(\\d+:\\d+:\\d+)\\s+(\\d+:\\d+:\\d+)\\s+(.*?)\\s+(.*?)\\s+(\\d+)$",
     RECORD_SUCCESS = "^[ >]*最近长安城内出现不少盗窃事件，有人报告.*$",
     RECORD_FAIL = "^[ >]*怎么又是你！我看你是机器人吧。$",
+    PREV_JOB_NOT_FINISH = "^[ >]*你先把手头上的工作完成以后才能接着领下一个任务。$",
     GENDER_AGE = "^[ >]*(他|她)看起来约(.*)多岁。$",
     CLOTH = "^\\s*□身穿一件(.*?)\\(.*$",
     SHOE = "^\\s*□脚穿一双(.*?)\\(.*$",
@@ -295,10 +296,12 @@ local define_nanjue = function()
       state = States.record,
       enter = function()
         self.recordSuccess = nil
+        self.prevNotFinish = nil
         helper.enableTriggerGroups("nanjue_info_start", "nanjue_record_start")
       end,
       exit = function()
         self.recordSuccess = nil
+        self.prevNotFinish = nil
         helper.disableTriggerGroups(
           "nanjue_info_start", "nanjue_info_done",
           "nanjue_record_start", "nanjue_record_done")
@@ -488,7 +491,12 @@ local define_nanjue = function()
       regexp = helper.settingRegexp("nanjue", "record_done"),
       response = function()
         helper.disableTriggerGroups("nanjue_record_done")
-        if self.recordSuccess then
+        if self.prevNotFinish then
+          SendNoEcho("record cancel")
+          self:debug("等待两秒重新接任务")
+          wait.time(2)
+          return self:doRecord()
+        elseif self.recordSuccess then
           return self:fire(Events.JOB_RECORDED)
         else
           return self:fire(Events.NO_JOB_AVAILABLE)
@@ -500,6 +508,13 @@ local define_nanjue = function()
       regexp = REGEXP.RECORD_FAIL,
       response = function()
         self.recordSuccess = false
+      end
+    }
+    helper.addTrigger {
+      group = "nanjue_record_done",
+      regexp = REGEXP.PREV_JOB_NOT_FINISH,
+      response = function()
+        self.prevNotFinish = true
       end
     }
     helper.addTrigger {
@@ -724,6 +739,7 @@ local define_nanjue = function()
 
   function prototype:doRecord()
     self.recordSuccess = true
+    self.prevNotFinish = false
     SendNoEcho("set nanjue record_start")
     SendNoEcho("record " .. self.selectedJob.code)
     SendNoEcho("set nanjue record_done")
