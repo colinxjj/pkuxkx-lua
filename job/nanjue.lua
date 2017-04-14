@@ -129,7 +129,7 @@ local define_nanjue = function()
     ["purple"] = "dark",
     ["green"] = "light",
     ["yellow"] = "light",
-    ["cyan"] = "light",
+    ["teal"] = "light",
     ["white"] = "light",
   }
   local FigureType = {
@@ -515,6 +515,7 @@ local define_nanjue = function()
       regexp = helper.settingRegexp("nanjue", "look_start"),
       response = function()
         helper.enableTriggerGroups("nanjue_look_done")
+        self.lookCloth = true
       end
     }
     helper.addTrigger {
@@ -563,26 +564,29 @@ local define_nanjue = function()
       group = "nanjue_look_done",
       regexp = REGEXP.CLOTH,
       response = function(name, line, wildcards, styles)
-        self:debug("CLOTH triggered")
-        local cloth = wildcards[1]
-        local clothType = ClothType[cloth]
-        if clothType then
-          self.currStranger.clothType = clothType
-        else
-          print("无法查找到衣服类型，设置为布衣：", cloth)
-          self.currStranger.clothType = "fabric"
+        self:debug("CLOTH triggered", self.lookCloth)
+        if self.lookCloth then  -- 只观察第一件衣服
+          self.lookCloth = false
+          local cloth = wildcards[1]
+          local clothType = ClothType[cloth]
+          if clothType then
+            self.currStranger.clothType = clothType
+          else
+            print("无法查找到衣服类型，设置为布衣：", cloth)
+            self.currStranger.clothType = "fabric"
+          end
+          local col = string.find(line, cloth)
+          local style = GetStyle(styles, col)
+          local color = RGBColourToName(style.textcolour)
+          local colorType = ColorType[color]
+          if colorType then
+            self.currStranger.clothColor = colorType
+          else
+            print("无法查找到衣服颜色深浅，设置为中性")
+            self.currStranger.clothColor = "normal"
+          end
+          self:debug("衣服类型：", clothType, "衣服颜色：", color)
         end
-        local col = string.find(line, cloth)
-        local style = GetStyle(styles, col)
-        local color = RGBColourToName(style.textcolour)
-        local colorType = ColorType[color]
-        if colorType then
-          self.currStranger.clothColor = colorType
-        else
-          print("无法查找到衣服颜色深浅，设置为中性")
-          self.currStranger.clothColor = "normal"
-        end
-        self:debug("衣服类型：", clothType, "衣服颜色：", color)
       end
     }
     helper.addTrigger {
@@ -623,7 +627,7 @@ local define_nanjue = function()
       group = "nanjue_ask_done",
       regexp = helper.settingRegexp("nanjue", "ask_done"),
       response = function()
-        helper.disableTriggerGroups("annjue_ask_done")
+        helper.disableTriggerGroups("nanjue_ask_done")
       end
     }
     helper.addTrigger {
@@ -631,6 +635,13 @@ local define_nanjue = function()
       regexp = self:identifyFeatureRegexp(),
       response = function(name, line, wildcards)
         local feature = wildcards[1]
+        local identified = IdentifyFeature[feature]
+        if identified then
+          self.currStranger.identifyFeature = {}
+          self.currStranger.identifyFeature[identified.k] = identified.v
+        else
+          ColourNote("yellow", "", "无法鉴定特征！")
+        end
       end
     }
     -- trigger for testify
@@ -725,21 +736,22 @@ local define_nanjue = function()
     SendNoEcho("set nanjue info_done")
   end
 
-  function prototype:doLookStranger(id)
+  function prototype:doLookStranger()
     SendNoEcho("set nanjue look_start")
-    SendNoEcho("look " .. id)
+    SendNoEcho("look " .. self.currStranger.id)
     SendNoEcho("set nanjue look_done")
   end
 
-  function prototype:doAskStranger(id)
+  function prototype:doAskStranger()
     SendNoEcho("set nanjue ask_start")
-    SendNoEcho("ask " .. id .. " about 消息")
+    SendNoEcho("ask " .. self.currStranger.id .. " about 消息")
     SendNoEcho("set nanjue ask_done")
   end
 
 
 
   function prototype:doCollect()
+    self.checkedRoomIds = {}
     travel:walkto(self.targetRoomId)
     travel:waitUntilArrived()
     helper.assureNotBusy()
@@ -753,32 +765,37 @@ local define_nanjue = function()
   end
 
   function prototype:doCollectWhenTraverse()
-    status:idhere()
-    local seq = 0
-    for _, item in ipairs(status.items) do
-      -- todo
-      if string.find(item.itemIds, "luren") then
-        seq = seq + 1
-        local name = item.name
-        local id = item.id
-        self:debug("发现路人", seq, name, id)
-        self.currStranger = NanjueStranger:decorate {
-          id = id,
-          name = name,
-          seq = seq,
-          roomId = travel.traverseRoomId
-        }
-        prototype:doLookStranger(id)
-        helper.assureNotBusy()
-        wait.time(1)
-        prototype:doAskStranger(id)
-        helper.assureNotBusy()
-        wait.time(1)
-        if self.DEBUG then
-          self.currStranger:show()
+    -- 先获取该房间是否已经被检查
+    local currRoomId = travel.traverseRoomId
+    if not self.checkedRoomIds[currRoomId] then
+      self.checkedRoomIds[currRoomId] = true
+      status:idhere()
+      local seq = 0
+      for _, item in ipairs(status.items) do
+        -- todo
+        if string.find(item.ids, "luren") then
+          seq = seq + 1
+          local name = item.name
+          local id = item.id
+          self:debug("发现路人", seq, name, id)
+          self.currStranger = NanjueStranger:decorate {
+            id = id,
+            name = name,
+            seq = seq,
+            roomId = travel.traverseRoomId
+          }
+          self:doLookStranger()
+          helper.assureNotBusy()
+          wait.time(1)
+          self:doAskStranger()
+          helper.assureNotBusy()
+          wait.time(1)
+          if self.DEBUG then
+            self.currStranger:show()
+          end
+          self.currStranger:confirmed()
+          table.insert(self.strangers, self.currStranger)
         end
-        self.currStranger:confirmed()
-        table.insert(self.strangers, self.currStranger)
       end
     end
     return false
@@ -947,7 +964,8 @@ local define_nanjue = function()
       end
       self:debug("嫌疑人有：", table.concat(names, ", "))
     end
-    self.currSuspect = next(self.suspects)
+    local id, suspect = next(self.suspects)
+    self.currSuspect = suspect
     travel:walkto(self.currSuspect.roomId)
     travel:waitUntilArrived()
     wait.time(2)

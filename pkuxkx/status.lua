@@ -388,6 +388,7 @@ local define_status = function()
       group = "status_id_start",
       regexp = helper.settingRegexp("status", "id_start"),
       response = function()
+        self:debug("ID_START triggered")
         helper.enableTriggerGroups("status_id_done")
       end
     }
@@ -395,6 +396,7 @@ local define_status = function()
       group = "status_id_done",
       regexp = helper.settingRegexp("status", "id_done"),
       response = function()
+        self:debug("ID_DONE triggered")
         helper.disableTriggerGroups("status_id_done")
         local thread = self.waitThread
         if thread then
@@ -412,6 +414,7 @@ local define_status = function()
       group = "status_id_done",
       regexp = REGEXP.ITEM_ID,
       response = function(name, line, wildcards)
+        self:debug("ITEM_ID triggered")
         local name = wildcards[1]
         local ids = string.lower(wildcards[2])
         local id = utils.split(ids, ",")[1]
@@ -429,6 +432,7 @@ local define_status = function()
       group = "status_id_done",
       regexp = REGEXP.SYSTEM_BUSY,
       response = function()
+        self:debug("SYSTEM_BUSY triggered")
         self.systemBusy = true
       end
     }
@@ -655,12 +659,12 @@ local define_status = function()
   end
 
   function prototype:doId(isHere)
-    if self.waitThread then
-      error("Previous thread is not disposed")
-    end
-    self.waitThread = assert(coroutine.running(), "Must be in coroutine")
-
     while true do
+      if self.waitThread then
+        error("Previous thread is not disposed")
+      end
+      self.waitThread = assert(coroutine.running(), "Must be in coroutine")
+
       SendNoEcho("set status id_start")
       if isHere then
         SendNoEcho("id here")
@@ -673,8 +677,8 @@ local define_status = function()
       if self.systemBusy then
         -- reset
         self.systemBusy = false
-        self:debug("等待2秒重试")
-        wait.time(2)
+        self:debug("等待3秒重试")
+        wait.time(3)
       else
         break
       end

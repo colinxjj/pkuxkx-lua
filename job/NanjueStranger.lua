@@ -35,7 +35,7 @@ local define_NanjueStranger = function()
     assert(self.name, "name cannot be nil")
     assert(self.id, "id cannot be nil")
     assert(self.seq, "seq cannot be nil")
-    -- self.identifyFeatures
+    -- self.identifyFeature
   end
 
   function prototype:show()
@@ -49,6 +49,11 @@ local define_NanjueStranger = function()
     print("衣服颜色：", self.clothColor)
     print("鞋子材质：", self.shoeType)
     print("鞋子颜色：", self.shoeColor)
+    if self.identifyFeature then
+      print("证词内容：", next(self.identifyFeature))
+    else
+      print("证词内容：", "无")
+    end
   end
 
   return prototype
