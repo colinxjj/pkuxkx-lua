@@ -30,6 +30,7 @@ local define_fsm = function()
     TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
     DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
     NOT_ENOUGH_JING = "^[ >]*你现在精不足，无法修行精力.*$",
+    NOT_ENOUGH_JING_DAZUO = "^[ >]*你现在精不够，无法控制内息的流动！$",
     JINGLI_MAX = "^[ >]*你现在精力接近圆满状态。$",
     NOT_ENOUGH_QI = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉.*",
     NEILI_MAX = "^[ >]*你现在内力接近圆满状态。$",
@@ -54,7 +55,7 @@ local define_fsm = function()
     self.lianCmd = nil
     self.tunaCmd = nil
     self.dazuoCmd = nil
-    self.requireNeili = true
+    self.requireNeili = false
     self.notEnoughJing = false
     self.notEnoughQi = false
     self.jingliMax = false
@@ -166,6 +167,14 @@ local define_fsm = function()
       regexp = REGEXP.NOT_ENOUGH_QI,
       response = function(name, line, wildcards)
         self.notEnoughQi = true
+        wait.time(5)
+        return self:doWait()
+      end
+    }
+    helper.addTrigger {
+      group = "kkndlearn_wait",
+      regexp = REGEXP.NOT_ENOUGH_JING_DAZUO,
+      response = function(name, line, wildcards)
         wait.time(5)
         return self:doWait()
       end
@@ -285,21 +294,34 @@ local define_fsm = function()
         SendNoEcho(self.dazuoCmd)
         return
       else  -- learn mode
-        wait.time(1)
-        if status.currNeili < 100 then
+        if status.currNeili < 100 and status.maxNeili > 2000 then
           self.requireNeili = true
-        elseif status.currNeili >= status.maxNeili then
+        elseif status.currNeili >= 1000 then
           self.requireNeili = false
         end
-        if self.requireNeili then
-          SendNoEcho("dazuo 150")
-          wait.regexp(REGEXP.DAZUO_FINISH, 6)
+        wait.time(1)
+        if status.currJing == status.maxJing then
+          SendNoEcho(self.learnCmd)
+        elseif self.requireNeili then
+          SendNoEcho("dazuo 300")
+          return
+--          wait.regexp(REGEXP.DAZUO_FINISH, 6)
         else
           if status.currJing > 50 and self.learnCmd then
             SendNoEcho(self.learnCmd)
           end
-          if status.currQi > 50 and self.lianCmd then
-            SendNoEcho(self.lianCmd)
+--          if status.currQi > 50 and self.lianCmd then
+--            SendNoEcho(self.lianCmd)
+--          end
+          if status.currQi > 200 then
+            SendNoEcho("wield jian")
+            SendNoEcho("jifa parry dugu-jiujian")
+            SendNoEcho("lian parry 5")
+            SendNoEcho("jifa parry huashan-jianfa")
+            SendNoEcho("lian parry 5")
+            SendNoEcho("unwield jian")
+            SendNoEcho("jifa parry poyu-quan")
+            SendNoEcho("lian parry 5")
           end
         end
       end

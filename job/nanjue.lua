@@ -53,6 +53,8 @@ local define_nanjue = function()
     CRIMINAL_ANALYZED = "criminal_analyzed",
     CRIMINAL_TO_CATCH = "criminal_to_catch",
     CRIMINAL_TO_TESTIFY = "criminal_to_testify",
+    TESTIFY_SUCCESS = "testify_success",
+    TESTIFY_FAIL = "testify_fail",
   }
   local REGEXP = {
     ALIAS_START = "^nanjue\\s+start\\s*$",
@@ -98,7 +100,7 @@ local define_nanjue = function()
     ["百褶裙"] = "fabric",
     ["蓝马褂"] = "fabric",
     ["短打劲装"] = "fabric",
-    ["天蓝锦袍"] = "silk",
+    ["天蓝锦袍"] = "fabric",
     ["鹤氅"] = "cotton",
     ["长袄"] = "cotton",
     ["棉袄"] = "cotton",
@@ -124,10 +126,14 @@ local define_nanjue = function()
     ["破鞋"] = "sandal",
   }
   local ColorType = {
+    ["silver"] = "light",
+    ["lime"] = "light", -- 待定，青绿色
     ["black"] = "dark",
     ["red"] = "dark",
     ["blue"] = "dark",
     ["purple"] = "dark",
+    ["magenta"] = "dark",  -- 待定，粉色
+    ["maroon"] = "dark",
     ["green"] = "light",
     ["yellow"] = "light",
     ["teal"] = "light",
@@ -192,9 +198,21 @@ local define_nanjue = function()
       k = "clothType",
       v = "cotton"
     },
+    ["丝绸衣服"] = {
+      k = "clothType",
+      v = "silk"
+    },
     ["一双布鞋"] = {
       k = "shoeType",
       v = "fabric"
+    },
+    ["一双凉鞋"] = {
+      k = "shoeType",
+      v = "sandal"
+    },
+    ["一双靴子"] = {
+      k = "shoeType",
+      v = "boot"
     },
     ["流浪汉"] = {
       k = "gender",
@@ -216,11 +234,27 @@ local define_nanjue = function()
       k = "height",
       v = "tall"
     },
+    ["不太高"] = {
+      k = "height",
+      v = "short"
+    },
     ["白发苍苍"] = {
       k = "age",
       v = "old"
     },
+    ["头发花白"] = {
+      k = "age",
+      v = "old"
+    },
+    ["半只脚埋入棺材"] = {
+      k = "age",
+      v = "old"
+    },
     ["年轻"] = {
+      k = "age",
+      v = "young"
+    },
+    ["青年人"] = {
       k = "age",
       v = "young"
     },
@@ -243,7 +277,23 @@ local define_nanjue = function()
     ["微微发福"] = {
       k = "weight",
       v = "fat"
-    }
+    },
+    ["猴子"] = {
+      k = "weight",
+      v = "thin"
+    },
+    ["有点偏廋"] = {
+      k = "weight",
+      v = "thin"
+    },
+    ["有点偏瘦"] = {
+      k = "weight",
+      v = "thin"
+    },
+    ["竹竿"] = {
+      k = "weight",
+      v = "thin"
+    },
   }
 
   local TraverseDepth = 1
@@ -379,6 +429,27 @@ local define_nanjue = function()
         return self:doTestify()
       end
     }
+    self:addTransitionToStop(States.collect)
+    -- transition from state<testify>
+    self:addTransition {
+      oldState = States.testify,
+      newState = States.submit,
+      event = Events.TESTIFY_SUCCESS,
+      action = function()
+        return self:doSubmit()
+      end
+    }
+    self:addTransition {
+      oldState = States.testify,
+      newState = States.submit,
+      event = Events.TESTIFY_FAIL,
+      action = function()
+        return self:doCancel()
+      end
+    }
+    self:addTransitionToStop(States.testify)
+    -- transition from submit<submit>
+    self:addTransitionToStop(States.submit)
   end
 
   function prototype:initTriggers()
@@ -461,7 +532,7 @@ local define_nanjue = function()
         -- 只做新的任务
         local restTime = endTime - currTs
         self:debug("任务剩余时间：", restTime, "接任务玩家数：", jobPlayers, "任务状态", jobStatus)
-        if restTime >= 5 * 60 and jobPlayers == 0 and jobStatus == "新建" then
+        if restTime >= 180 and jobPlayers == 0 and jobStatus == "新建" then
           self:debug("添加进入可选列表")
           table.insert(self.jobs, NanjueJob:decorate {
             code = jobCode,
@@ -649,6 +720,7 @@ local define_nanjue = function()
       group = "nanjue_ask_done",
       regexp = self:identifyFeatureRegexp(),
       response = function(name, line, wildcards)
+        self:debug("IDENTIFY_FEATURE triggered")
         local feature = wildcards[1]
         local identified = IdentifyFeature[feature]
         if identified then
@@ -850,7 +922,7 @@ local define_nanjue = function()
     for _, witness in ipairs(self.witnesses) do
       local toldTruth = false
       for k, v in pairs(witness.identifyFeature) do
-        if witness[k] ~= v then
+        if witness[k] == v then
           self:debug("路人" .. witness.name .. "必定不是罪犯，因为证词与自身符合", k, v)
           toldTruth = true
           break
@@ -878,6 +950,7 @@ local define_nanjue = function()
         for k, v in pairs(self.trueFeatures) do
           if suspect[k] ~= v then
             diff = true
+            break
           end
         end
         if diff then
@@ -899,56 +972,78 @@ local define_nanjue = function()
       end
     end
 
-    self:debug("对剩余人群进行有罪判定并检查是否存在矛盾")
-    while true do
-      local suspectCnt = #(self.suspects)
-      for i = 1, suspectCnt do
-        local diff = false
-        local suspect = self.suspects[i]
-        local features = self:featuresExcluded(self.witnesses, suspect)
-        for k, v in pairs(features) do
-          if suspect[k] ~= v then
-            diff = true
-          end
-        end
-        if diff then
-          self:debug("假定路人" .. suspect.name .. "有罪，推断出矛盾，该人不是罪犯")
-          table.insert(self.nonCriminals, suspect)
-          table.remove(self.suspects, i)
-          if suspect.identifyFeature then
-            self:debug("路人" .. suspect.name .. "有证词，证词添加到必定为真的证词列表")
-            for k, v in pairs(suspect.identifyFeature) do
-              self.trueFeatures[k] = v
+    if #(self.suspects) > 1 then
+      self:debug("仍有多名嫌疑人，目前确认为真的罪犯特征：")
+      for k, v in pairs(self.trueFeatures) do
+        self:debug(k, v)
+      end
+
+      while true do
+        local suspectCnt = #(self.suspects)
+        for i = 1, suspectCnt do
+          local diff = false
+          local suspect = self.suspects[i]
+          local features = self:featuresExcluded(self.witnesses, suspect)
+          for k, v in pairs(features) do
+            if suspect[k] ~= v then
+              diff = true
             end
           end
+          if diff then
+            self:debug("假定路人" .. suspect.name .. "有罪，推断出矛盾，该人不是罪犯")
+            table.insert(self.nonCriminals, suspect)
+            table.remove(self.suspects, i)
+            if suspect.identifyFeature then
+              self:debug("路人" .. suspect.name .. "有证词，证词添加到必定为真的证词列表")
+              for k, v in pairs(suspect.identifyFeature) do
+                self.trueFeatures[k] = v
+              end
+            end
+            break
+          end
+        end
+        -- 如果嫌疑人没有减少，则退出循环
+        if #(self.suspects) == suspectCnt then
           break
         end
       end
-      -- 如果嫌疑人没有减少，则退出循环
-      if #(self.suspects) == suspectCnt then
-        break
-      end
     end
 
+    -- 最终步骤
     if #(self.suspects) == 0 then
-      self:debug("所有路人都被排除嫌疑，判定过程有错误！")
-      print("所有路人都被排除嫌疑，判定过程有错误！随机了……")
+      self:debug("所有路人都被排除嫌疑，判定过程有错误！补救方法为选择满足特征最多的路人")
+      local fallbackStranger
+      local maxFits = 0
+      for _, stranger in ipairs(self.strangers) do
+        local fits = 0
+        for k, v in pairs(self.trueFeatures) do
+          if stranger[k] == v then
+            fits = fits + 1
+          end
+        end
+        if fits > maxFits then
+          maxFits = fits
+          fallbackStranger = stranger
+        end
+      end
+      self:debug("符合特征最多的路人被标记为嫌疑人", fallbackStranger.name)
+      self.suspects = {fallbackStranger}
       return self:fire(Events.CRIMINAL_ANALYZED)
     elseif #(self.suspects) == 1 then
       self:debug("仅剩1人有嫌疑，确定为罪犯")
       return self:fire(Events.CRIMINAL_ANALYZED)
     else
-      self:debug("仍有多名嫌疑人，挑选有证词的作为最可以的嫌疑人")
-      local suspect
-      for _, s in ipairs(self.suspects) do
-        if s.identifyFeature then
-          suspect = s
-          break
-        end
-      end
-      if suspect then
-        self.suspects = {suspect}
-      end
+      self:debug("仍有多名嫌疑人，选择第一个作为嫌疑人")
+--      local suspect
+--      for _, s in ipairs(self.suspects) do
+--        if s.identifyFeature then
+--          suspect = s
+--          break
+--        end
+--      end
+--      if suspect then
+--        self.suspects = {suspect}
+--      end
       return self:fire(Events.CRIMINAL_ANALYZED)
     end
   end
@@ -968,7 +1063,7 @@ local define_nanjue = function()
   function prototype:doTestify()
     if #(self.suspects) == 0 then
       print("没有发现任何嫌疑人，在证人中随机挑选一个")
-      local randomCriminal = self.witness[math.random(#(self.witnesses))]
+      local randomCriminal = self.witnesses[math.random(#(self.witnesses))]
       table.insert(self.suspects, randomCriminal)
     end
     self.currSuspect = nil

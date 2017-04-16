@@ -10,6 +10,9 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 
+-- add nanjue job
+require "job.nanjue"
+
 local define_fsm = function()
   local prototype = FSM.inheritedMeta()
 
@@ -37,9 +40,9 @@ local define_fsm = function()
     SOURCE_LINE = "^(.*?)♀.*$",
     EMPTY_LINE = "^[^ ]+$",
     NOT_FOUND = "^[ >]*这里不是你要寻找帮派资材的地方。$",
-    -- todo ready
     MOVE_FINISH = "^[ >]*你现在搜索的位置似乎有些帮派资材，可以用bhgather命令采集。$",
     MOVE_BUSY = "^[ >]*看你手忙脚乱的！不用这么着急的。$",
+    NEILI_DOUBLE = "^[ >]*你现在内力接近圆满状态。$",
   }
 
   function prototype:FSM()
@@ -124,8 +127,10 @@ local define_fsm = function()
       newState = States.move,
       event = Events.FIND_SUCCESS,
       action = function()
+        self:debug("等待2秒后bhmove")
+        wait.time(2)
         self:clearMoveInfo()
-        return self:fire(Events.MOVE_CONTINUE)
+        return self:doBeginMove()
       end
     }
     self:addTransitionToStop(States.find)
@@ -351,6 +356,7 @@ local define_fsm = function()
   end
 
   function prototype:doBeginMove()
+    SendNoEcho("dazuo max")
     SendNoEcho("set banghui move_start")
     SendNoEcho("bhfind")
     SendNoEcho("set banghui move_done")
