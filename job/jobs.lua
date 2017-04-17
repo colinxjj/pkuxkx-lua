@@ -14,6 +14,7 @@ local status = require "pkuxkx.status"
 local Job = require "job.Job"
 local JobDefinition = require "job.JobDefinition"
 local songxin = require "job.songxin"
+local nanjue = require "job.nanjue"
 
 local patterns = {[[
 l xiansuo
@@ -95,6 +96,7 @@ local define_fsm = function()
     self:initTransitions()
     self:initTriggers()
     self:initAliases()
+    self:defineAllJobs()
     self:initJobs()
     self:setState(States.stop)
     self.weaponId = "sword"
@@ -108,9 +110,18 @@ local define_fsm = function()
 
   function prototype:initJobs()
     self.jobs = {}
-    self.jobs.songxin = Job:decorate {
+    self.jobs.songxin = self.definedJobs.songxin
+  end
+
+  function prototype:defineAllJobs()
+    self.definedJobs = {}
+    self.definedJobs.songxin = Job:decorate {
       def = JobDefinition.songxin,
       impl = songxin
+    }
+    self.definedJobs.nanjue = Job:decorate {
+      def = JobDefinition.nanjue,
+      impl = nanjue
     }
   end
 

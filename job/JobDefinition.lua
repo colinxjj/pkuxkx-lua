@@ -144,6 +144,11 @@ local define_JobDefinition = function()
     name = "鄱阳湖寻宝",
     code = "poyanghu"
   }
+  prototype.nanjue = prototype:decorate {
+    id = -1,  -- 不在jobquery中
+    name = "长安男爵任务",
+    code = "nanjue"
+  }
 
   return prototype
 end

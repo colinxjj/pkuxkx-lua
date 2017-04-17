@@ -55,6 +55,7 @@ local define_nanjue = function()
     CRIMINAL_TO_TESTIFY = "criminal_to_testify",
     TESTIFY_SUCCESS = "testify_success",
     TESTIFY_FAIL = "testify_fail",
+    CONTINUE = "continue",  -- the convenient way to continuously do 5 jobs
   }
   local REGEXP = {
     ALIAS_START = "^nanjue\\s+start\\s*$",
@@ -449,6 +450,18 @@ local define_nanjue = function()
     }
     self:addTransitionToStop(States.testify)
     -- transition from submit<submit>
+    self:addTransition {
+      oldState = States.submit,
+      newState = States.record,
+      event = Events.CONTINUE,
+      action = function()
+        -- we must reset all variables before do next job
+        self:resetOnStop()
+        return travel:walkto(2289, function()
+          return self:doAskInfo()
+        end)
+      end
+    }
     self:addTransitionToStop(States.submit)
   end
 
@@ -532,7 +545,7 @@ local define_nanjue = function()
         -- 只做新的任务
         local restTime = endTime - currTs
         self:debug("任务剩余时间：", restTime, "接任务玩家数：", jobPlayers, "任务状态", jobStatus)
-        if restTime >= 180 and jobPlayers == 0 and jobStatus == "新建" then
+        if restTime >= 60 and jobPlayers == 0 and jobStatus == "新建" then
           self:debug("添加进入可选列表")
           table.insert(self.jobs, NanjueJob:decorate {
             code = jobCode,
@@ -1095,8 +1108,9 @@ local define_nanjue = function()
     travel:walkto(2289)
     travel:waitUntilArrived()
     SendNoEcho("record cancel")
+    wait.time(2)
     helper.assureNotBusy()
-    return self:fire(Events.STOP)
+    return self:fire(Events.CONTINUE)
   end
 
   function prototype:doSubmit()
@@ -1104,8 +1118,9 @@ local define_nanjue = function()
     travel:walkto(2289)
     travel:waitUntilArrived()
     SendNoEcho("ask shaoyin about 领赏")
+    wait.time(2)
     helper.assureNotBusy()
-    return self:fire(Events.STOP)
+    return self:fire(Events.CONTINUE)
   end
 
   return prototype
