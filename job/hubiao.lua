@@ -234,6 +234,7 @@ local define_fsm = function()
     RECOVER = "recover",  -- prepare -> prepare
   }
   local REGEXP = {
+    JOB_INFO = "^(\\d+)\\s+(.*?)\\s+(\\d+)秒\\s+(.*?)\\s+(.*)$",
 
   }
 
@@ -312,7 +313,37 @@ local define_fsm = function()
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("hubiao_info_start", "hubiao_info_done")
+    -- info
+    helper.addTrigger {
+      group = "hubiao_info_start",
+      regexp = helper.settingRegexp("hubiao", "info_start"),
+      response = function()
+        helper.enableTriggerGroups("hubiao_info_done")
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_info_done",
+      regexp = helper.settingRegexp("hubiao", "info_done"),
+      response = function()
+        helper.disableTriggerGroups("hubiao_info_done")
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_info_done",
+      regexp = REGEXP.JOB_INFO,
+      response = function(name, line, wildcards)
+        self:debug("JOB_INFO triggered")
+        local jobId = wildcards[1]
+        local jobLocation = wildcards[2]
+        local jobRemainedTime = wildcards[3]
+        local jobStatus = wildcards[4]
+        local jobPlayer = wildcards[5]
+        if jobStatus == "待认领" then
+          table.insert(self.jobs, {id = jobId, location = jobLocation})
+        end
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -330,8 +361,27 @@ local define_fsm = function()
     }
   end
 
+  function prototype:doGetJob()
+    self.jobs = {}
+    SendNoEcho("set hubiao info_start")
+    SendNoEcho("listesc")
+    SendNoEcho("set hubiao info_done")
+    -- 等待两秒接任务
+    wait.time(2)
+    helper.assureNotBusy()
+    if #(self.jobs) > 0 then
+      return self:doAcceptJob()
+    else
+      return self:fire(Events.NO_JOB_AVAILABLE)
+    end
+  end
 
-
+  function prototype:doAcceptJob()
+    SendNoEcho("set hubiao accept_start")
+    SendNoEcho("getesc " .. self.currJob.id)
+    SendNoEcho("set hubiao accept_done")
+    helper.assureNotBusy()
+  end
 
   return prototype
 end

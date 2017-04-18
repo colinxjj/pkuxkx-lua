@@ -302,27 +302,27 @@ local define_fsm = function()
         wait.time(1)
         if status.currJing == status.maxJing then
           SendNoEcho(self.learnCmd)
+          status:hpbrief()
         elseif self.requireNeili then
           SendNoEcho("dazuo 300")
           return
 --          wait.regexp(REGEXP.DAZUO_FINISH, 6)
-        else
-          if status.currJing > 50 and self.learnCmd then
-            SendNoEcho(self.learnCmd)
-          end
---          if status.currQi > 50 and self.lianCmd then
---            SendNoEcho(self.lianCmd)
---          end
-          if status.currQi > 200 then
-            SendNoEcho("wield jian")
-            SendNoEcho("jifa parry dugu-jiujian")
-            SendNoEcho("lian parry 5")
-            SendNoEcho("jifa parry huashan-jianfa")
-            SendNoEcho("lian parry 5")
-            SendNoEcho("unwield jian")
-            SendNoEcho("jifa parry poyu-quan")
-            SendNoEcho("lian parry 5")
-          end
+        end
+        if status.currJing > 200 and self.learnCmd then
+          SendNoEcho(self.learnCmd)
+        end
+        --          if status.currQi > 50 and self.lianCmd then
+        --            SendNoEcho(self.lianCmd)
+        --          end
+        if status.currQi > 200 then
+          SendNoEcho("wield jian")
+          SendNoEcho("jifa sword dugu-jiujian")
+          SendNoEcho("lian sword 5")
+          SendNoEcho("jifa sword huashan-jianfa")
+          SendNoEcho("lian sword 5")
+          SendNoEcho("unwield jian")
+          SendNoEcho("jifa parry poyu-quan")
+          SendNoEcho("lian parry 5")
         end
       end
     end
