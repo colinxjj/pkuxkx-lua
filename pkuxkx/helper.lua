@@ -102,6 +102,29 @@ local define_helper = function()
     end
   end
 
+  -- convenient way to add trigger pair to enable/disable via set variable
+  helper.addTriggerSettingsPair = function(args)
+    local group = assert(args.group, "group of trigger pair cannot be nil")
+    local start = assert(args.start, "start of trigger pair cannot be nil")
+    local done = assert(args.done, "done of trigger pair cannot be nil")
+    local startName = group .. "_" .. start
+    local doneName = group .. "_" .. done
+    helper.addTrigger {
+      group = startName,
+      regexp = helper.settingRegexp(group, start),
+      response = function()
+        helper.enableTriggerGroups(doneName)
+      end
+    }
+    helper.addTrigger {
+      group = doneName,
+      regexp = helper.settingRegexp(group, done),
+      response = function()
+        helper.disableTriggerGroups(doneName)
+      end
+    }
+  end
+
   helper.addOneShotTrigger = function(args)
     local regexp = assert(type(args.regexp) == "string" and args.regexp, "regexp in trigger must be string")
     local group = assert(args.group, "group in trigger cannot be empty")

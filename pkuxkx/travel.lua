@@ -62,6 +62,7 @@
 -- 可包含协程方法(如wait.lua提供的time, regexp方法)
 -- travel:waitUntilArrived() 如果walkto方法中传递callback方法不满足需要，
 -- 提供该函数（作用类似wait.regexp），该方法yield直到到达目的地。
+-- travel:generateWalkPlan(fromRoomId, toRoomId) 获取指定两地点间的路径栈
 --
 -- 特殊，提供可编程的接口（无直接别名）
 -- travel:traverse(rooms, check, action)
@@ -163,7 +164,7 @@ local define_travel = function()
     NOT_BUSY = "^[ >]*你现在不忙。$",
     WALK_LOST = "^[> ]*(哎哟，你一头撞在墙上，才发现这个方向没有出路。|这个方向没有出路。|你一不小心脚下踏了个空，... 啊...！|你反应迅速，急忙双手抱头，身体蜷曲。眼前昏天黑地，顺着山路直滚了下去。)$",
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
-    WALK_RESUME = "^[ >]*(你终于来到了对面，心里的石头终于落地.*|突然间蓬一声，屁股撞上了什么物事，.*|你终于一步步的终于挨到了桥头.*|不知过了多久，船终于靠岸了，你累得满头大汗.*|小舟终于划到近岸，你从船上走了出来.*|小舟终于划到近岸，你从船上走了出来.*|你沿着踏板走了上去.*|绿衣少女将小船系在树枝之上，你跨上岸去.*)$",
+    WALK_RESUME = "^[ >]*(你终于来到了对面，心里的石头终于落地.*|突然间蓬一声，屁股撞上了什么物事，.*|你终于一步步的终于挨到了桥头.*|不知过了多久，船终于靠岸了，你累得满头大汗.*|小舟终于划到近岸，你从船上走了出来.*|你沿着踏板走了上去.*|绿衣少女将小船系在树枝之上，你跨上岸去.*)$",
     -- 添加武当沼泽busy
     WALK_BUSY = "^[ >]*(吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的。|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*|你的动作还没有完成，不能移动。|沙石地几乎没有路了，你走不了那么快。)$",
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
@@ -311,8 +312,82 @@ local define_travel = function()
     end
   end
 
-  -- 获取指定房间的附近N格房间列表
+  -- 获取指定出发地和目的地之间的路径栈
+  function prototype:generateWalkPlan(fromRoomId, toRoomId)
+    local fromid = fromRoomId or self.currRoomId
+    local toid = toRoomId or self.targetRoomId
+    self:debug("检验起始房间和目标房间", fromid, toid)
+    local startRoom = self.roomsById[fromid]
+    local endRoom = self.roomsById[toid]
+    if not startRoom then
+      self:debug("当前房间不在自动行走列表中")
+      return nil
+    elseif not endRoom then
+      self:debug("目标房间不在自动行走列表中")
+      return nil
+    else
+      local startZone = self.zonesByCode[startRoom.zone]
+      local endZone = self.zonesByCode[endRoom.zone]
+      if not startZone then
+        self:debug("当前区域不在自动行走列表中", startRoom.zone)
+        return nil
+      elseif not endZone then
+        self:debug("目标区域不在自动行走列表中", endRoom.zone)
+        return nil
+      elseif startZone == endZone then
+        if self.DEBUG then
+          local roomCnt = 0
+          for _, room in pairs(startZone.rooms) do
+            roomCnt = roomCnt + 1
+          end
+          self:debug("出发地与目的地处于同一区域，共" .. roomCnt .. "个房间")
+        end
+        return roomsearch {
+          rooms = startZone.rooms,
+          startid = fromid,
+          targetid = toid
+        }
+      else
+        -- zone search for shortest path
+        local zoneStack = zonesearch {
+          rooms = self.zonesById,
+          startid = startZone.id,
+          targetid = endZone.id
+        }
+        if not zoneStack then
+          self:debug("计算区域路径失败，区域 " .. startZone.name .. " 至区域 " .. endZone.name .. " 不可达")
+          return false
+        else
+          table.insert(zoneStack, ZonePath:decorate {startid=startZone.id, endid=startZone.id, weight=0})
+          -- only for debug
+          if self.DEBUG then
+            local zones = {}
+            for i=1,#zoneStack do
+              table.insert(zones, zoneStack[i].name)
+            end
+            self:debug("共经过" .. #zoneStack .. "个区域", table.concat(zones, ", "))
+          end
 
+          local zoneCnt = #zoneStack
+          local rooms = {}
+          local roomCnt = 0
+          while #zoneStack > 0 do
+            local zonePath = table.remove(zoneStack)
+            for _, room in pairs(self.zonesById[zonePath.endid].rooms) do
+              rooms[room.id] = room
+              roomCnt = roomCnt + 1
+            end
+          end
+          self:debug("本次路径计算跨" .. zoneCnt .. "个区域，共" .. roomCnt .. "个房间")
+          return roomsearch {
+            rooms = rooms,
+            startid = fromid,
+            targetid = toid
+          }
+        end
+      end
+    end
+  end
 
   ----------- Alias-only API ----------
   -- below functions are only used
@@ -1483,83 +1558,6 @@ local define_travel = function()
         print("停止 - 当前状态", self.currState)
       end
     }
-  end
-
-  -- 生成行走计划（路径栈）
-  function prototype:generateWalkPlan()
-    local fromid = self.currRoomId
-    local toid = self.targetRoomId
-    self:debug("检验起始房间和目标房间", fromid, toid)
-    local startRoom = self.roomsById[fromid]
-    local endRoom = self.roomsById[toid]
-    if not startRoom then
-      self:debug("当前房间不在自动行走列表中")
-      return nil
-    elseif not endRoom then
-      self:debug("目标房间不在自动行走列表中")
-      return nil
-    else
-      local startZone = self.zonesByCode[startRoom.zone]
-      local endZone = self.zonesByCode[endRoom.zone]
-      if not startZone then
-        self:debug("当前区域不在自动行走列表中", startRoom.zone)
-        return nil
-      elseif not endZone then
-        self:debug("目标区域不在自动行走列表中", endRoom.zone)
-        return nil
-      elseif startZone == endZone then
-        if self.DEBUG then
-          local roomCnt = 0
-          for _, room in pairs(startZone.rooms) do
-            roomCnt = roomCnt + 1
-          end
-          self:debug("出发地与目的地处于同一区域，共" .. roomCnt .. "个房间")
-        end
-        return roomsearch {
-          rooms = startZone.rooms,
-          startid = fromid,
-          targetid = toid
-        }
-      else
-        -- zone search for shortest path
-        local zoneStack = zonesearch {
-          rooms = self.zonesById,
-          startid = startZone.id,
-          targetid = endZone.id
-        }
-        if not zoneStack then
-          self:debug("计算区域路径失败，区域 " .. startZone.name .. " 至区域 " .. endZone.name .. " 不可达")
-          return false
-        else
-          table.insert(zoneStack, ZonePath:decorate {startid=startZone.id, endid=startZone.id, weight=0})
-          -- only for debug
-          if self.DEBUG then
-            local zones = {}
-            for i=1,#zoneStack do
-              table.insert(zones, zoneStack[i].name)
-            end
-            self:debug("共经过" .. #zoneStack .. "个区域", table.concat(zones, ", "))
-          end
-
-          local zoneCnt = #zoneStack
-          local rooms = {}
-          local roomCnt = 0
-          while #zoneStack > 0 do
-            local zonePath = table.remove(zoneStack)
-            for _, room in pairs(self.zonesById[zonePath.endid].rooms) do
-              rooms[room.id] = room
-              roomCnt = roomCnt + 1
-            end
-          end
-          self:debug("本次路径计算跨" .. zoneCnt .. "个区域，共" .. roomCnt .. "个房间")
-          return roomsearch {
-            rooms = rooms,
-            startid = fromid,
-            targetid = toid
-          }
-        end
-      end
-    end
   end
 
   -- 格式化原始出口字符串

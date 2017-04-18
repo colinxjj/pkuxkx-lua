@@ -227,19 +227,28 @@ local define_fsm = function()
     transfer = "transfer",  -- 运输中
     lost = "lost",  -- 迷路中（很大可能被强盗推至相邻房间）
     submit = "submit",  -- 提交
+    mixin = "mixin",  -- 密信
   }
   local Events = {
+    ALIAS_START = "^hubiao\\s+start\\s*$",
+    ALIAS_STOP = "^hubiao\\s+stop\\s*$",
+    ALIAS_DEBUG = "%hubiao\\s+debug\\s+(on|off)\\s*$",
     STOP = "stop",  -- 任何状态下停止
     START = "start",  -- stop -> prepare
-    RECOVER = "recover",  -- prepare -> prepare
+    ACCEPT_SUCCESS = "accept_success",  -- prepare -> prefetch
+    ACCEPT_FAIL = "accept_fail",  -- prepare -> prepare
+    NEXT_PREFETCH = "next_prefetch",  -- prefetch -> prefetch
+    PREFETCH_SUCCESS = "prefetch_success",  -- prefetch -> transfer
   }
   local REGEXP = {
     JOB_INFO = "^(\\d+)\\s+(.*?)\\s+(\\d+)秒\\s+(.*?)\\s+(.*)$",
-
+    ACCEPT_INFO = "^.*把这批红货送到(.*?)那里，他已经派了个伙计名叫(.*?)到(.*?)附近接你，把镖车送到他那里就行了。$",
+    ACCEPT_FAIL = "^[ >]*认领任务失败，请选择其他任务。$",
   }
 
   -- 福州福威镖局
   local StartRoomId = 26
+  local PrefetchDepth = 5
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -264,6 +273,9 @@ local define_fsm = function()
       jingli = 1,
       neili = 1.8
     }
+    -- special variable
+    self.playerName = "撸啊"
+    self.playerId = "luar"
   end
 
   function prototype:disableAllTriggers()
@@ -275,14 +287,20 @@ local define_fsm = function()
       state = States.stop,
       enter = function()
         self:disableAllTriggers()
+        self:removeTriggerGroups("hubiao_prefetch_traverse")
         SendNoEcho("set jobs done")  -- 为jobs提供结束触发
       end,
       exit = function() end
     }
     self:addState {
       state = States.prepare,
-      enter = function() end,
-      exit = function() end
+      enter = function()
+        helper.enableTriggerGroups("hubiao_info_start", "hubiao_accept_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("hubiao_info_start", "hubiao_info_done",
+          "hubiao_accept_start", "hubiao_accept_done")
+      end
     }
     self:addState {
       state = States.prefetch,
@@ -302,6 +320,7 @@ local define_fsm = function()
   end
 
   function prototype:initTransitions()
+    -- transition from state<stop>
     self:addTransition {
       oldState = States.stop,
       newState = States.prepare,
@@ -310,24 +329,58 @@ local define_fsm = function()
         return self:doPrepare()
       end
     }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<prepare>
+    self:addTransition {
+      oldState = States.prepare,
+      newState = States.prepare,
+      event = Events.ACCEPT_FAIL,
+      action = function()
+        self:debug("等待3秒后重新接任务")
+        wait.time(3)
+        return self:doPrepare()
+      end
+    }
+    self:addTransition {
+      oldState = States.prepare,
+      newState = States.prefetch,
+      event = Events.ACCEPT_SUCCESS,
+      action = function()
+        self:debug("等待3秒后开始预取")
+        wait.time(3)
+        return self:doConfirmSearhRooms()
+      end
+    }
+    self:addTransition {
+      oldState = States.prepare,
+      newState = States.stop,
+      event = Events.NO_JOB_AVAILABLE,
+      action = function()
+        self:debug("目前无可用任务，等待2秒后结束")
+        wait.time(2)
+        return self:fire(Events.STOP)
+      end
+    }
+    self:addTransitionToStop(States.prepare)
+    -- transition from state<prefetch>
+    self:addTransition {
+      oldState = States.prefetch,
+      newState = States.prefetch,
+      event = Events.NEXT_PREFETCH,
+      action = function()
+        return self:doPrefetch()
+      end
+    }
+    self:addTransitionToStop(States.prefetch)
   end
 
   function prototype:initTriggers()
     helper.removeTriggerGroups("hubiao_info_start", "hubiao_info_done")
     -- info
-    helper.addTrigger {
-      group = "hubiao_info_start",
-      regexp = helper.settingRegexp("hubiao", "info_start"),
-      response = function()
-        helper.enableTriggerGroups("hubiao_info_done")
-      end
-    }
-    helper.addTrigger {
-      group = "hubiao_info_done",
-      regexp = helper.settingRegexp("hubiao", "info_done"),
-      response = function()
-        helper.disableTriggerGroups("hubiao_info_done")
-      end
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "info_start",
+      done = "info_done"
     }
     helper.addTrigger {
       group = "hubiao_info_done",
@@ -344,10 +397,59 @@ local define_fsm = function()
         end
       end
     }
+    -- accept
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "accept_start",
+      done = "accept_done"
+    }
+    helper.addTrigger {
+      group = "hubiao_accept_done",
+      regexp = REGEXP.ACCEPT_FAIL,
+      response = function()
+        self:debug("ACCEPT_FAIL triggered")
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_accept_done",
+      regexp = REGEXP.ACCEPT_INFO,
+      response = function(name, line, wildcards)
+        self.acceptSuccess = true
+        self.employer = wildcards[1]
+        self.dudeName = wildcards[2]
+        self.searchRoomName = wildcards[3]
+      end
+    }
   end
 
   function prototype:initAliases()
-
+    helper.removeAliasGroups("hubiao")
+    helper.addAlias {
+      group = "hubiao",
+      regexp = REGEXP.ALIAS_START,
+      response = function()
+        return self:fire(Events.START)
+      end
+    }
+    helper.addAlias {
+      group = "hubiao",
+      regexp = REGEXP.ALIAS_STOP,
+      response = function()
+        return self:fire(Events.STOP)
+      end
+    }
+    helper.addAlias {
+      group = "hubiao",
+      regexp = REGEXP.ALIAS_DEBUG,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self:debugOn()
+        else
+          self:debugOff()
+        end
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -377,10 +479,101 @@ local define_fsm = function()
   end
 
   function prototype:doAcceptJob()
+    -- 设置当前任务
+    local _, job = next(self.jobs)
+    self.currJob = job
+    self.acceptSuccess = false
+    self.employer = nil
+    self.dudeName = nil
+    self.searchRoomName = nil
     SendNoEcho("set hubiao accept_start")
     SendNoEcho("getesc " .. self.currJob.id)
     SendNoEcho("set hubiao accept_done")
     helper.assureNotBusy()
+    if self.acceptSuccess then
+      return self:fire(Events.ACCEPT_SUCCESS)
+    else
+      return self:fire(Events.ACCEPT_FAIL)
+    end
+  end
+
+  function prototype:doConfirmSearhRooms()
+    local targets = travel:getMatchedRooms {
+      fullname = self.currJob.location
+    }
+    if #(targets) == 0 then
+      self:debug("运镖区域不可达，等待2秒后结束")
+      wait.time(2)
+      return self:fire(Events.STOP)
+    else
+      local searchRooms = travel:getMatchedRooms {
+        zone = targets[1].zone,
+        name = self.searchRoomName,
+      }
+      if #(searchRooms) == 0 then
+        self:debug("伙计所在地点不可达，无法执行预取，等待2秒后结束")
+        wait.time(2)
+        return self:fire(Events.STOP)
+      else
+        self.searchedRoomIds = {}
+        self.searchRooms = searchRooms
+        return self:fire(Events.NEXT_PREFETCH)
+      end
+    end
+  end
+
+  function prototype:doPrefetch()
+    if #(self.searchRooms) > 0 then
+      local searchStartRoom = table.remove(self.searchRooms)
+      if self.searchedRoomIds[searchStartRoom.id] then
+        self:debug("房间已搜索过，跳过", searchStartRoom.id)
+        return self:doPrefetch()
+      else
+        helper.assureNotBusy()
+        travel:walkto(searchStartRoom.id)
+        travel:waitUntilArrived()
+        self:debug("到达搜索起始地点", searchStartRoom.id)
+        self:debug("开始遍历寻找，深度为", PrefetchDepth)
+
+        self.targetRoomId = nil
+        helper.addTrigger {
+          group = "hubiao_prefetch_traverse",
+          regexp = "^\\s*「店铺伙计」" .. self.dudeName .. "\\(.*?\\)$",
+          response = function()
+            --找到伙计，则设置目标地点为当前房间编号
+            self.targetRoomId = travel:traverseRoomId
+          end
+        }
+        local onStep = function()
+          return self.targetRoomId ~= nil  -- 停止条件，找到伙计
+        end
+        local onArrive = function()
+          helper.removeTriggerGroups("hubiao_prefetch_traverse")
+          if self.targetRoomId then
+            self:debug("遍历结束，已经发现伙计，并确定目标房间：", self.targetRoomId)
+            return self:fire(Events.PREFETCH_SUCCESS)
+          else
+            self:debug("没有发现伙计，尝试下一个地点")
+            wait.time(1)
+            return self:fire(Events.NEXT_PREFETCH)
+          end
+        end
+        return travel:traverseNearby(PrefetchDepth, onStep, onArrive)
+      end
+    else
+      self:debug("没有更多的搜索房间，预取失败，放弃该任务")
+      wait.time(2)
+      return self:doCancel()
+    end
+  end
+
+  function prototype:doCancel()
+    helper.assureNotBusy()
+    travel:walkto(StartRoomId)
+    travel:waitUntilArrived()
+    helper.assureNotBusy()
+    SendNoEcho("ask lin about fail")
+    return self:fire(Events.STOP)
   end
 
   return prototype

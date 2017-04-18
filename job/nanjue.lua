@@ -120,7 +120,7 @@ local define_nanjue = function()
     ["锦鞋"] = "fabric",
     ["凤鞋"] = "fabric",
     ["布鞋"] = "fabric",
-    ["麻鞋"] = "fabirc",
+    ["麻鞋"] = "fabric",
     ["千层底布鞋"] = "fabric",
     ["木屐"] = "sandal",
     ["草鞋"] = "sandal",
@@ -128,17 +128,20 @@ local define_nanjue = function()
   }
   local ColorType = {
     ["silver"] = "light",
-    ["lime"] = "light", -- 待定，青绿色
-    ["black"] = "dark",
-    ["red"] = "dark",
-    ["blue"] = "dark",
-    ["purple"] = "dark",
-    ["magenta"] = "dark",  -- 待定，粉色
-    ["maroon"] = "dark",
+    ["lime"] = "light",
     ["green"] = "light",
     ["yellow"] = "light",
     ["teal"] = "light",
     ["white"] = "light",
+    ["olive"] = "light",
+    ["magenta"] = "dark",  -- 待定，粉色
+    ["black"] = "dark",
+    ["red"] = "dark",
+    ["blue"] = "dark",
+    ["purple"] = "dark",
+    ["maroon"] = "dark",
+    ["navy"] = "dark",  -- 深蓝
+
   }
   local FigureType = {
     ["身材异常魁梧高大"] = {
@@ -655,7 +658,7 @@ local define_nanjue = function()
           self.currStranger.weight = figureType.weight
           self.currStranger.height = figureType.height
         else
-          print("无法鉴别路人身材：", figure)
+          ColourNote("yellow", "", "无法鉴别路人身材：", figure)
         end
       end
     }
@@ -671,7 +674,7 @@ local define_nanjue = function()
           if clothType then
             self.currStranger.clothType = clothType
           else
-            print("无法查找到衣服类型，设置为布衣：", cloth)
+            ColourNote("yellow", "", "无法查找到衣服类型，设置为布衣：", cloth)
             self.currStranger.clothType = "fabric"
           end
           local col = string.find(line, cloth)
@@ -681,7 +684,7 @@ local define_nanjue = function()
           if colorType then
             self.currStranger.clothColor = colorType
           else
-            print("无法查找到衣服颜色深浅，设置为中性")
+            ColourNote("yellow", "", "无法查找到衣服颜色深浅，设置为中性")
             self.currStranger.clothColor = "normal"
           end
           self:debug("衣服类型：", clothType, "衣服颜色：", color)
@@ -698,7 +701,7 @@ local define_nanjue = function()
         if shoeType then
           self.currStranger.shoeType = shoeType
         else
-          print("无法查找到鞋子类型，设置为布鞋：", shoe)
+          ColourNote("yellow", "", "无法查找到鞋子类型，设置为布鞋：", shoe)
           self.currStranger.shoeType = "fabric"
         end
         local col = string.find(line, shoe)
@@ -708,7 +711,7 @@ local define_nanjue = function()
         if colorType then
           self.currStranger.shoeColor = colorType
         else
-          print("无法查找到鞋子颜色深浅，设置为中性")
+          ColourNote("yellow", "", "无法查找到鞋子颜色深浅，设置为中性")
           self.currStranger.shoeColor = "normal"
         end
         self:debug("鞋子类型：", shoeType, "鞋子颜色：", color)

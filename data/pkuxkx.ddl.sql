@@ -31,7 +31,9 @@ insert into path_category (id, name, description) values
   (1, 'normal', '单个命令'),
   (2, 'multiple', '多个命令，使用分号隔开'),
   (3, 'busy', '单个命令，将导致busy状态，可能需要多次重复执行'),
-  (4, 'boat', '乘船命令');
+  (4, 'boat', '乘船命令'),
+  (5, 'pause', '行走暂停'),
+  (6, 'block', '被阻挡，有npc挡路需要清除');
 
 create table if not exists pinyin2chr (
   pinyin text primary key,
@@ -108,7 +110,9 @@ values
   ('emei', '峨眉', 'emeishanmen'),
   ('xihu', '西湖', 'xihuhangzhoufenduodamen'),
   ('yuewangmu', '岳王墓', 'yuewangmumuqianxiaodao'),
-  ('murong', '姑苏慕容', 'muronghubian')
+  ('murong', '姑苏慕容', 'muronghubian'),
+  ('riyue', '日月神教', 'riyuexiaoshancun'),
+  ('taohuadao', '桃花岛', 'taohaodaodating')
 ;
 
 create table if not exists zone_connectivity (
@@ -281,7 +285,12 @@ values
   ('quanzhou', 'yuewangmu', 6),
   ('yuewangmu', 'quanzhou', 6),
   ('suzhou', 'murong', 7),
-  ('murong', 'suzhou', 7)
+  ('murong', 'suzhou', 7),
+  ('jinyang', 'riyue', 8),
+  ('riyue', 'jinyang', 8),
+  ('mingzhou', 'taohuadao', 14),
+  ('taohuadao', 'mingzhou', 14),
+  --
 ;
 
 update zone_connectivity set boat = 1
