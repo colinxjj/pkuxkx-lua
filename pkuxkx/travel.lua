@@ -389,6 +389,12 @@ local define_travel = function()
     end
   end
 
+  -- 获取指定房间周围指定距离内的遍历路径栈
+  function prototype:generateNearbyTraversePlan(centerRoomId, depth)
+    local rooms = self:getNearbyRooms(centerRoomId, depth)
+    return self:generateTraversePlan(rooms, centerRoomId)
+  end
+
   ----------- Alias-only API ----------
   -- below functions are only used
   -- in alias
@@ -620,7 +626,7 @@ local define_travel = function()
     if not self.currRoomId then
       print("失败。当前房间未定位，无法进行范围内自动遍历")
     else
-      local traverseRooms = self:getNearbyRooms(depth)
+      local traverseRooms = self:getNearbyRooms(self.currRoomId, depth)
     -- todo need to consider situation that rooms in maze may not be bi-directional reachable
 --      local RoomsInZone = self.zonesByCode[self.roomsById[self.currRoomId].zone].rooms
       if not traverseRooms then
@@ -1867,11 +1873,11 @@ local define_travel = function()
   end
 
   -- 生成遍历计划
-  function prototype:generateTraversePlan()
+  function prototype:generateTraversePlan(traverseRooms, startid)
     local plan = traversal {
-      rooms = self.traverseRooms,
+      rooms = traverseRooms or self.traverseRooms,
       fallbackRooms = self.roomsById,
-      startid = self.currRoomId
+      startid = startid or self.currRoomId
     }
     -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path
     if plan and #plan > 0 then
@@ -1901,9 +1907,8 @@ local define_travel = function()
     end
   end
 
-  function prototype:getNearbyRooms(maxDepth, centerRoomId)
+  function prototype:getNearbyRooms(centerRoomId, maxDepth)
     if maxDepth < 1 then return nil end
-    local centerRoomId = centerRoomId or self.currRoomId
     local startroom = self.roomsById[centerRoomId]
     if not startroom then return nil end
 

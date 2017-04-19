@@ -217,7 +217,7 @@ local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
 
-local define_fsm = function()
+local define_hubiao = function()
   local prototype = FSM.inheritedMeta()
 
   local States = {
@@ -228,6 +228,7 @@ local define_fsm = function()
     lost = "lost",  -- 迷路中（很大可能被强盗推至相邻房间）
     submit = "submit",  -- 提交
     mixin = "mixin",  -- 密信
+    find = "find",  -- 寻找，当到达目的地而无法找到伙计时
   }
   local Events = {
     ALIAS_START = "^hubiao\\s+start\\s*$",
@@ -239,11 +240,15 @@ local define_fsm = function()
     ACCEPT_FAIL = "accept_fail",  -- prepare -> prepare
     NEXT_PREFETCH = "next_prefetch",  -- prefetch -> prefetch
     PREFETCH_SUCCESS = "prefetch_success",  -- prefetch -> transfer
+    TRANSFER_STEP = "transfer_step",  -- transfer -> step
   }
   local REGEXP = {
     JOB_INFO = "^(\\d+)\\s+(.*?)\\s+(\\d+)秒\\s+(.*?)\\s+(.*)$",
     ACCEPT_INFO = "^.*把这批红货送到(.*?)那里，他已经派了个伙计名叫(.*?)到(.*?)附近接你，把镖车送到他那里就行了。$",
     ACCEPT_FAIL = "^[ >]*认领任务失败，请选择其他任务。$",
+    TRANSFER_SUCCESS = "^[ >]*你累了个半死，终于把镖运到了地头。$",
+    ROBBER_MOVE = "^[ >]*劫匪趁你不注意，推着镖车就跑，你赶紧追了上去。$",
+    TRANSFER_BUSY = "^[ >]*(劫匪伸手一拦道：“想跑？没那么容易！”|你还是先把对手解决了再说吧！|你现在正忙着哩。)$"
   }
 
   -- 福州福威镖局
@@ -309,7 +314,8 @@ local define_fsm = function()
     }
     self:addState {
       state = States.transfer,
-      enter = function() end,
+      enter = function()
+      end,
       exit = function() end
     }
     self:addState {
@@ -348,6 +354,7 @@ local define_fsm = function()
       action = function()
         self:debug("等待3秒后开始预取")
         wait.time(3)
+        self.transferVisitedRoomIds = {}
         return self:doConfirmSearhRooms()
       end
     }
@@ -372,6 +379,28 @@ local define_fsm = function()
       end
     }
     self:addTransitionToStop(States.prefetch)
+    -- transition from state<transfer>
+    self:addTransition {
+      oldState = States.prefetch,
+      newState = States.transfer,
+      event = Events.PREFETCH_SUCCESS,
+      action = function()
+        -- back to start
+        travel:walkto(StartRoomId)
+        travel:waitUntilArrived()
+        self:debug("等待2秒后进行运送")
+        wait.time(2)
+        return self:doPrepareTransfer()
+      end
+    }
+    self:addTransition {
+      oldState = States.transfer,
+      newState = States.transfer,
+      event = Events.TRANSFER_STEP,
+      action = function()
+        return self:doTransfering()
+      end
+    }
   end
 
   function prototype:initTriggers()
@@ -497,14 +526,14 @@ local define_fsm = function()
     end
   end
 
-  function prototype:doConfirmSearhRooms()
+  function prototype:doConfirmSearchRooms()
     local targets = travel:getMatchedRooms {
       fullname = self.currJob.location
     }
     if #(targets) == 0 then
       self:debug("运镖区域不可达，等待2秒后结束")
       wait.time(2)
-      return self:fire(Events.STOP)
+      return self:doCancel()
     else
       local searchRooms = travel:getMatchedRooms {
         zone = targets[1].zone,
@@ -513,7 +542,7 @@ local define_fsm = function()
       if #(searchRooms) == 0 then
         self:debug("伙计所在地点不可达，无法执行预取，等待2秒后结束")
         wait.time(2)
-        return self:fire(Events.STOP)
+        return self:doCancel()
       else
         self.searchedRoomIds = {}
         self.searchRooms = searchRooms
@@ -538,7 +567,7 @@ local define_fsm = function()
         self.targetRoomId = nil
         helper.addTrigger {
           group = "hubiao_prefetch_traverse",
-          regexp = "^\\s*「店铺伙计」" .. self.dudeName .. "\\(.*?\\)$",
+          regexp = self:dudeNameRegexp(),
           response = function()
             --找到伙计，则设置目标地点为当前房间编号
             self.targetRoomId = travel:traverseRoomId
@@ -567,6 +596,10 @@ local define_fsm = function()
     end
   end
 
+  function prototype:dudeNameRegexp()
+    return "^\\s*「店铺伙计」" .. self.dudeName .. "\\(.*?\\)$";
+  end
+
   function prototype:doCancel()
     helper.assureNotBusy()
     travel:walkto(StartRoomId)
@@ -576,7 +609,42 @@ local define_fsm = function()
     return self:fire(Events.STOP)
   end
 
+  function prototype:doPrepareTransfer()
+    local walkPlan = travel:generateWalkPlan(travel.currRoomId, self.targetRoomId)
+    if not walkPlan then
+      ColourNote("red", "", "计算路径失败，放弃该任务")
+      return self:doCancel()
+    end
+    self.walkPlan = walkPlan
+    self.walkLost = false
+    self.findDude = false
+    helper.removeTriggerGroups("hubiao_transfer")
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = self:dudeNameRegexp(),
+      response = function()
+        self.findDude = true
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      -- todo
+
+    }
+    return self:fire(Events.TRANSFER_STEP)
+  end
+
+  function prototype:doTransferring()
+    if #(self.walkPlan) == 0 then
+      helper.checkUntilNotBusy()
+      if self.findDude then
+        wait.time(5)
+      --todo
+      end
+    end
+  end
+
   return prototype
 end
-return define_fsm():FSM()
+return define_hubiao():FSM()
 
