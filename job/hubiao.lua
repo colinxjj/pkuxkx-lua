@@ -206,6 +206,14 @@ getesc 48917
 你正忙着呢！
 >
 
+xian
+你按照林震南的指示，打开密信……原来要你到以下地方找(zhao/zhaoxun)到潜逃的伙计并要(yao)回其席卷的财物！
+你的客户端不支持MXP,请直接打开链接查看图片。
+请注意，忽略验证码中的红色文字。
+http://pkuxkx.net/antirobot/robot.php?filename=1492599526849159
+
+卷走林震南财物的伙计 佰赏庆(Toes)
+
 （只听见「啪」地一声，你手中的青锋剑已经断为两截！）
 
 （宋悦蓓的钢杖和你的青锋剑重重交击在一起，发出「铛」地一声。）
@@ -241,6 +249,12 @@ local define_hubiao = function()
     NEXT_PREFETCH = "next_prefetch",  -- prefetch -> prefetch
     PREFETCH_SUCCESS = "prefetch_success",  -- prefetch -> transfer
     TRANSFER_STEP = "transfer_step",  -- transfer -> step
+    STEP_SUCCESS = "step_success",  -- 行走一步成功 transfer -> transfer
+    STEP_FAIL = "step_fail",  -- 行走一步失败 transfer -> transfer
+    GET_LOST = "get_lost",  -- 迷路 transfer -> lost
+    RELOCATED = "relocated",  -- 重定位成功 lost -> transfer
+    TRANSFER_SUCCESS = "transfer_success",  -- 运输成功 transfer -> submit
+    MIXIN_FOUND = "mixin_found",  -- 发现密信 submit -> mixin
   }
   local REGEXP = {
     JOB_INFO = "^(\\d+)\\s+(.*?)\\s+(\\d+)秒\\s+(.*?)\\s+(.*)$",
@@ -248,7 +262,14 @@ local define_hubiao = function()
     ACCEPT_FAIL = "^[ >]*认领任务失败，请选择其他任务。$",
     TRANSFER_SUCCESS = "^[ >]*你累了个半死，终于把镖运到了地头。$",
     ROBBER_MOVE = "^[ >]*劫匪趁你不注意，推着镖车就跑，你赶紧追了上去。$",
-    TRANSFER_BUSY = "^[ >]*(劫匪伸手一拦道：“想跑？没那么容易！”|你还是先把对手解决了再说吧！|你现在正忙着哩。)$"
+    TRANSFER_BUSY = "^[ >]*(劫匪伸手一拦道：“想跑？没那么容易！”|你还是先把对手解决了再说吧！|你现在正忙着哩。|镖车还没有跟上来呢,走慢点.*)$",
+    STEP_SUCCESS = "^[ >]*你赶着镖车驶了过来。$",
+    REWARDED = "^[ >]*你一共被奖励了：$",
+    -- todo
+    MIXIN_DESC = "^[ >]*这是一张林震南给你的密信，需要用特殊的药水才能显形\\(xian\\)。$",
+    MIXIN_NPC_DISPLAY = "^[ >]*\\s*卷走.*?财物的伙计 .*?\\((.*?)\\)$",
+    MIXIN_NPC_FOUND = "^[ >]*一个伙计挖着鼻屎走了出来，道：你找我啥事？$",
+    MIXIN_YAO_SUCCESS = "^[ >]*.*把一包财物砸向你，一转眼不见了。$",
   }
 
   -- 福州福威镖局
@@ -292,7 +313,7 @@ local define_hubiao = function()
       state = States.stop,
       enter = function()
         self:disableAllTriggers()
-        self:removeTriggerGroups("hubiao_prefetch_traverse")
+        self:removeTriggerGroups("hubiao_prefetch_traverse", "hubiao_transfer")
         SendNoEcho("set jobs done")  -- 为jobs提供结束触发
       end,
       exit = function() end
@@ -315,13 +336,21 @@ local define_hubiao = function()
     self:addState {
       state = States.transfer,
       enter = function()
+        helper.enableTriggerGroups("hubiao_step_start", "hubiao_transfer")
       end,
-      exit = function() end
+      exit = function()
+        helper.disableTriggerGroups("hubiao_step_start", "hubiao_step_done", "hubiao_transfer")
+      end
     }
     self:addState {
       state = States.submit,
-      enter = function() end,
-      exit = function() end
+      enter = function()
+        helper.enableTriggerGroups("hubiao_submit_start", "hubiao_mixin_start")
+      end,
+      exit = function()
+        helper.enableTriggerGroups("hubiao_submit_start", "hubiao_submit_done",
+          "hubiao_mixin_start", "hubiao_mixin_done")
+      end
     }
   end
 
@@ -378,8 +407,6 @@ local define_hubiao = function()
         return self:doPrefetch()
       end
     }
-    self:addTransitionToStop(States.prefetch)
-    -- transition from state<transfer>
     self:addTransition {
       oldState = States.prefetch,
       newState = States.transfer,
@@ -393,18 +420,93 @@ local define_hubiao = function()
         return self:doPrepareTransfer()
       end
     }
+    self:addTransitionToStop(States.prefetch)
+    -- transition from state<transfer>
     self:addTransition {
       oldState = States.transfer,
       newState = States.transfer,
-      event = Events.TRANSFER_STEP,
+      event = Events.STEP_SUCCESS,
       action = function()
-        return self:doTransfering()
+        -- 设置运输房间编号
+        if self.currStep then
+          self.transferRoomId = self.currStep.endid
+        end
+        -- 设置下一步的路径为当前路径
+        if #(self.transferPlan) > 0 then
+          self.currStep = table.remove(self.transferPlan)
+          return self:doStep()
+        else
+          ColourNote("yellow", "", "已走完全部路径")
+          wait.time(4)
+          helper.checkUntilNotBusy()
+          if self.transferSuccess then
+            self:debug("镖已送到，返回提交任务")
+            return self:doSubmit()
+          else
+            ColourNote("red", "", "没有找到伙计，任务失败！")
+            return self:doCancel()
+          end
+        end
       end
     }
+    self:addTransition {
+      oldState = States.transfer,
+      newState = States.transfer,
+      event = Events.STEP_FAIL,
+      action = function()
+        -- 失败时不更新当前路径，重试
+        return self:doStep()
+      end
+    }
+    self:addTransition {
+      oldState = States.transfer,
+      newState = States.lost,
+      event = Events.GET_LOST,
+      action = function()
+        return self:doRelocate()
+      end
+    }
+    self:addTransition {
+      oldState = States.transfer,
+      newState = States.submit,
+      event = Events.TRANSFER_SUCCESS,
+      action = function()
+        return self:doSubmit()
+      end
+    }
+    self:addTransitionToStop(States.transfer)
+    -- transition from state<lost>
+    self:addTransition {
+      oldState = States.lost,
+      newState = States.transfer,
+      event = Events.RELOCATED,
+      action = function()
+        return self:doPrepareTransfer()
+      end
+    }
+    self:addTransitionToStop(States.lost)
+    -- transition from state<submit>
+    self:addTransition {
+      oldState = States.submit,
+      newState = States.mixin,
+      event = Events.MIXIN_FOUND,
+      action = function()
+        ColourNote("yellow", "", "发现密信，请手动输入密信地点hubiao mixin <地点>")
+      end
+    }
+    self:addTransitionToStop(States.submit)
+    -- transition from state<mixin>
+    self:addTransitionToStop(States.mixin)
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("hubiao_info_start", "hubiao_info_done")
+    helper.removeTriggerGroups(
+      "hubiao_info_start", "hubiao_info_done",
+      "hubiao_accept_start", "hubiao_accept_done",
+      "hubiao_step_start", "hubiao_step_done",
+      "hubiao_submit_start", "hubiao_submit_done",
+      "hubiao_mixin_start", "hubiao_mixin_done",
+      "hubiao_transfer")
     -- info
     helper.addTriggerSettingsPair {
       group = "hubiao",
@@ -449,6 +551,62 @@ local define_hubiao = function()
         self.searchRoomName = wildcards[3]
       end
     }
+    -- step
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "step_start",
+      done = "step_done"
+    }
+    -- 行走成功
+    helper.addTrigger {
+      group = "hubiao_step_done",
+      regexp = REGEXP.STEP_SUCCESS,
+      response = function()
+        self.stepSuccess = true
+      end
+    }
+    -- submit
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "submit_start",
+      done = "submit_done"
+    }
+    helper.addTrigger {
+      group = "hubiao_submit_done",
+      regexp = REGEXP.REWARDED,
+      response = function()
+        self.submitSuccess = true
+        self:debug("任务完成，获得奖励")
+      end
+    }
+    -- mixin
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "mixin_start",
+      done = "mixin_done"
+    }
+    helper.addTrigger {
+      group = "hubiao_mixin_done",
+      regexp = REGEXP.MIXIN_DESC,
+      response = function()
+        self.findMixin = true
+      end
+    }
+    -- transfer
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.TRANSFER_SUCCESS,
+      response = function()
+        self.transferSuccess = true
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.ROBBER_MOVE,
+      response = function()
+        self.transferLost = true
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -476,6 +634,54 @@ local define_hubiao = function()
           self:debugOn()
         else
           self:debugOff()
+        end
+      end
+    }
+    helper.addAlias {
+      group = "hubiao",
+      regexp = REGEXP.ALIAS_MIXIN,
+      response = function(name, line, wildcards)
+        local location = wildcards[1]
+        local rooms = travel:getMatchedRooms {
+          fullname = location
+        }
+        if #(rooms) == 0 then
+          ColourNote("red", "", "房间查询不到或不可达")
+        else
+          self.mixinRoomId = rooms[1].id
+          travel:walkto(self.mixinRoomId)
+          travel:waitUntilArrived()
+          self:debug("等待2秒后开始执行密信任务")
+          wait.time(2)
+          while true do
+            SendNoEcho("zhao")
+            local line = wait.regexp(REGEXP.MIXIN_NPC_FOUND, 5)
+            if line then break end
+          end
+
+          self.mixinNpcId = nil
+          helper.addOneShotTrigger {
+            group = "hubiao_mixin_one_shot",
+            regexp = REGEXP.MIXIN_NPC_DISPLAY,
+            response = function(name, line, wildcards)
+              self.mixinNpcId = string.lower(wildcards[1])
+            end
+          }
+          travel:lookUntilNotBusy()
+          helper.removeTriggerGroups("hubiao_mixin_one_shot")
+          while true do
+            SendNoEcho("ask " .. self.mixinNpcId .. " about yao")
+            local line = wait.regexp(REGEXP.MIXIN_YAO_SUCCESS, 5)
+            if line then break end
+          end
+          self:debug("获得财物，返回")
+          wait.time(2)
+          helper.checkUntilNotBusy()
+          travel:walkto(StartRoomId)
+          travel:waitUntilArrived()
+          helper.checkUntilNotBusy()
+          SendNoEcho("give cai wu to lin")
+          return self:fire(Events.STOP)
         end
       end
     }
@@ -570,7 +776,7 @@ local define_hubiao = function()
           regexp = self:dudeNameRegexp(),
           response = function()
             --找到伙计，则设置目标地点为当前房间编号
-            self.targetRoomId = travel:traverseRoomId
+            self.targetRoomId = travel.traverseRoomId
           end
         }
         local onStep = function()
@@ -612,13 +818,29 @@ local define_hubiao = function()
   function prototype:doPrepareTransfer()
     local walkPlan = travel:generateWalkPlan(travel.currRoomId, self.targetRoomId)
     if not walkPlan then
-      ColourNote("red", "", "计算路径失败，放弃该任务")
+      ColourNote("red", "", "计算直达路径失败，放弃该任务")
       return self:doCancel()
     end
-    self.walkPlan = walkPlan
-    self.walkLost = false
+    local traversePlan = travel:generateNearbyTraversePlan(self.targetRoomId, 2, true)
+    if not traversePlan then
+      ColourNote("red", "", "计算搜索路径失败，放弃该任务")
+      return self:doCancel()
+    end
+    -- 合并两个行走计划栈，注意方向
+    local transferPlan = {}
+    for _, path in ipairs(traversePlan) do
+      table.insert(transferPlan, path)
+    end
+    for _, path in ipairs(walkPlan) do
+      table.insert(transferPlan, path)
+    end
+    self.transferRoomId = travel.currRoomId
+    self.transferPlan = transferPlan
+    self.transferLost = false
     self.findDude = false
+    self.transferSuccess = false
     helper.removeTriggerGroups("hubiao_transfer")
+    -- 找到伙计
     helper.addTrigger {
       group = "hubiao_transfer",
       regexp = self:dudeNameRegexp(),
@@ -626,21 +848,98 @@ local define_hubiao = function()
         self.findDude = true
       end
     }
-    helper.addTrigger {
-      group = "hubiao_transfer",
-      -- todo
-
-    }
-    return self:fire(Events.TRANSFER_STEP)
+    return self:fire(Events.STEP_SUCCESS)
   end
 
-  function prototype:doTransferring()
-    if #(self.walkPlan) == 0 then
+  function prototype:doStep()
+    self.stepSuccess = false
+    SendNoEcho("set hubiao step_start")
+    SendNoEcho("gan che to " .. helper.expandDirection(self.currStep))
+    SendNoEcho("set hubiao step_done")
+    wait.time(2)
+    helper.checkUntilNotBusy()
+    self:debug("行走一步，是否成功", self.stepSuccess)
+    if self.transferSuccess then
+      self:debug("运镖已成功，准备返回")
+      wait.time(2)
       helper.checkUntilNotBusy()
-      if self.findDude then
-        wait.time(5)
-      --todo
+      return self:fire(Events.TRANSFER_SUCCESS)
+    elseif self.transferLost then
+      return self:fire(Events.GET_LOST)
+    elseif self.stepSuccess then
+      return self:fire(Events.STEP_SUCCESS)
+    else
+      return self:fire(Events.STEP_FAIL)
+    end
+  end
+
+  function prototype:doRelocate()
+    wait.time(2)
+    helper.checkUntilNotBusy()
+    self:debug("重定位：获取最近房间并匹配")
+    -- 获取最近一格房间
+    local rooms1 = travel:getNearbyRooms(self.transferRoomId, 1)
+    if self.DEBUG then
+      local roomIds = helper.copyKeys(rooms1)
+      print("最近1格房间列表：", table.concat(roomIds, ","))
+      -- 匹配
+    end
+    self:debug("获取当前房间信息")
+    travel:lookUntilNotBusy()
+    self:debug(travel.currRoomName)
+    self:debug(travel.currRoomDesc)
+    self:debug(travel.currRoomExits)
+    local matchedRooms = {}
+    for _, room in pairs(rooms1) do
+      if travel.currRoomName == room.name
+        and travel.currRoomDesc == room.description
+        and travel:checkExitsIdentical(travel.currRoomDesc, room.exits)
+        and self.transferRoomId ~= room.id then
+        table.insert(matchedRooms, room)
       end
+    end
+    if #(matchedRooms) > 1 then
+      ColourNote("yellow", "", "存在多个房间匹配迷路房间，放弃该任务")
+      travel:stop()
+      return self:doCancel()
+    elseif #(matchedRooms) == 1 then
+      self:debug("已匹配唯一房间，重新计算运输计划")
+      travel.currRoomId = matchedRooms[1].id
+      travel:refreshRoomInfo()
+      self.transferRoomId = travel.currRoomId
+      return self:fire(Events.RELOCATED)
+    else
+      ColourNote("yellow", "", "无房间可匹配，放弃该任务")
+      travel:stop()
+      return self:doCancel()
+    end
+  end
+
+  function prototype:doSubmit()
+    travel:walkto(StartRoomId)
+    travel:waitUntilArrived()
+    self.submitSuccess = false
+    SendNoEcho("set hubiao submit_start")
+    SendNoEcho("ask lin about finish")
+    SendNoEcho("set hubiao submit_done")
+    wait.time(2)
+    helper.checkUntilNotBusy()
+    if self.submitSuccess then
+      self.findMixin = false
+      SendNoEcho("set hubiao mixin_start")
+      SendNoEcho("look mixin")
+      SendNoEcho("set hubiao mixin_done")
+      wait.time(2)
+      helper.checkUntilNotBusy()
+      if self.findMixin then
+        return self:fire(Events.MIXIN_FOUND)
+      else
+        self:debug("成功完成一轮任务")
+        return self:fire(Events.STOP)
+      end
+    else
+      self:debug("任务提交不成功，取消之")
+      return self:doCancel()
     end
   end
 

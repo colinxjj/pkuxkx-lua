@@ -193,6 +193,11 @@ local define_travel = function()
     ["大理城中"] = "大理",
     ["武当山"] = "武当"
   }
+  local SpecialRenamedRooms = {
+    ["陆家庄大厅"] = "大厅",
+    ["岳飞墓"] = "岳  飞  墓",
+  }
+
   -- room 3185 has 2-line exits descriptions
 
   -- 区域最短路径搜索算法
@@ -390,9 +395,28 @@ local define_travel = function()
   end
 
   -- 获取指定房间周围指定距离内的遍历路径栈
-  function prototype:generateNearbyTraversePlan(centerRoomId, depth)
+  function prototype:generateNearbyTraversePlan(centerRoomId, depth, skipStart)
     local rooms = self:getNearbyRooms(centerRoomId, depth)
-    return self:generateTraversePlan(rooms, centerRoomId)
+    return self:generateTraversePlan(rooms, centerRoomId, skipStart)
+  end
+
+  -- 检查两个房间的出口列表是否一致
+  function prototype:checkExitsIdentical(exits1, exits2)
+    local ls1 = utils.split(exits1, ";")
+    local ls2 = utils.split(exits2, ";")
+    if #ls1 ~= #ls2 then
+      return false
+    end
+    local map1 = {}
+    for i = 1, #ls1 do
+      map1[ls1[i]] = true
+    end
+    for i = 1, #ls2 do
+      if not map1[ls2[i]] then
+        return false
+      end
+    end
+    return true
   end
 
   ----------- Alias-only API ----------
@@ -659,12 +683,24 @@ local define_travel = function()
           name = name
         }
       end
+      local fullname = args.fullname
+      -- 先检查是否为重命名房间
+      for roomName, renamed in pairs(SpecialRenamedRooms) do
+        local idxStart, idxEnd = string.find(fullname, roomName)
+        -- 房间匹配结尾
+        if idxEnd == string.len(fullname) then
+          self:debug("发现房间为重命名房间", fullname)
+          fullname = string.sub(fullname, 1, idxStart - 1) .. renamed
+          break
+        end
+      end
+
       local results = {}
       for zoneName, zone in pairs(self.zonesByName) do
-        local idxStart, idxEnd = string.find(args.fullname, zoneName)
+        local idxStart, idxEnd = string.find(fullname, zoneName)
         -- 首字符匹配
         if idxStart == 1 then
-          local roomName = string.sub(args.fullname, idxEnd + 1)
+          local roomName = string.sub(fullname, idxEnd + 1)
           for _, room in pairs(zone.rooms) do
             if room.name == roomName then
               table.insert(results, room)
@@ -677,12 +713,14 @@ local define_travel = function()
       -- 二次查询，查找重命名区域列表
       if #results == 0 then
         -- check renamed zone
+        local zoneRenameMatch = false
         for zoneName, renamed in pairs(SpecialRenamedZones) do
-          local idxStart, idxEnd = string.find(args.fullname, zoneName)
+          local idxStart, idxEnd = string.find(fullname, zoneName)
           if idxStart == 1 then
             self:debug("重命名区域匹配成功")
+            zoneRenameMatch = true
             local zone = self.zonesByName[renamed]
-            local roomName = string.sub(args.fullname, idxEnd + 1)
+            local roomName = string.sub(fullname, idxEnd + 1)
             for _, room in pairs(zone.rooms) do
               if room.name == roomName then
                 table.insert(results, room)
@@ -696,6 +734,9 @@ local define_travel = function()
     else
       assert(args.name, "name cannot be nil")
       assert(args.zone, "zone cannot be nil")
+      -- 先检查房间是否为重命名房间
+      local name = SpecialRenamedRooms[args.name] or args.name
+
       local results = {}
       local zoneName = SpecialRenamedZones[args.zone] or args.zone
       local zone = self.zonesByName[zoneName]
@@ -703,7 +744,7 @@ local define_travel = function()
         return results
       end
       for _, room in pairs(zone.rooms) do
-        if room.name == args.name then
+        if room.name == name then
           table.insert(results, room)
         end
       end
@@ -1802,24 +1843,6 @@ local define_travel = function()
     end
   end
 
-  function prototype:checkExitsIdentical(exits1, exits2)
-    local ls1 = utils.split(exits1, ";")
-    local ls2 = utils.split(exits2, ";")
-    if #ls1 ~= #ls2 then
-      return false
-    end
-    local map1 = {}
-    for i = 1, #ls1 do
-      map1[ls1[i]] = true
-    end
-    for i = 1, #ls2 do
-      if not map1[ls2[i]] then
-        return false
-      end
-    end
-    return true
-  end
-
   function prototype:assureStepResponsive(extraWaitTime)
     while true do
       SendNoEcho("set travel walk_step")
@@ -1873,14 +1896,14 @@ local define_travel = function()
   end
 
   -- 生成遍历计划
-  function prototype:generateTraversePlan(traverseRooms, startid)
+  function prototype:generateTraversePlan(traverseRooms, startid, skipStart)
     local plan = traversal {
       rooms = traverseRooms or self.traverseRooms,
       fallbackRooms = self.roomsById,
       startid = startid or self.currRoomId
     }
-    -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path
-    if plan and #plan > 0 then
+    if plan and #plan > 0 and not skipStart then
+      -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path
       table.insert(plan, dal:getPseudoPath(plan[#plan].startid))
     end
     return plan

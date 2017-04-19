@@ -8,6 +8,7 @@
 
 local helper = require "pkuxkx.helper"
 local status = require "pkuxkx.status"
+local travel = require "pkuxkx.travel"
 --------------------------------------------------------------
 -- lingwu.lua
 -- 领悟基本武功，请自备干粮和酒袋

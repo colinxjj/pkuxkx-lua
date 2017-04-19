@@ -47,6 +47,22 @@ local define_helper = function()
     return DIRECTIONS[path] or path
   end
 
+  helper.copyKeys = function(tb)
+    local results = {}
+    for k, _ in pairs(tb) do
+      table.insert(results, k)
+    end
+    return results
+  end
+
+  helper.copyValues = function(tb)
+    local results = {}
+    for _, v in pairs(tb) do
+      table.insert(results, v)
+    end
+    return results
+  end
+
   -- the global namespace to store the functions used in trigger, alias and timer
   local _global_trigger_callbacks = {}
   local _global_alias_callbacks = {}
