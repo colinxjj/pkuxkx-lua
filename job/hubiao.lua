@@ -239,11 +239,9 @@ local define_hubiao = function()
     find = "find",  -- 寻找，当到达目的地而无法找到伙计时
   }
   local Events = {
-    ALIAS_START = "^hubiao\\s+start\\s*$",
-    ALIAS_STOP = "^hubiao\\s+stop\\s*$",
-    ALIAS_DEBUG = "%hubiao\\s+debug\\s+(on|off)\\s*$",
     STOP = "stop",  -- 任何状态下停止
     START = "start",  -- stop -> prepare
+    NO_JOB_AVAILABLE = "no_job_available",  -- prepare -> stop
     ACCEPT_SUCCESS = "accept_success",  -- prepare -> prefetch
     ACCEPT_FAIL = "accept_fail",  -- prepare -> prepare
     NEXT_PREFETCH = "next_prefetch",  -- prefetch -> prefetch
@@ -257,6 +255,10 @@ local define_hubiao = function()
     MIXIN_FOUND = "mixin_found",  -- 发现密信 submit -> mixin
   }
   local REGEXP = {
+    ALIAS_START = "^hubiao\\s+start\\s*$",
+    ALIAS_STOP = "^hubiao\\s+stop\\s*$",
+    ALIAS_DEBUG = "^hubiao\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_MIXIN = "^hubiao\\s+mixin\\s+(.*?)\\s*$",
     JOB_INFO = "^(\\d+)\\s+(.*?)\\s+(\\d+)秒\\s+(.*?)\\s+(.*)$",
     ACCEPT_INFO = "^.*把这批红货送到(.*?)那里，他已经派了个伙计名叫(.*?)到(.*?)附近接你，把镖车送到他那里就行了。$",
     ACCEPT_FAIL = "^[ >]*认领任务失败，请选择其他任务。$",
@@ -351,6 +353,16 @@ local define_hubiao = function()
         helper.enableTriggerGroups("hubiao_submit_start", "hubiao_submit_done",
           "hubiao_mixin_start", "hubiao_mixin_done")
       end
+    }
+    self:addState {
+      state = States.lost,
+      enter = function() end,
+      exit = function() end
+    }
+    self:addState {
+      state = States.mixin,
+      enter = function() end,
+      exit = function() end
     }
   end
 
