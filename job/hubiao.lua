@@ -267,16 +267,23 @@ local define_hubiao = function()
     TRANSFER_BUSY = "^[ >]*(劫匪伸手一拦道：“想跑？没那么容易！”|你还是先把对手解决了再说吧！|你现在正忙着哩。|镖车还没有跟上来呢,走慢点.*)$",
     STEP_SUCCESS = "^[ >]*你赶着镖车驶了过来。$",
     REWARDED = "^[ >]*你一共被奖励了：$",
-    -- todo
     MIXIN_DESC = "^[ >]*这是一张林震南给你的密信，需要用特殊的药水才能显形\\(xian\\)。$",
     MIXIN_NPC_DISPLAY = "^[ >]*\\s*卷走.*?财物的伙计 .*?\\((.*?)\\)$",
     MIXIN_NPC_FOUND = "^[ >]*一个伙计挖着鼻屎走了出来，道：你找我啥事？$",
     MIXIN_YAO_SUCCESS = "^[ >]*.*把一包财物砸向你，一转眼不见了。$",
+    POWERUP_EXPIRE = "^[ >]*你的紫霞神功运行完毕，将内力收回丹田。$",
+    QI_EXPIRE = "^[ >]*你减缓真气运行，让气血运行恢复正常。 $",
   }
+
+  local SpecialRenameRooms = {
+    ["嘉兴钱庄"] = "嘉兴嘉兴钱庄",
+  }
+
 
   -- 福州福威镖局
   local StartRoomId = 26
   local PrefetchDepth = 5
+  local DoubleSearchDepth = 3
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -293,6 +300,7 @@ local define_hubiao = function()
     self:setState(States.stop)
     self.maxRound = 8
     self.round = 0
+    self.DEBUG = true
 
     -- precondition
     self.precondition = {
@@ -315,7 +323,7 @@ local define_hubiao = function()
       state = States.stop,
       enter = function()
         self:disableAllTriggers()
-        self:removeTriggerGroups("hubiao_prefetch_traverse", "hubiao_transfer")
+        helper.removeTriggerGroups("hubiao_prefetch_traverse", "hubiao_transfer_traverse")
         SendNoEcho("set jobs done")  -- 为jobs提供结束触发
       end,
       exit = function() end
@@ -373,7 +381,7 @@ local define_hubiao = function()
       newState = States.prepare,
       event = Events.START,
       action = function()
-        return self:doPrepare()
+        return self:doGetJob()
       end
     }
     self:addTransitionToStop(States.stop)
@@ -385,7 +393,7 @@ local define_hubiao = function()
       action = function()
         self:debug("等待3秒后重新接任务")
         wait.time(3)
-        return self:doPrepare()
+        return self:doGetJob()
       end
     }
     self:addTransition {
@@ -396,7 +404,7 @@ local define_hubiao = function()
         self:debug("等待3秒后开始预取")
         wait.time(3)
         self.transferVisitedRoomIds = {}
-        return self:doConfirmSearhRooms()
+        return self:doConfirmSearchRooms()
       end
     }
     self:addTransition {
@@ -439,10 +447,6 @@ local define_hubiao = function()
       newState = States.transfer,
       event = Events.STEP_SUCCESS,
       action = function()
-        -- 设置运输房间编号
-        if self.currStep then
-          self.transferRoomId = self.currStep.endid
-        end
         -- 设置下一步的路径为当前路径
         if #(self.transferPlan) > 0 then
           self.currStep = table.remove(self.transferPlan)
@@ -483,6 +487,7 @@ local define_hubiao = function()
       newState = States.submit,
       event = Events.TRANSFER_SUCCESS,
       action = function()
+        helper.checkUntilNotBusy()
         return self:doSubmit()
       end
     }
@@ -536,7 +541,7 @@ local define_hubiao = function()
         local jobStatus = wildcards[4]
         local jobPlayer = wildcards[5]
         if jobStatus == "待认领" then
-          table.insert(self.jobs, {id = jobId, location = jobLocation})
+          table.insert(self.jobs, {id = jobId, location = SpecialRenameRooms[jobLocation] or jobLocation})
         end
       end
     }
@@ -575,6 +580,11 @@ local define_hubiao = function()
       regexp = REGEXP.STEP_SUCCESS,
       response = function()
         self.stepSuccess = true
+        -- 在触发车子行走时设置运输房间编号
+        if self.currStep then
+          self.transferRoomId = self.currStep.endid
+          self:debug("设置运输房间编号为", self.currStep.endid)
+        end
       end
     }
     -- submit
@@ -619,6 +629,20 @@ local define_hubiao = function()
         self.transferLost = true
       end
     }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.POWERUP_EXPIRE,
+      response = function()
+        SendNoEcho("yun powerup")
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.QI_EXPIRE,
+      response = function()
+        SendNoEcho("yun qi")
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -658,7 +682,7 @@ local define_hubiao = function()
           fullname = location
         }
         if #(rooms) == 0 then
-          ColourNote("red", "", "房间查询不到或不可达")
+          ColourNote("red", "", "房间查询不到或不可达 " .. location)
         else
           self.mixinRoomId = rooms[1].id
           travel:walkto(self.mixinRoomId)
@@ -679,7 +703,7 @@ local define_hubiao = function()
               self.mixinNpcId = string.lower(wildcards[1])
             end
           }
-          travel:lookUntilNotBusy()
+          travel:lookUntilNotBusy()  --
           helper.removeTriggerGroups("hubiao_mixin_one_shot")
           while true do
             SendNoEcho("ask " .. self.mixinNpcId .. " about yao")
@@ -689,11 +713,7 @@ local define_hubiao = function()
           self:debug("获得财物，返回")
           wait.time(2)
           helper.checkUntilNotBusy()
-          travel:walkto(StartRoomId)
-          travel:waitUntilArrived()
-          helper.checkUntilNotBusy()
-          SendNoEcho("give cai wu to lin")
-          return self:fire(Events.STOP)
+          return self:doSubmitCaiwu()
         end
       end
     }
@@ -710,7 +730,21 @@ local define_hubiao = function()
     }
   end
 
+  function prototype:doSubmitCaiwu()
+    travel:stop()
+    travel:walkto(StartRoomId)
+    travel:waitUntilArrived()
+    helper.checkUntilNotBusy()
+    SendNoEcho("give cai wu to lin")
+    return self:fire(Events.STOP)
+  end
+
   function prototype:doGetJob()
+    travel:stop()
+    travel:walkto(StartRoomId)
+    travel:waitUntilArrived()
+    self:debug("等待1秒后查询任务")
+    wait.time(1)
     self.jobs = {}
     SendNoEcho("set hubiao info_start")
     SendNoEcho("listesc")
@@ -753,12 +787,16 @@ local define_hubiao = function()
       wait.time(2)
       return self:doCancel()
     else
-      local searchRooms = travel:getMatchedRooms {
-        zone = targets[1].zone,
-        name = self.searchRoomName,
-      }
+      local zone = targets[1].zone
+      local searchRooms = {}
+      local rooms = travel.zonesByCode[zone].rooms
+      for _, room in pairs(rooms) do
+        if room.name == self.searchRoomName then
+          table.insert(searchRooms, room)
+        end
+      end
       if #(searchRooms) == 0 then
-        self:debug("伙计所在地点不可达，无法执行预取，等待2秒后结束")
+        self:debug("伙计所在地点不可达", zone, self.searchRoomName, "无法执行预取，等待2秒后结束")
         wait.time(2)
         return self:doCancel()
       else
@@ -780,7 +818,7 @@ local define_hubiao = function()
         travel:walkto(searchStartRoom.id)
         travel:waitUntilArrived()
         self:debug("到达搜索起始地点", searchStartRoom.id)
-        self:debug("开始遍历寻找，深度为", PrefetchDepth)
+        self:debug("开始遍历，深度为", PrefetchDepth, "寻找伙计名为：", self.dudeName)
 
         self.targetRoomId = nil
         helper.addTrigger {
@@ -788,9 +826,11 @@ local define_hubiao = function()
           regexp = self:dudeNameRegexp(),
           response = function()
             --找到伙计，则设置目标地点为当前房间编号
+            self:debug("发现伙计", self.dudeName)
             self.targetRoomId = travel.traverseRoomId
           end
         }
+        helper.enableTriggerGroups("hubiao_prefetch_traverse")
         local onStep = function()
           return self.targetRoomId ~= nil  -- 停止条件，找到伙计
         end
@@ -819,12 +859,15 @@ local define_hubiao = function()
   end
 
   function prototype:doCancel()
-    helper.assureNotBusy()
-    travel:walkto(StartRoomId)
-    travel:waitUntilArrived()
-    helper.assureNotBusy()
-    SendNoEcho("ask lin about fail")
-    return self:fire(Events.STOP)
+    -- for debug purpose
+    ColourNote("red", "", "调试模式不进行任务取消，请手动完成后再重新加载")
+--    helper.assureNotBusy()
+--    travel:stop()
+--    travel:walkto(StartRoomId)
+--    travel:waitUntilArrived()
+--    helper.assureNotBusy()
+--    SendNoEcho("ask lin about fail")
+--    return self:fire(Events.STOP)
   end
 
   function prototype:doPrepareTransfer()
@@ -833,12 +876,12 @@ local define_hubiao = function()
       ColourNote("red", "", "计算直达路径失败，放弃该任务")
       return self:doCancel()
     end
-    local traversePlan = travel:generateNearbyTraversePlan(self.targetRoomId, 2, true)
+    local traversePlan = travel:generateNearbyTraversePlan(self.targetRoomId, DoubleSearchDepth, true)
     if not traversePlan then
       ColourNote("red", "", "计算搜索路径失败，放弃该任务")
       return self:doCancel()
     end
-    -- 合并两个行走计划栈，注意方向
+    -- 合并两个行走计划栈，注意顺序
     local transferPlan = {}
     for _, path in ipairs(traversePlan) do
       table.insert(transferPlan, path)
@@ -851,22 +894,27 @@ local define_hubiao = function()
     self.transferLost = false
     self.findDude = false
     self.transferSuccess = false
-    helper.removeTriggerGroups("hubiao_transfer")
-    -- 找到伙计
+    helper.removeTriggerGroups("hubiao_transfer_traverse")
+    -- 找到伙计触发
     helper.addTrigger {
-      group = "hubiao_transfer",
+      group = "hubiao_transfer_traverse",
       regexp = self:dudeNameRegexp(),
       response = function()
         self.findDude = true
       end
     }
+    helper.enableTriggerGroups("hubiao_transfer_traverse")
+    -- 最初时装备和运功
+    SendNoEcho("yun powerup")
+    SendNoEcho("yun qi")
     return self:fire(Events.STEP_SUCCESS)
   end
 
   function prototype:doStep()
+    self:debug("当前行走方向", self.currStep.path)
     self.stepSuccess = false
     SendNoEcho("set hubiao step_start")
-    SendNoEcho("gan che to " .. helper.expandDirection(self.currStep))
+    SendNoEcho("gan che to " .. helper.expandDirection(self.currStep.path))
     SendNoEcho("set hubiao step_done")
     wait.time(2)
     helper.checkUntilNotBusy()
@@ -894,25 +942,26 @@ local define_hubiao = function()
     if self.DEBUG then
       local roomIds = helper.copyKeys(rooms1)
       print("最近1格房间列表：", table.concat(roomIds, ","))
-      -- 匹配
     end
     self:debug("获取当前房间信息")
     travel:lookUntilNotBusy()
-    self:debug(travel.currRoomName)
-    self:debug(travel.currRoomDesc)
-    self:debug(travel.currRoomExits)
+    local currRoomName = travel.currRoomName
+    local currRoomDesc = table.concat(travel.currRoomDesc)
+    local currRoomExits = travel.currRoomExits
+    self:debug(currRoomName)
+    self:debug(currRoomDesc)
+    self:debug(currRoomExits)
     local matchedRooms = {}
     for _, room in pairs(rooms1) do
-      if travel.currRoomName == room.name
-        and travel.currRoomDesc == room.description
-        and travel:checkExitsIdentical(travel.currRoomDesc, room.exits)
+      if currRoomName == room.name
+        and currRoomDesc == room.description
+        and travel:checkExitsIdentical(currRoomExits, room.exits)
         and self.transferRoomId ~= room.id then
         table.insert(matchedRooms, room)
       end
     end
     if #(matchedRooms) > 1 then
       ColourNote("yellow", "", "存在多个房间匹配迷路房间，放弃该任务")
-      travel:stop()
       return self:doCancel()
     elseif #(matchedRooms) == 1 then
       self:debug("已匹配唯一房间，重新计算运输计划")
@@ -922,12 +971,12 @@ local define_hubiao = function()
       return self:fire(Events.RELOCATED)
     else
       ColourNote("yellow", "", "无房间可匹配，放弃该任务")
-      travel:stop()
       return self:doCancel()
     end
   end
 
   function prototype:doSubmit()
+    travel:stop()
     travel:walkto(StartRoomId)
     travel:waitUntilArrived()
     self.submitSuccess = false

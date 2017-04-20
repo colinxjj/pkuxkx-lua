@@ -100,6 +100,35 @@ newFile:write(im:pngStr())
 newFile:close()
 
 
+-- 正则为 ^gopaths (.*?)$
+
+--local directions = {
+--  ["东"] = "east",
+--  ["南"] = "south",
+--  ["西"] = "west",
+--  ["北"] = "north",
+--  ["上"] = "up",
+--  ["下"] = "down",
+--  ["东上"] = "eastup",
+--  ["东下"] = "eastdown",
+--}
+--local cmd = "%1"
+--Note("接收到路径为：", cmd)
+--local paths = utils.split(cmd, " ")
+--for _, path in ipairs(paths) do
+--  local fullPath = directions[path]
+--  if fullPath then
+--    Send(fullPath)
+--  else
+--    ColourNote("red", "", "无法识别方向：" .. path)
+--    break
+--  end
+--end
+
+
+
+
+
 --83	31.757328647138
 --144	89.593528277346
 --202	858.16509116016

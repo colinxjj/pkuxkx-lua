@@ -17,9 +17,99 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
-local NanjueJob = require "job.NanjueJob"
-local NanjueStranger = require "job.NanjueStranger"
 require "getstyle"
+
+-- nanjue job data structure
+local define_NanjueJob = function()
+  local prototype = {}
+  prototype.__index = prototype
+
+  function prototype:new(args)
+    local obj = {}
+    obj.code = assert(args.code, "code of job cannot be nil")
+    obj.name = assert(args.name, "name of job cannot be nil")
+    obj.level = assert(args.level, "level of job cannot be nil")
+    obj.status = assert(args.status, "status of job cannot be nil")
+    obj.startTime = assert(args.startTime, "startTime of job cannot be nil")
+    obj.endTime = assert(args.endTime, "endTime of job cannot be nil")
+    obj.location = assert(args.location, "location of job cannot be nil")
+    obj.requirements = assert(args.requirements, "requirements of job cannot be nil")
+    obj.players = assert(args.players, "players of job cannot be nil")
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:decorate(obj)
+    assert(obj.code, "code of job cannot be nil")
+    assert(obj.name, "name of job cannot be nil")
+    assert(obj.level, "level of job cannot be nil")
+    assert(obj.status, "status of job cannot be nil")
+    assert(obj.startTime, "startTime of job cannot be nil")
+    assert(obj.endTime, "endTime of job cannot be nil")
+    assert(obj.location, "location of job cannot be nil")
+    assert(obj.requirements, "requirements of job cannot be nil")
+    assert(obj.players, "players of job cannot be nil")
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  return prototype
+end
+local NanjueJob = define_NanjueJob()
+
+-- nanjue stranger(路人) data structure
+local define_NanjueStranger = function()
+  local prototype = {}
+  prototype.__index = prototype
+
+  function prototype:new(args)
+    local obj = {}
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:decorate(obj)
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  function prototype:confirmed()
+    assert(self.shoeType, "shoeType cannot be nil")
+    assert(self.shoeColor, "shoeColor cannot be nil")
+    assert(self.clothType, "clothType cannot be nil")
+    assert(self.clothColor, "clothColor cannot be nil")
+    assert(self.height, "height cannot be nil")
+    assert(self.weight, "weight cannot be nil")
+    assert(self.age, "age cannot be nil")
+    assert(self.gender, "gender cannot be nil")
+    assert(self.roomId, "roomId cannot be nil")
+    assert(self.name, "name cannot be nil")
+    assert(self.id, "id cannot be nil")
+    assert(self.seq, "seq cannot be nil")
+    -- self.identifyFeature
+  end
+
+  function prototype:show()
+    print("当前路人信息如下：")
+    print("姓名：", self.name)
+    print("性别：", self.gender)
+    print("年龄：", self.age)
+    print("身高：", self.height)
+    print("体重：", self.weight)
+    print("衣服材质：", self.clothType)
+    print("衣服颜色：", self.clothColor)
+    print("鞋子材质：", self.shoeType)
+    print("鞋子颜色：", self.shoeColor)
+    if self.identifyFeature then
+      print("证词内容：", next(self.identifyFeature))
+    else
+      print("证词内容：", "无")
+    end
+  end
+
+  return prototype
+end
+local NanjueStranger = define_NanjueStranger()
 
 --------------------------------------------------------------
 -- nanjue.lua
@@ -1049,17 +1139,22 @@ local define_nanjue = function()
       self:debug("仅剩1人有嫌疑，确定为罪犯")
       return self:fire(Events.CRIMINAL_ANALYZED)
     else
-      self:debug("仍有多名嫌疑人，选择第一个作为嫌疑人")
---      local suspect
---      for _, s in ipairs(self.suspects) do
---        if s.identifyFeature then
---          suspect = s
---          break
---        end
---      end
---      if suspect then
---        self.suspects = {suspect}
---      end
+      self:debug("仍有多名嫌疑人，尝试选择有证词的作为嫌疑人")
+      local suspects
+      for _, s in ipairs(self.suspects) do
+        if s.identifyFeature then
+          table.insert(suspects, s)
+        end
+      end
+      if #suspects > 1 then
+        self:debug("仍有多名嫌疑人有证词，选择第一个")
+        self.suspects = suspects
+      elseif #suspects == 1 then
+        self:debug("仅有一人有证词，选作嫌疑人：", suspects[1].name)
+        self.suspects = suspects
+      else
+        self:debug("没有人有证词，选择第一个")
+      end
       return self:fire(Events.CRIMINAL_ANALYZED)
     end
   end
