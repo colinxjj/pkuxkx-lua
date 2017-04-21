@@ -282,7 +282,9 @@ local define_hubiao = function()
     ["嘉兴钱庄"] = "嘉兴嘉兴钱庄",
     ["泉州当铺"] = "泉州泉州当铺"
   }
-
+  local SpecialRelocateRooms = {
+    ["金鸡亭"] = 785
+  }
 
   -- 福州福威镖局
   local StartRoomId = 26
@@ -309,7 +311,7 @@ local define_hubiao = function()
     self.precondition = {
       jing = 0.96,
       qi = 0.96,
-      jingli = 1,
+      jingli = 0.96,
       neili = 1.8
     }
     -- special variable
@@ -338,7 +340,7 @@ local define_hubiao = function()
       enter = function()
         self:disableAllTriggers()
         helper.removeTriggerGroups("hubiao_prefetch_traverse", "hubiao_transfer_traverse")
-        SendNoEcho("set jobs done")  -- 为jobs提供结束触发
+        SendNoEcho("set jobs job_done")  -- 为jobs提供结束触发
       end,
       exit = function()
         helper.enableTriggerGroups("hubiao_robber", "hubiao_force")
@@ -503,9 +505,11 @@ local define_hubiao = function()
       newState = States.submit,
       event = Events.TRANSFER_SUCCESS,
       action = function()
+        local tick = 0 -- 超过12 tick认为无匪了
         while true do
           helper.checkUntilNotBusy()
-          if self.robberPresent then
+          if tick <= 12 and self.robberPresent then
+            tick = tick + 1
             wait.time(3)
           else
             break
@@ -787,6 +791,10 @@ local define_hubiao = function()
     }
   end
 
+  function prototype:doStart()
+    return self:fire(Events.START)
+  end
+
   function prototype:doSubmitCaiwu()
     travel:stop()
     travel:walkto(StartRoomId)
@@ -853,14 +861,19 @@ local define_hubiao = function()
         end
       end
       if #(searchRooms) == 0 then
-        self:debug("伙计所在地点不可达", zone, self.searchRoomName, "无法执行预取，等待2秒后结束")
-        wait.time(2)
-        return self:doCancel()
-      else
-        self.searchedRoomIds = {}
-        self.searchRooms = searchRooms
-        return self:fire(Events.NEXT_PREFETCH)
+        ColourNote("yellow", "", "伙计所在地点不可达", zone, self.searchRoomName, "无法执行预取，等待2秒后结束")
+        self:debug("尝试特殊定位房间")
+        local specialRelocateId = SpecialRelocateRooms[self.searchRoomName]
+        if not specialRelocateId then
+          ColourNote("red", "", "无法执行预取，取消该任务")
+          wait.time(2)
+          return self:doCancel()
+        end
+        table.insert(searchRooms, travel.roomsById[specialRelocateId])
       end
+      self.searchedRoomIds = {}
+      self.searchRooms = searchRooms
+      return self:fire(Events.NEXT_PREFETCH)
     end
   end
 
@@ -962,8 +975,9 @@ local define_hubiao = function()
     }
     helper.enableTriggerGroups("hubiao_transfer_traverse")
     -- 最初时装备和运功
---    SendNoEcho("yun powerup")
---    SendNoEcho("yun qi")
+    self.powerupPresent = false
+    self.qiPresent = false
+    SendNoEcho("wield sword")
     return self:fire(Events.STEP_SUCCESS)
   end
 

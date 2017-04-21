@@ -114,10 +114,10 @@ local define_JobDefinition = function()
     name = "都统制府刺杀",
     code = "cisha"
   }
-  prototype.yunbiao = prototype:decorate {
+  prototype.hubiao = prototype:decorate {
     id = 9,
     name = "运镖任务",
-    code = "yunbiao"
+    code = "hubiao"
   }
   prototype.huyidao = prototype:decorate {
     id = 10,
@@ -223,6 +223,8 @@ local define_Job = function()
   function prototype:postConstruct()
     self.waitThread = nil
     self.stopped = true
+    self.cancelThreshold = 3600
+    self.warnThreshold = 600
   end
 
   function prototype:start()
@@ -243,10 +245,10 @@ local define_Job = function()
     antiIdle = function()
       return coroutine.wrap(function()
         local currTime = os.time()
-        if currTime - self:getLastUpdateTime() >= 300 then
+        if currTime - self:getLastUpdateTime() >= self.cancelThreshold then
           ColourNote("red", "", "停顿超过5分钟，强制取消任务")
           return self:cancel()
-        elseif currTime - self:getLastUpdateTime() >= 180 then
+        elseif currTime - self:getLastUpdateTime() >= self.warnThreshold then
           ColourNote("yellow", "", "停顿超过3分钟，警告")
         else
           print("等待60秒后继续查看状态")
@@ -330,6 +332,8 @@ local define_jobs = function()
     CANNOT_RECOVER = "^[ >]*你正在运行真气加速气血恢复，无法再分出内力来。$",
     TUNA_BEGIN = "^[ >]*你盘膝坐下，开始吐纳炼精。$",
     DAZUO_BEGIN = "^[ >]*你坐下来运气用功，一股内息开始在体内流动。$",
+    DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
+    TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
   }
 
   function prototype:FSM()
@@ -349,7 +353,7 @@ local define_jobs = function()
     self:setState(States.stop)
     self.weaponId = "sword"
     self.silverThreshold = 300
-    self.goldThreshold = 5
+    self.goldThreshold = 20
   end
 
   function prototype:disableAllTriggers()
@@ -416,8 +420,12 @@ local define_jobs = function()
     }
     self:addState {
       state = States.recover,
-      enter = function() end,
-      exit = function() end
+      enter = function()
+        helper.enableTriggerGroups("jobs_recover")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("jobs_recover")
+      end
     }
     self:addState {
       state = States.job,
@@ -525,7 +533,21 @@ local define_jobs = function()
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("jobs_recover")
+    helper.addTrigger {
+      group = "jobs_recover",
+      regexp = REGEXP.DAZUO_FINISH,
+      response = function()
+        return self:doRecover()
+      end
+    }
+    helper.addTrigger {
+      group = "jobs_recover",
+      regexp = REGEXP.TUNA_FINISH,
+      response = function()
+        return self:doRecover()
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -603,7 +625,7 @@ local define_jobs = function()
     helper.assureNotBusy()
     print("任务信息检查完毕（待完善）")
     -- 确定任务
-    self.currJob = self.jobs["songxin"]
+    self.currJob = self.jobs.hubiao
     print("确定当前任务类型：", self.currJob.name)
     wait.time(1)
     helper.assureNotBusy()
@@ -613,11 +635,11 @@ local define_jobs = function()
     end
     print("食物饮水检查完毕")
     local precondition = self.currJob:getPrecondition()
-    if status.effJing < precondition.jingPercent * status.maxJing - 1
-      or status.currJingli < precondition.jingPercent * status.maxJingli - 1
-      or status.effQi < precondition.qiPercent * status.maxQi - 1
-      or status.currNeili < precondition.neiliPercent * status.maxNeili - 1 then
-      return self:fire(Events.RECOVER)
+    if status.effJing < precondition.jing * status.maxJing - 1
+      or status.currJingli < precondition.jingli * status.maxJingli - 1
+      or status.effQi < precondition.qi * status.maxQi - 1
+      or status.currNeili < precondition.neili * status.maxNeili - 1 then
+      return self:fire(Events.TO_RECOVER)
     end
     print("身体状态检查完毕")
     return self:fire(Events.JOB_READY)
@@ -677,16 +699,22 @@ local define_jobs = function()
   end
 
   function prototype:doRecover()
+    wait.time(1)
     local pct = self.currJob:getPrecondition()
     status:hpbrief()
     -- 先恢复精
     local neiliUsed = false
     if status.effJing < status.maxJing * pct.jing - 1 then
-      SendNoEcho("do 2 yun inspire")
+      self:debug("精受损，进行恢复")
+      SendNoEcho("yun inspire")
+      helper.checkUntilNotBusy()
+      SendNoEcho("yun inspire")
+      helper.checkUntilNotBusy()
       neiliUsed = true
     end
     -- 再恢复气
     if status.effQi < status.maxQi * pct.qi - 1 then
+      self:debug("气受损，进行恢复")
       SendNoEcho("do 2 yun heal")
       neiliUsed = true
     end
@@ -727,8 +755,9 @@ local define_jobs = function()
           return self:doRecover()
         end
       end
+    else
+      return self:fire(Events.RECOVERED)
     end
-    return self:fire(Events.RECOVERED)
   end
 
   return prototype

@@ -334,7 +334,7 @@ local define_nanjue = function()
     },
     ["白发苍苍"] = {
       k = "age",
-      v = "medium"    -- 此处，应该为中年
+      v = "old"    -- 此处有疑问？
     },
     ["头发花白"] = {
       k = "age",
@@ -408,6 +408,13 @@ local define_nanjue = function()
     self:resetOnStop()
     -- debug purpose
     self.DEBUG = true
+
+    self.precondition = {
+      jing = 0.96,
+      qi = 0.96,
+      jingli = 0.5,
+      neili = 0.1
+    }
   end
 
   function prototype:resetOnStop()

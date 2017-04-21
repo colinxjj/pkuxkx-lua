@@ -1902,6 +1902,7 @@ local define_travel = function()
       fallbackRooms = self.roomsById,
       startid = startid or self.currRoomId
     }
+    local skipStart = skipStart or false
     if plan and #plan > 0 and not skipStart then
       -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path
       table.insert(plan, dal:getPseudoPath(plan[#plan].startid))

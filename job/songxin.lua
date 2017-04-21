@@ -74,7 +74,6 @@ local define_songxin = function()
   end
 
   function prototype:postConstruct()
-    self.lastUpdateTime = os.time()
     self:initStates()
     self:initTransitions()
     self:initTriggers()
@@ -681,16 +680,6 @@ local define_songxin = function()
   function prototype:doStart()
     return self:fire(Events.START)
   end
-
---  function prototype:doWaitUntilDone()
---    local currCo = assert(coroutine.running(), "Must be in coroutine")
---    helper.addOneShotTrigger {
---      group = "jobs_one_shot",
---      regexp = helper.settingRegexp("jobs", "job_done"),
---      response = helper.resumeCoRunnable(currCo)
---    }
---    return coroutine.yield()
---  end
 
   function prototype:doKill()
     for _, robber in pairs(self.robbersToKill) do
