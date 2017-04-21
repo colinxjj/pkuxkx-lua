@@ -236,7 +236,6 @@ local define_hubiao = function()
     lost = "lost",  -- 迷路中（很大可能被强盗推至相邻房间）
     submit = "submit",  -- 提交
     mixin = "mixin",  -- 密信
-    find = "find",  -- 寻找，当到达目的地而无法找到伙计时
   }
   local Events = {
     STOP = "stop",  -- 任何状态下停止
@@ -272,11 +271,16 @@ local define_hubiao = function()
     MIXIN_NPC_FOUND = "^[ >]*一个伙计挖着鼻屎走了出来，道：你找我啥事？$",
     MIXIN_YAO_SUCCESS = "^[ >]*.*把一包财物砸向你，一转眼不见了。$",
     POWERUP_EXPIRE = "^[ >]*你的紫霞神功运行完毕，将内力收回丹田。$",
-    QI_EXPIRE = "^[ >]*你减缓真气运行，让气血运行恢复正常。 $",
+    POWERUP_ENABLE = "^[ >]*(你运起紫霞神功，脸上紫气若隐若现绵如云霞。|你已经在运功中了。)$",
+    QI_EXPIRE = "^[ >]*你减缓真气运行，让气血运行恢复正常。$",
+    QI_ENABLE = "^[ >]*(你运行真气加速自身的气血恢复。|你已经运行内功加速全身气血恢复。)$",
+    ROBBER_ESCAPE = "^[ >]*劫匪叫道：点子扎手，扯呼！$",
+    ROBBER_APPEAR = "^[ >]*劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”$",
   }
 
   local SpecialRenameRooms = {
     ["嘉兴钱庄"] = "嘉兴嘉兴钱庄",
+    ["泉州当铺"] = "泉州泉州当铺"
   }
 
 
@@ -301,7 +305,6 @@ local define_hubiao = function()
     self.maxRound = 8
     self.round = 0
     self.DEBUG = true
-
     -- precondition
     self.precondition = {
       jing = 0.96,
@@ -312,10 +315,21 @@ local define_hubiao = function()
     -- special variable
     self.playerName = "撸啊"
     self.playerId = "luar"
+    self.robberPresent = false
+    self.qiPresent = false
+    self.powerupPresent = false
   end
 
   function prototype:disableAllTriggers()
-
+    helper.disableTriggerGroups(
+      "hubiao_info_start", "hubiao_info_done",
+      "hubiao_accept_start", "hubiao_accept_done",
+      "hubiao_step_start", "hubiao_step_done",
+      "hubiao_submit_start", "hubiao_submit_done",
+      "hubiao_mixin_start", "hubiao_mixin_done",
+      "hubiao_transfer",
+      "hubiao_robber",
+      "hubiao_force")
   end
 
   function prototype:initStates()
@@ -326,7 +340,9 @@ local define_hubiao = function()
         helper.removeTriggerGroups("hubiao_prefetch_traverse", "hubiao_transfer_traverse")
         SendNoEcho("set jobs done")  -- 为jobs提供结束触发
       end,
-      exit = function() end
+      exit = function()
+        helper.enableTriggerGroups("hubiao_robber", "hubiao_force")
+      end
     }
     self:addState {
       state = States.prepare,
@@ -487,7 +503,14 @@ local define_hubiao = function()
       newState = States.submit,
       event = Events.TRANSFER_SUCCESS,
       action = function()
-        helper.checkUntilNotBusy()
+        while true do
+          helper.checkUntilNotBusy()
+          if self.robberPresent then
+            wait.time(3)
+          else
+            break
+          end
+        end
         return self:doSubmit()
       end
     }
@@ -523,7 +546,9 @@ local define_hubiao = function()
       "hubiao_step_start", "hubiao_step_done",
       "hubiao_submit_start", "hubiao_submit_done",
       "hubiao_mixin_start", "hubiao_mixin_done",
-      "hubiao_transfer")
+      "hubiao_transfer",
+      "hubiao_robber",
+      "hubiao_force")
     -- info
     helper.addTriggerSettingsPair {
       group = "hubiao",
@@ -629,18 +654,50 @@ local define_hubiao = function()
         self.transferLost = true
       end
     }
+    -- robber
     helper.addTrigger {
-      group = "hubiao_transfer",
-      regexp = REGEXP.POWERUP_EXPIRE,
+      group = "hubiao_robber",
+      regexp = REGEXP.ROBBER_APPEAR,
       response = function()
-        SendNoEcho("yun powerup")
+        self.robberPresent = true
       end
     }
     helper.addTrigger {
-      group = "hubiao_transfer",
+      group = "hubiao_robber",
+      regexp = REGEXP.ROBBER_ESCAPE,
+      response = function()
+        self.robberPresent = false
+      end
+    }
+    -- force
+    helper.addTrigger {
+      group = "hubiao_force",
+      regexp = REGEXP.POWERUP_EXPIRE,
+      response = function()
+        self:debug("powerup过期，需要重新运功")
+        self.powerupPresent = false
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_force",
       regexp = REGEXP.QI_EXPIRE,
       response = function()
-        SendNoEcho("yun qi")
+        self:debug("qi过期，需要重新运功")
+        self.qiPresent = false
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_force",
+      regexp = REGEXP.POWERUP_ENABLE,
+      response = function()
+        self.powerupPresent = true
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_force",
+      regexp = REGEXP.QI_ENABLE,
+      response = function()
+        self.qiPresent = true
       end
     }
   end
@@ -905,14 +962,20 @@ local define_hubiao = function()
     }
     helper.enableTriggerGroups("hubiao_transfer_traverse")
     -- 最初时装备和运功
-    SendNoEcho("yun powerup")
-    SendNoEcho("yun qi")
+--    SendNoEcho("yun powerup")
+--    SendNoEcho("yun qi")
     return self:fire(Events.STEP_SUCCESS)
   end
 
   function prototype:doStep()
     self:debug("当前行走方向", self.currStep.path)
     self.stepSuccess = false
+    if not self.powerupPresent then
+      SendNoEcho("yun powerup")
+    end
+    if not self.qiPresent then
+      SendNoEcho("yun qi")
+    end
     SendNoEcho("set hubiao step_start")
     SendNoEcho("gan che to " .. helper.expandDirection(self.currStep.path))
     SendNoEcho("set hubiao step_done")

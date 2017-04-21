@@ -334,7 +334,7 @@ local define_nanjue = function()
     },
     ["白发苍苍"] = {
       k = "age",
-      v = "old"
+      v = "medium"    -- 此处，应该为中年
     },
     ["头发花白"] = {
       k = "age",
@@ -1140,7 +1140,7 @@ local define_nanjue = function()
       return self:fire(Events.CRIMINAL_ANALYZED)
     else
       self:debug("仍有多名嫌疑人，尝试选择有证词的作为嫌疑人")
-      local suspects
+      local suspects = {}
       for _, s in ipairs(self.suspects) do
         if s.identifyFeature then
           table.insert(suspects, s)

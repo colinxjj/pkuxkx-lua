@@ -101,7 +101,6 @@ newFile:close()
 
 
 -- 正则为 ^gopaths (.*?)$
-
 --local directions = {
 --  ["东"] = "east",
 --  ["南"] = "south",
@@ -111,6 +110,16 @@ newFile:close()
 --  ["下"] = "down",
 --  ["东上"] = "eastup",
 --  ["东下"] = "eastdown",
+--  ["南上"] = "southup",
+--  ["南下"] = "southdown",
+--  ["西上"] = "westup",
+--  ["西下"] = "westdown",
+--  ["北上"] = "northup",
+--  ["北下"] = "northdown",
+--  ["东南"] = "southeast",
+--  ["西南"] = "southwest",
+--  ["东北"] = "northeast",
+--  ["西北"] = "northwest",
 --}
 --local cmd = "%1"
 --Note("接收到路径为：", cmd)
