@@ -60,7 +60,7 @@ local define_murong = function()
     NEXT_SEARCH = "next_search",  -- search -> search
     JIAZEI_FOUND = "jiazei_found",  -- search -> kill
     JIAZEI_MISS = "jiazei_miss", -- kill -> search
-
+    JIAZEI_KILLED = "jiazei_killed", -- kill -> submit
   }
   local REGEXP = {
     ALIAS_START = "^murong\\s+start\\s*$",
@@ -70,6 +70,7 @@ local define_murong = function()
     CAPTCHA_LINK = "^(http://pkuxkx.net/antirobot.*)$",
     JOB_INFO = "^[ >]*仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在『(.*?)』附近出现，你去把它找回来吧.*$",
     JIAZEI_DESC = "^\\s*(.*?)发现的 慕容世家家贼\\((.*)\\).*$",
+    JIAZEI_KILLED = "^[ >]*jiazei killed$",
   }
 
   function prototype:FSM()
@@ -209,17 +210,24 @@ local define_murong = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroup("murong_ask_start", "murong_ask_done", "murong_search")
+    helper.removeTriggerGroups("murong_ask_start", "murong_ask_done", "murong_search")
     helper.addTriggerSettingsPair {
       group = "murong",
       start = "ask_start",
       done = "ask_done"
     }
-    helper. addTrigger {
+    helper.addTrigger {
       group = "murong_ask_done",
       regexp = REGEXP.JOB_INFO,
       response = function(name, line, wildcards)
         self.searchLocation = wildcards[1]
+      end
+    }
+    helper.addTrigger {
+      group = "murong_ask_done",
+      regexp = REGEXP.CAPTCHA_LINK,
+      response = function(name, line, wildcards)
+        self.captchaLink = wildcards[1]
       end
     }
     -- jiazei名称固定
@@ -273,7 +281,7 @@ local define_murong = function()
       regexp = REGEXP.ALIAS_SEARCH,
       response = function(name, line, wildcards)
         self.searchLocation = wildcards[1]
-        return self:fire(Events.LOCATION_ACQUIRED)
+        return self:fire(Events.NEW_JOB_CAPTCHA)
       end
     }
   end
@@ -328,7 +336,7 @@ local define_murong = function()
     elseif self.searchLocation then
       return self:fire(Events.NEW_JOB)
     else
-      ColourNote("没有获取到任务地点，任务失败")
+      ColourNote("yellow", "", "没有获取到任务地点，任务失败")
       return self:doCancel()
     end
   end
@@ -413,13 +421,15 @@ local define_murong = function()
   end
 
   function prototype:doCancel()
-    helper.assureNotBusy()
-    travel:walkto(479)
-    travel:waitUntilArrived()
-    wait.time(1)
-    SendNoEcho("ask pu about fail")
-    helper.checkUntilNotBusy()
-    return self:fire(Events.STOP)
+    ColourNote("red", "", "调试模式，请手动取消任务")
+
+--    helper.assureNotBusy()
+--    travel:walkto(479)
+--    travel:waitUntilArrived()
+--    wait.time(1)
+--    SendNoEcho("ask pu about fail")
+--    helper.checkUntilNotBusy()
+--    return self:fire(Events.STOP)
   end
 
   return prototype
