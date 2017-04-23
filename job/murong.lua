@@ -16,6 +16,24 @@ ask pu about job
 请注意，忽略验证码中的红色文字。
 http://pkuxkx.net/antirobot/robot.php?filename=1492781942600002
 
+慕容世家家贼死了。
+
+你从慕容世家家贼的尸体身上搜出一封信件。
+
+give pu xin
+仆人对着你点了点头。
+仆人说道：「干得好！」
+你给仆人一封信件。
+> 由于你成功的找回慕容复写给江湖豪杰的信件，被奖励：
+一千零九十点实战经验，
+一百四十八点潜能，
+八十点江湖声望作为答谢。
+仆人看着你会心地一笑。
+仆人在你的耳边悄声说道：为了表达对你的谢意，我已经在你的帐户存了一些辛苦费！
+
+你向仆人打听有关『job』的消息。
+仆人说道：「壮士能为慕容世家出力，真是太好了。」
+仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在『临安府怡红馆』附近出现，你去把它找回来吧！
 
 ]]}
 
@@ -37,6 +55,11 @@ local define_murong = function()
   local Events = {
     STOP = "stop",  -- any status -> stop
     START = "start",  -- stop -> ask
+    NEW_JOB = "new_job",  -- ask -> search
+    NEW_JOB_CAPTCHA = "new_job_captcha",
+    NEXT_SEARCH = "next_search",  -- search -> search
+    JIAZEI_FOUND = "jiazei_found",  -- search -> kill
+    JIAZEI_MISS = "jiazei_miss", -- kill -> search
 
   }
   local REGEXP = {
@@ -45,6 +68,8 @@ local define_murong = function()
     ALIAS_DEBUG = "^murong\\s+debug\\s+(on|off)\\s*$",
     ALIAS_SEARCH = "^murong\\s+search\\s+(.*?)\\s*$",
     CAPTCHA_LINK = "^(http://pkuxkx.net/antirobot.*)$",
+    JOB_INFO = "^[ >]*仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在『(.*?)』附近出现，你去把它找回来吧.*$",
+    JIAZEI_DESC = "^\\s*(.*?)发现的 慕容世家家贼\\((.*)\\).*$",
   }
 
   function prototype:FSM()
@@ -54,26 +79,26 @@ local define_murong = function()
     return obj
   end
 
+  local SearchDepth = 5
+
   function prototype:postConstruct()
     self:initStates()
     self:initTransitions()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-
-    self.myId = "luar"
-    self.myName = "撸啊"
-
     self.precondition = {
       jing = 1,
       qi = 1,
       neili = 1.5,
       jingli = 1
     }
+
+    self.myName = "撸啊"
   end
 
   function prototype:disableAllTriggers()
-
+    helper.disableTriggerGroups("murong_ask_start", "murong_ask_done", "murong_search")
   end
 
   function prototype:initStates()
@@ -128,7 +153,7 @@ local define_murong = function()
       newState = States.search,
       event = Events.NEW_JOB,
       action = function()
-        return self:doSearch()
+        return self:doPrepareSearch()
       end
     }
     self:addTransition {
@@ -140,10 +165,51 @@ local define_murong = function()
         ColourNote("yellow", "", self.captchaLink)
       end
     }
+    self:addTransitionToStop(States.ask)
+    -- transition from state<search>
+    self:addTransition {
+      oldState = States.search,
+      newState = States.search,
+      event = Events.NEXT_SEARCH,
+      action = function()
+        return self:doSearch()
+      end
+    }
+    self:addTransition {
+      oldState = States.search,
+      newState = States.kill,
+      event = Events.JIAZEI_FOUND,
+      action = function()
+        return self:doKill()
+      end
+    }
+    self:addTransition {
+      oldState = States.kill,
+      newState = States.search,
+      event = Events.JIAZEI_MISS,
+      action = function()
+        local currRoom = travel.roomsById[travel.currRoomId]
+        self.searchRooms = { currRoom }
+        self.searchedRoomIds = {}  -- this is required as we may skip it because it's previously searched
+        return self:doSearch()
+      end
+    }
+    self:addTransition {
+      oldState = States.kill,
+      newState = States.submit,
+      event = Events.JIAZEI_KILLED,
+      action = function()
+        helper.checkUntilNotBusy()
+        SendNoEcho("get xin from corpse")
+        SendNoEcho("get gold from corpse")
+        SendNoEcho("get silver from corpse")
+        return self:doSubmit()
+      end
+    }
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroup("murong_ask_start", "murong_ask_done")
+    helper.removeTriggerGroup("murong_ask_start", "murong_ask_done", "murong_search")
     helper.addTriggerSettingsPair {
       group = "murong",
       start = "ask_start",
@@ -152,7 +218,25 @@ local define_murong = function()
     helper. addTrigger {
       group = "murong_ask_done",
       regexp = REGEXP.JOB_INFO,
-      -- todo
+      response = function(name, line, wildcards)
+        self.searchLocation = wildcards[1]
+      end
+    }
+    -- jiazei名称固定
+    helper.addTrigger {
+      group = "murong_search",
+      regexp = REGEXP.JIAZEI_DESC,
+      response = function(name, line, wildcards)
+        local name = wildcards[1]
+        if name == self.myName then
+          --找到家贼，则设置目标地点为当前房间编号
+          self:debug("发现家贼")
+          self.jiazeiRoomId = travel.traverseRoomId
+          self.jiazeiId = string.lower(wildcards[2])
+        else
+          self:debug("别人的家贼")
+        end
+      end
     }
   end
 
@@ -188,8 +272,32 @@ local define_murong = function()
       group = "murong",
       regexp = REGEXP.ALIAS_SEARCH,
       response = function(name, line, wildcards)
-        local location = wildcards[1]
-        -- todo
+        self.searchLocation = wildcards[1]
+        return self:fire(Events.LOCATION_ACQUIRED)
+      end
+    }
+  end
+
+  function prototype:initTimers()
+    helper.removeTimerGroups("murong_kill")
+    helper.addAlias {
+      group = "murong_kill",
+      interval = 2,
+      response = function()
+        if not self.killSeconds then
+          self.killSeconds = 0
+        else
+          self.killSeconds = self.killSeconds + 2
+        end
+        self:debug("战斗时间", self.killSeconds)
+        if self.jiazeiKilled then
+          helper.disableTimerGroups("murong_kill")
+          return self:fire(Events.JIAZEI_KILLED)
+        end
+        if self.killSeconds % 3 == 0 then
+          SendNoEcho("perform dugu-jiujian.po")
+          SendNoEcho("perform dugu-jiujian.pobing")
+        end
       end
     }
   end
@@ -205,12 +313,98 @@ local define_murong = function()
     }
   end
 
-  function prototype:jiazeiId()
-    return self.myId .. "'s murong jiazei"
+  function prototype:doAsk()
+    travel:walkto(479)
+    travel:waitUntilArrived()
+    self.searchLocation = nil
+    self.captchaLink = nil
+    SendNoEcho("set murong ask_start")
+    SendNoEcho("ask pu about job")
+    SendNoEcho("set murong ask_done")
+    helper.checkUntilNotBusy()
+
+    if self.captchaLink then
+      return self:fire(Events.NEW_JOB_CAPTCHA)
+    elseif self.searchLocation then
+      return self:fire(Events.NEW_JOB)
+    else
+      ColourNote("没有获取到任务地点，任务失败")
+      return self:doCancel()
+    end
   end
 
-  function prototype:jiazeiRegexp()
-    return "^\\s*" .. self.myName .. "发现的 慕容世家家贼.*$"
+  function prototype:doPrepareSearch()
+    local searchRooms = travel:getMatchedRooms {
+      fullname = self.searchLocation
+    }
+    if #(searchRooms) == 0 then
+      ColourNote("yellow", "", "任务失败，无法匹配到房间 ", self.searchLocation)
+      return self:doCancel()
+    else
+      self.searchRooms = searchRooms
+      self.searchedRoomIds = {}
+      return self:fire(Events.NEXT_SEARCH)
+    end
+  end
+
+  function prototype:doSearch()
+    if #(self.searchRooms) == 0 then
+      ColourNote("yellow", "", "任务失败，没有更多的可搜索房间")
+      return self:doCancel()
+    else
+      local nextRoom = table.remove(self.searchRooms)
+      if self.searchedRoomIds[nextRoom.id] then
+        return self:doSearch()
+      end
+
+      self.jiazeiRoomId = nil
+      helper.checkUntilNotBusy()
+      self:doPowerup()
+      travel:walkto(nextRoom.id)
+      travel:waitUntilArrived()
+      helper.enableTriggerGroups("murong_search")
+      local onStep = function()
+        -- 将每个经历的地点都放入已搜索列表
+        self.searchedRoomIds[travel.traverseRoomId] = true
+        return self.targetRoomId ~= nil  -- 停止条件，找到伙计
+      end
+      local onArrive = function()
+        helper.disableTriggerGroups("murong_search")
+        if self.targetRoomId then
+          self:debug("遍历结束，已经发现家贼，并确定目标房间：", self.targetRoomId)
+          return self:fire(Events.JIAZEI_FOUND)
+        else
+          self:debug("没有发现家贼，尝试下一个地点")
+          wait.time(1)
+          return self:fire(Events.NEXT_SEARCH)
+        end
+      end
+      return travel:traverseNearby(SearchDepth, onStep, onArrive)
+    end
+  end
+
+  function prototype:doPowerup()
+    SendNoEcho("yun powerup")
+    SendNoEcho("wield sword")
+  end
+
+  function prototype:doSubmit()
+    helper.checkUntilNotBusy()
+    travel:walkto(479)
+    travel:waitUntilArrived()
+    SendNoEcho("give xin to pu")
+    helper.checkUntilNotBusy()
+    return self:fire(Events.STOP)
+  end
+
+  function prototype:doKill()
+    SendNoEcho("halt")
+    self:doPowerup()
+    SendNoEcho("killall " .. self.jiazeiId)
+    SendNoEcho("perform dugu-jiujian.po")
+    self.killSeconds = nil
+    helper.enableTriggerGroups("murong_kill")
+    helper.enableTimerGroups("murong_kill")
   end
 
   -- jobs 框架

@@ -276,6 +276,7 @@ local define_hubiao = function()
     QI_ENABLE = "^[ >]*(你运行真气加速自身的气血恢复。|你已经运行内功加速全身气血恢复。)$",
     ROBBER_ESCAPE = "^[ >]*劫匪叫道：点子扎手，扯呼！$",
     ROBBER_APPEAR = "^[ >]*劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”$",
+    ROBBER_ASSIST = "^[ >]*劫匪大喊：点子爪子硬！赶紧来帮忙！$",
     WEAPON_DETACHED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
     GARBAGE = "^[ >]*你获得了.*份石炭【劣质】。$",
   }
@@ -319,7 +320,7 @@ local define_hubiao = function()
     -- special variable
     self.playerName = "撸啊"
     self.playerId = "luar"
-    self.robberPresent = false
+    self.robbersPresent = 0
     self.qiPresent = false
     self.powerupPresent = false
   end
@@ -510,7 +511,7 @@ local define_hubiao = function()
         local tick = 0 -- 超过12 tick认为无匪了
         while true do
           helper.checkUntilNotBusy()
-          if tick <= 12 and self.robberPresent then
+          if tick <= 12 and self.robbersPresent > 0 then
             tick = tick + 1
             wait.time(3)
           else
@@ -611,8 +612,10 @@ local define_hubiao = function()
       regexp = REGEXP.STEP_SUCCESS,
       response = function()
         self.stepSuccess = true
-        -- 在触发车子行走时设置运输房间编号
+        -- 重置匪徒数为0
+        self.robbersPresent = 0
         if self.currStep then
+          -- 在触发车子行走时设置运输房间编号
           self.transferRoomId = self.currStep.endid
           self:debug("设置运输房间编号为", self.currStep.endid)
         end
@@ -672,14 +675,24 @@ local define_hubiao = function()
       group = "hubiao_robber",
       regexp = REGEXP.ROBBER_APPEAR,
       response = function()
-        self.robberPresent = true
+        self.robbersPresent = self.robbersPresent + 1
+        self:debug("当前匪徒数：", self.robbersPresent)
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_robber",
+      regexp = REGEXP.ROBBER_ASSIST,
+      response = function()
+        self.robbersPresent = self.robbersPresent + 1
+        self:debug("当前匪徒数：", self.robbersPresent)
       end
     }
     helper.addTrigger {
       group = "hubiao_robber",
       regexp = REGEXP.ROBBER_ESCAPE,
       response = function()
-        self.robberPresent = false
+        self.robbersPresent = self.robbersPresent - 1
+        self:debug("当前匪徒数：", self.robbersPresent)
       end
     }
     -- force
