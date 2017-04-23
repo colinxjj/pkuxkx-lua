@@ -276,6 +276,8 @@ local define_hubiao = function()
     QI_ENABLE = "^[ >]*(你运行真气加速自身的气血恢复。|你已经运行内功加速全身气血恢复。)$",
     ROBBER_ESCAPE = "^[ >]*劫匪叫道：点子扎手，扯呼！$",
     ROBBER_APPEAR = "^[ >]*劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”$",
+    WEAPON_DETACHED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
+    GARBAGE = "^[ >]*你获得了.*份石炭【劣质】。$",
   }
 
   local SpecialRenameRooms = {
@@ -628,6 +630,13 @@ local define_hubiao = function()
       response = function()
         self.submitSuccess = true
         self:debug("任务完成，获得奖励")
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_submit_done",
+      regexp = REGEXP.GARBAGE,
+      response = function()
+        SendNoEcho("drop shi tan")
       end
     }
     -- mixin

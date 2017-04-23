@@ -319,10 +319,12 @@ local define_boat = function()
     helper.assureNotBusy()
     SendNoEcho("set boat enter_start")
     SendNoEcho("enter")
+    SendNoEcho("dazuo max")
     SendNoEcho("set boat enter_done")
   end
 
   function prototype:doLeave()
+    SendNoEcho("halt")
     helper.assureNotBusy()
     SendNoEcho("out")
     SendNoEcho("set boat arrived")

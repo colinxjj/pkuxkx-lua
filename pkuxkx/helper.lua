@@ -285,6 +285,7 @@ local define_helper = function()
     local hours = math.floor(interval / 3600)
     local minutes = math.floor((interval - hours * 3600) / 60)
     local seconds = interval - hours * 3600 - minutes * 60
+    -- ≥ı º
     check(AddTimer(name, hours, minutes, seconds, "-- added by helper", 0, name))
     check(SetTimerOption(name, "send_to", "12"))
     check(SetTimerOption(name, "group", group))

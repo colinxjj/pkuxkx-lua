@@ -6,6 +6,19 @@
 -- Change:
 -- 2017/4/20 - created
 
+local patterns = {[[
+
+ask pu about job
+你向仆人打听有关『job』的消息。
+仆人说道：「壮士能为慕容世家出力，真是太好了。」
+仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在以下地点附近出现，你去把它找回来吧！
+你的客户端不支持MXP,请直接打开链接查看图片。
+请注意，忽略验证码中的红色文字。
+http://pkuxkx.net/antirobot/robot.php?filename=1492781942600002
+
+
+]]}
+
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
@@ -30,7 +43,8 @@ local define_murong = function()
     ALIAS_START = "^murong\\s+start\\s*$",
     ALIAS_STOP = "^murong\\s+stop\\s*$",
     ALIAS_DEBUG = "^murong\\s+debug\\s+(on|off)\\s*$",
-    ALIAS_LOCATION = "^murong\\s+location\\s+(.*?)\\s*$",
+    ALIAS_SEARCH = "^murong\\s+search\\s+(.*?)\\s*$",
+    CAPTCHA_LINK = "^(http://pkuxkx.net/antirobot.*)$",
   }
 
   function prototype:FSM()
@@ -49,6 +63,13 @@ local define_murong = function()
 
     self.myId = "luar"
     self.myName = "撸啊"
+
+    self.precondition = {
+      jing = 1,
+      qi = 1,
+      neili = 1.5,
+      jingli = 1
+    }
   end
 
   function prototype:disableAllTriggers()
@@ -91,7 +112,34 @@ local define_murong = function()
   end
 
   function prototype:initTransitions()
-
+    -- transition from state<stop>
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.ask,
+      event = Events.START,
+      action = function()
+        return self:doAsk()
+      end
+    }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<ask>
+    self:addTransition {
+      oldState = States.ask,
+      newState = States.search,
+      event = Events.NEW_JOB,
+      action = function()
+        return self:doSearch()
+      end
+    }
+    self:addTransition {
+      oldState = States.ask,
+      newState = States.search,
+      event = Events.NEW_JOB_CAPTCHA,
+      action = function()
+        ColourNote("yellow", "", "需要识别验证码，请手动输入murong search <位置信息>")
+        ColourNote("yellow", "", self.captchaLink)
+      end
+    }
   end
 
   function prototype:initTriggers()
@@ -138,7 +186,7 @@ local define_murong = function()
     }
     helper.addAlias {
       group = "murong",
-      regexp = REGEXP.ALIAS_LOCATION,
+      regexp = REGEXP.ALIAS_SEARCH,
       response = function(name, line, wildcards)
         local location = wildcards[1]
         -- todo
@@ -158,11 +206,26 @@ local define_murong = function()
   end
 
   function prototype:jiazeiId()
-    return self.myId .. "'s jiazei"
+    return self.myId .. "'s murong jiazei"
   end
 
   function prototype:jiazeiRegexp()
-    return "^\\s*" .. self.myName .. "发现的慕容世家家贼.*$"
+    return "^\\s*" .. self.myName .. "发现的 慕容世家家贼.*$"
+  end
+
+  -- jobs 框架
+  function prototype:doStart()
+    return self:fire(Events.START)
+  end
+
+  function prototype:doCancel()
+    helper.assureNotBusy()
+    travel:walkto(479)
+    travel:waitUntilArrived()
+    wait.time(1)
+    SendNoEcho("ask pu about fail")
+    helper.checkUntilNotBusy()
+    return self:fire(Events.STOP)
   end
 
   return prototype

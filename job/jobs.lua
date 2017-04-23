@@ -722,7 +722,11 @@ local define_jobs = function()
     if neiliUsed then status:hpbrief() end
     if status.currNeili < status.maxNeili * pct.neili - 1 then
       local diff = status.maxNeili * pct.neili - status.currNeili
-      if diff > status.currQi - status.maxQi * 0.2 then
+      local dzNum = math.floor(diff)
+      if status.currNeili < status.maxNeili * 2 - 550 and diff < 500 then
+        dzNum = 500
+      end
+      if dzNum > status.currQi - status.maxQi * 0.2 then
         SendNoEcho("dazuo max")
         local line = wait.regexp(REGEXP.DAZUO_BEGIN, 4)
         if not line then
@@ -730,7 +734,7 @@ local define_jobs = function()
           return self:doRecover()
         end
       else
-        SendNoEcho("dazuo " .. math.floor(diff))
+        SendNoEcho("dazuo " .. dzNum)
         local line = wait.regexp(REGEXP.DAZUO_BEGIN, 4)
         if not line then
           -- todo

@@ -166,7 +166,7 @@ local define_travel = function()
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
     WALK_RESUME = "^[ >]*(你终于来到了对面，心里的石头终于落地.*|突然间蓬一声，屁股撞上了什么物事，.*|你终于一步步的终于挨到了桥头.*|不知过了多久，船终于靠岸了，你累得满头大汗.*|小舟终于划到近岸，你从船上走了出来.*|你沿着踏板走了上去.*|绿衣少女将小船系在树枝之上，你跨上岸去.*)$",
     -- 添加武当沼泽busy
-    WALK_BUSY = "^[ >]*(吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的。|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*|你的动作还没有完成，不能移动。|沙石地几乎没有路了，你走不了那么快。)$",
+    WALK_BUSY = "^[ >]*(你走到门前，轻轻地扣了两下门环。|吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的。|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*|你的动作还没有完成，不能移动。|沙石地几乎没有路了，你走不了那么快。)$",
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
     WALK_STEP = helper.settingRegexp("travel", "walk_step"),
     ARRIVED = helper.settingRegexp("travel", "arrived"),
@@ -1077,8 +1077,12 @@ local define_travel = function()
       newState = States.walking,
       event = Events.EASE,
       action = function()
+        if self.walkBusyResumeCmd then
+          self:sendPath(self.walkBusyResumeCmd)
+        end
         -- 重置busy命令
         self.walkBusyCmd = nil
+        self.walkBusyResumeCmd = nil
         return self:walking()
       end
     }
@@ -1570,6 +1574,7 @@ local define_travel = function()
     self.delay = self.delay or 1
     -- busy
     self.walkBusyCmd = nil
+    self.walkBusyResumeCmd = nil
     self.walkBusy = false
     -- flood
     self.prevMove = nil
@@ -1786,7 +1791,10 @@ local define_travel = function()
       elseif move.category == PathCategory.multiple then
         self:sendPath(move.path)
       elseif move.category == PathCategory.busy then
-        self.walkBusyCmd = move.path
+        local cmds = utils.split(move.path, ";")
+        assert(#cmds <= 2, "busy path can at most have 2 commands(start and stop)")
+        self.walkBusyCmd = cmds[1]
+        self.walkBusyResumeCmd = cmds[2]
         return self:fire(Events.BUSY)
       elseif move.category == PathCategory.boat then
         self.boatCmd = move.path

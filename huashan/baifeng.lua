@@ -8,6 +8,7 @@
 
 local helper = require "pkuxkx.helper"
 local travel = require "pkuxkx.travel"
+local status = require "pkuxkx.status"
 
 local define_module = function()
   local prototype = {}
@@ -15,6 +16,7 @@ local define_module = function()
 
   local REGEXP = {
     ALIAS_START = "^baifeng\\s+start\\s*$",
+    ALIAS_STOP = "^baifeng\\s+stop\\s*$",
     ALIAS_DEBUG = "^baifeng\\s+stop\\s*$",
   }
 
@@ -49,7 +51,13 @@ local define_module = function()
           SendNoEcho("wu")
           SendNoEcho("sd")
           SendNoEcho("eu")
-          self:keepTryingBaiFeng()
+          helper.addTimer {
+            group = "baifeng",
+            interval = 10,
+            response = function()
+              self:keepTryingBaiFeng()
+            end
+          }
         end)
       end
     }
@@ -63,20 +71,24 @@ local define_module = function()
   end
 
   function prototype:keepTryingBaiFeng()
-    print("√ø10√Î≥¢ ‘1¥Œ")
-    helper.addTimer {
-      group = "baifeng",
-      interval = 10,
-      response = function()
-        SendNoEcho("ask linghu about ‘¿¡È…∫")
-        SendNoEcho("ask linghu about ∑ÁÃ´ ¶ Â")
-        SendNoEcho("enter dong")
-        SendNoEcho("south")
-        SendNoEcho("bai feng")
-        SendNoEcho("n")
-        SendNoEcho("out")
-      end
-    }
+    status:hpbrief()
+    if status.food < 150 then
+      SendNoEcho("do 2 eat ganliang")
+    end
+    if status.drink < 150 then
+      SendNoEcho("do 2 drink jiudai")
+    end
+    if status.currQi > 1000 and status.currNeili > 500 then
+      SendNoEcho("lian dodge 2")
+      SendNoEcho("lian sword 2")
+    end
+    SendNoEcho("ask linghu about ‘¿¡È…∫")
+    SendNoEcho("ask linghu about ∑ÁÃ´ ¶ Â")
+    SendNoEcho("enter dong")
+    SendNoEcho("south")
+    SendNoEcho("bai feng")
+    SendNoEcho("n")
+    SendNoEcho("out")
   end
 
   return prototype
