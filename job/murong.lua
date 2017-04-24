@@ -69,8 +69,8 @@ local define_murong = function()
     ALIAS_SEARCH = "^murong\\s+search\\s+(.*?)\\s*$",
     CAPTCHA_LINK = "^(http://pkuxkx.net/antirobot.*)$",
     JOB_INFO = "^[ >]*仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在『(.*?)』附近出现，你去把它找回来吧.*$",
-    JIAZEI_DESC = "^\\s*(.*?)发现的 慕容世家家贼\\((.*)\\).*$",
-    JIAZEI_KILLED = "^[ >]*jiazei killed$",
+    JIAZEI_DESC = "^\\s*(.*?)发现的 慕容世家内鬼\\((.*)\\).*$",
+    JIAZEI_KILLED = "^[ >]*慕容世家内鬼死了。$",
   }
 
   function prototype:FSM()
@@ -96,6 +96,8 @@ local define_murong = function()
     }
 
     self.myName = "撸啊"
+
+    self.DEBUG = true
   end
 
   function prototype:disableAllTriggers()
@@ -128,7 +130,10 @@ local define_murong = function()
     self:addState {
       state = States.kill,
       enter = function() end,
-      exit = function() end
+      exit = function()
+        helper.disableTriggerGroups("murong_kill")
+        helper.disableTimerGroups("murong_kill")
+      end
     }
     self:addState {
       state = States.submit,
@@ -178,6 +183,15 @@ local define_murong = function()
     }
     self:addTransition {
       oldState = States.search,
+      newState = States.search,
+      event = Events.NEW_JOB_CAPTCHA,
+      action = function()
+        assert(self.searchLocation, "searchLocation cannot be nil")
+        return self:doPrepareSearch()
+      end
+    }
+    self:addTransition {
+      oldState = States.search,
       newState = States.kill,
       event = Events.JIAZEI_FOUND,
       action = function()
@@ -207,10 +221,14 @@ local define_murong = function()
         return self:doSubmit()
       end
     }
+    self:addTransitionToStop(States.kill)
+    -- transition from state<submit>
+    self:addTransitionToStop(States.submit)
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("murong_ask_start", "murong_ask_done", "murong_search")
+    helper.removeTriggerGroups("murong_ask_start", "murong_ask_done",
+      "murong_search", "murong_kill")
     helper.addTriggerSettingsPair {
       group = "murong",
       start = "ask_start",
@@ -235,8 +253,9 @@ local define_murong = function()
       group = "murong_search",
       regexp = REGEXP.JIAZEI_DESC,
       response = function(name, line, wildcards)
-        local name = wildcards[1]
-        if name == self.myName then
+        local playerName = wildcards[1]
+        self:debug("JIAZEI_DESC triggered", playerName)
+        if playerName == self.myName then
           --找到家贼，则设置目标地点为当前房间编号
           self:debug("发现家贼")
           self.jiazeiRoomId = travel.traverseRoomId
@@ -244,6 +263,14 @@ local define_murong = function()
         else
           self:debug("别人的家贼")
         end
+      end
+    }
+    helper.addTrigger {
+      group = "murong_kill",
+      regexp = REGEXP.JIAZEI_KILLED,
+      response = function()
+        self:debug("JIAZEI_KILLED triggered")
+        self.jiazeiKilled = true
       end
     }
   end
@@ -298,10 +325,6 @@ local define_murong = function()
           self.killSeconds = self.killSeconds + 2
         end
         self:debug("战斗时间", self.killSeconds)
-        if self.jiazeiKilled then
-          helper.disableTimerGroups("murong_kill")
-          return self:fire(Events.JIAZEI_KILLED)
-        end
         if self.killSeconds % 3 == 0 then
           SendNoEcho("perform dugu-jiujian.po")
           SendNoEcho("perform dugu-jiujian.pobing")
@@ -346,7 +369,7 @@ local define_murong = function()
       fullname = self.searchLocation
     }
     if #(searchRooms) == 0 then
-      ColourNote("yellow", "", "任务失败，无法匹配到房间 ", self.searchLocation)
+      ColourNote("yellow", "", "任务失败，无法匹配到房间 " .. self.searchLocation)
       return self:doCancel()
     else
       self.searchRooms = searchRooms
@@ -409,10 +432,19 @@ local define_murong = function()
     SendNoEcho("halt")
     self:doPowerup()
     SendNoEcho("killall " .. self.jiazeiId)
-    SendNoEcho("perform dugu-jiujian.po")
+    SendNoEcho("perform dugu-jiujian.poqi")
     self.killSeconds = nil
+    self.jiazeiKilled = true
     helper.enableTriggerGroups("murong_kill")
     helper.enableTimerGroups("murong_kill")
+
+    while not self.jiazeiKilled do
+      wait.time(3)
+      self:debug("检查家贼是否已被杀死")
+    end
+
+    self:debug("家贼已被杀死，成功返回")
+    return self:fire(Events.JIAZEI_KILLED)
   end
 
   -- jobs 框架

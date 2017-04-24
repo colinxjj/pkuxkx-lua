@@ -154,6 +154,7 @@ local define_travel = function()
     ALIAS_LOC_MU_ID = "^loc\\s+mu\\s+(\\d+)\\s*$",
     ALIAS_LOC_SHOW = "^loc\\s+show\\s*$",
     ALIAS_LOC_LMU_ID = "^loc\\s+lmu\\s+(\\d+)\\s*$",
+    ALIAS_TASKLOC = "^taskloc\\s+(.+?)\\s+(.+?)\\s*$",
     -- triggers
     ROOM_NAME_WITH_AREA = "^[ >]*(.{0,14}) {1,2}\\- \\[[^ ]+\\]$",
     ROOM_NAME_WITHOUT_AREA = "^[ >]*(.{0,14}) {1,2}\\- $",
@@ -641,6 +642,51 @@ local define_travel = function()
       print("Room exits:", c.exits)
       print("Room Desc:", c.description and string.sub(c.description, 1, 30))
       print("----------------------------")
+    end
+  end
+
+  function prototype:taskloc(args)
+    local words = args.words
+    local exits = args.exits
+    local results = {}
+    for _, room in pairs(self.roomsById) do
+      local wordsMatched = true
+      for _, word in ipairs(words) do
+        if not string.find(room.description, word) then
+          wordsMatched = false
+          break
+        end
+      end
+      if wordsMatched then
+        local exitsMatched = true
+        local roomExits = {}
+        if room.exits and room.exits ~= "" then
+          for _, e in ipairs(utils.split(room.exits, ";")) do
+            roomExits[e] = true
+          end
+          for _, e in pairs(exits) do
+            if not roomExits[e] then
+              exitsMatched = false
+              break
+            end
+          end
+        elseif #(exits) > 0 then
+          exitsMatched = false
+        end
+        if exitsMatched then
+          table.insert(results, room)
+        end
+      end
+    end
+    if #(results) == 0 then
+      print("没有找到匹配房间")
+    elseif #(results) == 1 then
+      print("匹配到唯一房间：", results[1].id, results[1].name, results[1].code)
+    else
+      print("存在多个房间匹配：")
+      for _, room in ipairs(results) do
+        print(room.id, room.name, room.code)
+      end
     end
   end
 
@@ -1551,6 +1597,19 @@ local define_travel = function()
         self:lookUntilNotBusy()
         self:show()
         self:match(targetRoomId, true)
+      end
+    }
+    -- task相关查询功能
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_TASKLOC,
+      response = function(name, line, wildcards)
+        local words = utils.split(wildcards[1], ",")
+        local exits = utils.split(wildcards[2], ",")
+        return self:taskloc {
+          words = words,
+          exits = exits
+        }
       end
     }
   end
