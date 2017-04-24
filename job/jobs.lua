@@ -15,6 +15,9 @@ local songxin = require "job.songxin"
 local nanjue = require "job.nanjue"
 local hubiao = require "job.hubiao"
 
+-- 帮会任务
+local banghui = require "common.banghui"
+
 local patterns = {[[
 l xiansuo
 奇怪的线索(Qiguai xiansuo)
