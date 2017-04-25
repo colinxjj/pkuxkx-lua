@@ -14,6 +14,7 @@ local status = require "pkuxkx.status"
 local songxin = require "job.songxin"
 local nanjue = require "job.nanjue"
 local hubiao = require "job.hubiao"
+local murong = require "job.murong"
 
 -- ∞Ôª·»ŒŒÒ
 local banghui = require "common.banghui"
@@ -382,6 +383,10 @@ local define_jobs = function()
     self.definedJobs.hubiao = Job:decorate {
       def = JobDefinition.hubiao,
       impl = hubiao
+    }
+    self.definedJobs.murong = Job:decorate {
+      def = JobDefinition.murong,
+      impl = murong
     }
   end
 

@@ -278,7 +278,7 @@ local define_hubiao = function()
     ROBBER_APPEAR = "^[ >]*劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”$",
     ROBBER_ASSIST = "^[ >]*劫匪大喊：点子爪子硬！赶紧来帮忙！$",
     WEAPON_DETACHED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
-    GARBAGE = "^[ >]*你获得了.*份石炭【劣质】。$",
+    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【劣质】。$",
   }
 
   local SpecialRenameRooms = {
@@ -312,9 +312,9 @@ local define_hubiao = function()
     self.DEBUG = true
     -- precondition
     self.precondition = {
-      jing = 0.96,
-      qi = 0.96,
-      jingli = 0.96,
+      jing = 0.99,
+      qi = 0.99,
+      jingli = 1,
       neili = 1.8
     }
     -- special variable
@@ -640,6 +640,7 @@ local define_hubiao = function()
       regexp = REGEXP.GARBAGE,
       response = function()
         SendNoEcho("drop shi tan")
+        SendNoEcho("drop xuan bing")
       end
     }
     -- mixin
@@ -992,6 +993,7 @@ local define_hubiao = function()
       group = "hubiao_transfer_traverse",
       regexp = self:dudeNameRegexp(),
       response = function()
+        self:debug("DUDE_NAME triggered")
         self.findDude = true
       end
     }

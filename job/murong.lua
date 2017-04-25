@@ -258,7 +258,7 @@ local define_murong = function()
         if playerName == self.myName then
           --找到家贼，则设置目标地点为当前房间编号
           self:debug("发现家贼")
-          self.jiazeiRoomId = travel.traverseRoomId
+          self.targetRoomId = travel.traverseRoomId
           self.jiazeiId = string.lower(wildcards[2])
         else
           self:debug("别人的家贼")
@@ -388,7 +388,7 @@ local define_murong = function()
         return self:doSearch()
       end
 
-      self.jiazeiRoomId = nil
+      self.targetRoomId = nil
       helper.checkUntilNotBusy()
       self:doPowerup()
       travel:walkto(nextRoom.id)
