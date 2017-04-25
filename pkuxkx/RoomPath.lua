@@ -36,6 +36,7 @@ local define_RoomPath = function()
     obj.endcode = args.endcode
     obj.category = args.category or prototype.Category.normal
     obj.mapchange = args.mapchange or 0
+    obj.blockers = args.blockers
     setmetatable(obj, self or prototype)
     return obj
   end
@@ -46,6 +47,7 @@ local define_RoomPath = function()
     assert(obj.path, "path cannot be nil")
     obj.category = obj.category or prototype.Category.normal
     obj.mapchange = obj.mapchange or 0
+    -- blockers
     setmetatable(obj, self or prototype)
     return obj
   end

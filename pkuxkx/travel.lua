@@ -172,9 +172,9 @@ local define_travel = function()
     WALK_STEP = helper.settingRegexp("travel", "walk_step"),
     ARRIVED = helper.settingRegexp("travel", "arrived"),
     LOOK_DONE = helper.settingRegexp("travel", "look_done"),
-    JIANG = "江百胜伸手拦住你说道：盟主很忙，现在不见外客，你下山去吧！",
     strange = "你不小心被什么东西绊了一下，差点摔个大跟头。",
     FLOOD_OCCURRED = "^[ >]*(你刚要前行，忽然发现江水决堤，不由暗自庆幸，还好没过去。|你正要前行，有人大喝：黄河决堤啦，快跑啊！)$",
+    BLOCKED = "^[ >]*(江百胜伸手拦住你说道|红花会众说道：“阁下不是红花会弟子|号手首领伸手拦住了你的去路|鼓手首领一言不发，闪身拦在你面前|守山弟子说: 非我派弟子不许上峨嵋山|师太拦住了你的去路).*$",
   }
   -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_RETRIES = 4
@@ -816,6 +816,7 @@ local define_travel = function()
     -- all state transition should be handled by FSM
     -- built in finctions
     self:setState(States.stop)
+    self.blockUsedWeapon = "sword"
     self:resetOnStop()
   end
 
@@ -868,10 +869,10 @@ local define_travel = function()
     self:addState {
       state = States.blocked,
       enter = function()
-
+        helper.enableTriggerGroups("travel_block_start")
       end,
       exit = function()
-
+        helper.disableTriggerGroups("travel_block_start", "travel_block_done")
       end
     }
     self:addState {
@@ -1045,7 +1046,9 @@ local define_travel = function()
       newState = States.blocked,
       event = Events.BLOCKED,
       action = function()
-
+        assert(self.blockCmd, "blockCmd cannot be nil when blocked")
+        assert(self.blockers, "blockers cannot be nil when blocked")
+        return self:clearBlockers()
       end
     }
     self:addTransition {
@@ -1389,6 +1392,20 @@ local define_travel = function()
         self.walkBusy = true
       end
     }
+    -- 阻挡触发
+    helper.addTriggerSettingsPair {
+      group = "travel",
+      start = "block_start",
+      done = "block_done"
+    }
+    helper.addTrigger {
+      group = "travel_block_done",
+      regexp = REGEXP.BLOCKED,
+      response = function()
+        self:debug("BLOCKED triggered")
+        self.blocked = true
+      end
+    }
   end
 
   -- 初始化别名
@@ -1644,6 +1661,9 @@ local define_travel = function()
     self.traverseCheck = nil
     self.traverseRoomId = nil    -- 遍历时，每步都执行该方法，为true时停止遍历
     self.traverseRooms = nil    -- 需要遍历的房间列表，LOCATION_CONFIRMED_TRAVERSE时刷新，STOP, ARRIVED重置
+    -- block
+    self.blockCmd = nil
+    self.blockers = nil
   end
 
   -- 禁用所有触发器
@@ -1865,6 +1885,10 @@ local define_travel = function()
         if not line then
           error("行走60秒超时出错")
         end
+      elseif move.category == PathCategory.block then
+        self.blockCmd = move.path
+        self.blockers = move.blockers
+        return self:fire(Events.BLOCKED)
       else
         error("current version does not support this path category:" .. move.category, 2)
       end
@@ -1998,6 +2022,7 @@ local define_travel = function()
     end
   end
 
+  -- 获取附近房间列表
   function prototype:getNearbyRooms(centerRoomId, maxDepth)
     if maxDepth < 1 then return nil end
     local startroom = self.roomsById[centerRoomId]
@@ -2033,6 +2058,29 @@ local define_travel = function()
     self.currRoomName = currRoom and currRoom.name
     self.currRoomExits = currRoom and currRoom.exits
     self.currRoomDesc = currRoom and {currRoom.description}
+  end
+
+  -- 清除阻挡者
+  function prototype:clearBlockers()
+    while true do
+      self.blocked = false
+      SendNoEcho("halt")
+      SendNoEcho("set travel block_start")
+      self:sendPath(self.blockCmd)
+      SendNoEcho("set travel block_done")
+      helper.checkUntilNotBusy()
+      if self.blocked then
+        if self.blockUsedWeapon then
+          SendNoEcho("wield " .. self.blockUsedWeapon)
+        end
+        for _, blocker in ipairs(utils.split(self.blockers, ",")) do
+          SendNoEcho("killall " .. blocker)
+        end
+      else
+        return self:fire(Events.CLEARED)
+      end
+      wait.time(5)
+    end
   end
 
   return prototype

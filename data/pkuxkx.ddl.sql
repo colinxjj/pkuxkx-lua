@@ -5,7 +5,8 @@ create table if not exists rooms (
   description text,
   exits text,
   zone text,
-  mapinfo text
+  mapinfo text,
+  blockzone text
 );
 create unique index idx_rooms on rooms (code);
 
@@ -17,7 +18,8 @@ create table if not exists paths (
   weight integer default 1,
   enabled integer default 1,
   category integer default 1,
-  mapchange integer default 0
+  mapchange integer default 0,
+  blockers text
 );
 create index if not exists idx_paths on paths (startid, endid);
 
