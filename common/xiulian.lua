@@ -35,7 +35,7 @@ local define_xiulian = function()
     self:initAliases()
 
     self.forceId = "zixia-shengong"
-    self.roomId = 2918
+    self.roomId = 2921
   end
 
   function prototype:initTriggers()

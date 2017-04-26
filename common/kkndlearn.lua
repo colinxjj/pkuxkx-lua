@@ -12,7 +12,7 @@ local FSM = require "pkuxkx.FSM"
 local status = require "pkuxkx.status"
 local travel = require "pkuxkx.travel"
 
-local define_fsm = function()
+local define_kkndlearn = function()
   local prototype = FSM.inheritedMeta()
 
   local States = {
@@ -315,15 +315,15 @@ local define_fsm = function()
         --            SendNoEcho(self.lianCmd)
         --          end
         if status.currQi > 200 then
-          SendNoEcho("lian dodge 3")
-          SendNoEcho("wield jian")
-          SendNoEcho("jifa sword dugu-jiujian")
-          SendNoEcho("lian sword 3")
+          SendNoEcho("lian dodge 5")
+--          SendNoEcho("wield jian")
+          SendNoEcho("jifa sword kuangfeng-kuaijian")
+          SendNoEcho("lian sword 5")
           SendNoEcho("jifa sword huashan-jianfa")
-          SendNoEcho("lian sword 3")
-          SendNoEcho("unwield jian")
-          SendNoEcho("jifa parry poyu-quan")
-          SendNoEcho("lian parry 3")
+          SendNoEcho("lian sword 5")
+--          SendNoEcho("unwield jian")
+          SendNoEcho("jifa sword yangwu-jian")
+          SendNoEcho("lian sword 5")
         end
       end
     end
@@ -331,4 +331,4 @@ local define_fsm = function()
 
   return prototype
 end
-return define_fsm():new()
+return define_kkndlearn():new()

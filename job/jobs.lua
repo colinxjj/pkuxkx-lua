@@ -714,6 +714,10 @@ local define_jobs = function()
     local neiliUsed = false
     if status.effJing < status.maxJing * pct.jing - 1 then
       self:debug("精受损，进行恢复")
+      if status.effJing < status.maxJing * 0.7 then
+        ColourNote("yellow", "", "精严重受损，吃药！")
+        SendNoEcho("do 2 eat dan")
+      end
       SendNoEcho("yun inspire")
       helper.checkUntilNotBusy()
       SendNoEcho("yun inspire")
@@ -722,6 +726,10 @@ local define_jobs = function()
     end
     -- 再恢复气
     if status.effQi < status.maxQi * pct.qi - 1 then
+      if status.effQi < status.maxQi * 0.7 then
+        ColourNote("yellow", "", "气严重受损，吃药！")
+        SendNoEcho("do 2 eat yao")
+      end
       self:debug("气受损，进行恢复")
       SendNoEcho("do 2 yun heal")
       neiliUsed = true
@@ -735,6 +743,9 @@ local define_jobs = function()
         dzNum = 500
       end
       if dzNum > status.currQi - status.maxQi * 0.2 then
+        if status.currQi <= status.maxQi * 0.5 then
+          SendNoEcho("yun recover")
+        end
         SendNoEcho("dazuo max")
         local line = wait.regexp(REGEXP.DAZUO_BEGIN, 4)
         if not line then
