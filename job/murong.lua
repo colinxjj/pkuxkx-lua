@@ -69,6 +69,7 @@ local define_murong = function()
     ALIAS_SEARCH = "^murong\\s+search\\s+(.*?)\\s*$",
     CAPTCHA_LINK = "^(http://pkuxkx.net/antirobot.*)$",
     JOB_INFO = "^[ >]*仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在『(.*?)』附近出现，你去把它找回来吧.*$",
+    WORK_TOO_FAST = "^[ >]*仆人对着你摇了摇头说：「你刚做过任务，先去休息休息吧。」$",
     JIAZEI_DESC = "^\\s*(.*?)发现的 慕容世家内鬼\\((.*)\\).*$",
     JIAZEI_KILLED = "^[ >]*慕容世家内鬼死了。$",
   }
@@ -434,7 +435,7 @@ local define_murong = function()
     SendNoEcho("killall " .. self.jiazeiId)
     SendNoEcho("perform dugu-jiujian.poqi")
     self.killSeconds = nil
-    self.jiazeiKilled = true
+    self.jiazeiKilled = false
     helper.enableTriggerGroups("murong_kill")
     helper.enableTimerGroups("murong_kill")
 

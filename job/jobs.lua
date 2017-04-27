@@ -634,7 +634,7 @@ local define_jobs = function()
     print("任务信息检查完毕（待完善）")
     -- 确定任务
     self.currJob = self.jobs.hubiao
-    print("确定当前任务类型：", self.currJob.name)
+    print("确定当前任务类型：", self.currJob.def.name)
     wait.time(1)
     helper.assureNotBusy()
     status:hpbrief()
