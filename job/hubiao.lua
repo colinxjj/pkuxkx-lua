@@ -218,6 +218,12 @@ http://pkuxkx.net/antirobot/robot.php?filename=1492599526849159
 
 （宋悦蓓的钢杖和你的青锋剑重重交击在一起，发出「铛」地一声。）
 
+劫匪卸除了你的兵器玄铁剑。
+
+你从陈旧的剑鞘中拔出一把玄铁剑握在手中。
+
+你已经装备著了。
+
 ]]}
 
 local helper = require "pkuxkx.helper"
@@ -277,7 +283,8 @@ local define_hubiao = function()
     ROBBER_ESCAPE = "^[ >]*劫匪叫道：点子扎手，扯呼！$",
     ROBBER_APPEAR = "^[ >]*劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”$",
     ROBBER_ASSIST = "^[ >]*劫匪大喊：点子爪子硬！赶紧来帮忙！$",
-    WEAPON_DETACHED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
+    WEAPON_REMOVED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
+    WEAPON_WIELDED = "^[ >]*(你已经装备著了。|你从陈旧的剑鞘中拔出一把玄铁剑握在手中。)$",
     GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【劣质】。$",
   }
 
@@ -669,6 +676,20 @@ local define_hubiao = function()
       regexp = REGEXP.ROBBER_MOVE,
       response = function()
         self.transferLost = true
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.WEAPON_REMOVED,
+      response = function()
+        self.weaponRemoved = true
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.WEAPON_WIELDED,
+      response = function()
+        self.weaponRemoved = false
       end
     }
     -- robber

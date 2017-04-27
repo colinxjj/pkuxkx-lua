@@ -72,6 +72,9 @@ kan xinde
 │[25][特]百晓生任务              现在即可接到下个任务。                                        │
 │[26][特]公孙绿萼任务            现在即可接到下个任务。                                        │
 
+村民告诉你：华容道最近被一伙山贼占据，没事最好绕道而行。
+一个山贼跳了出来，阴恻恻地对你道：此山是我开，此树是我栽，要想过此路，留下买路财。
+山贼往襄阳的乡间土路附近逃离。
 ]]}
 
 local define_JobDefinition = function()
@@ -388,6 +391,7 @@ local define_jobs = function()
       def = JobDefinition.murong,
       impl = murong
     }
+--    self.definedJobs.
   end
 
   function prototype:initStates()
