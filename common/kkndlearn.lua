@@ -29,7 +29,7 @@ local define_kkndlearn = function()
   local REGEXP = {
     TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
     DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
-    NOT_ENOUGH_JING = "^[ >]*你现在精不足，无法修行精力.*$",
+    NOT_ENOUGH_JING = "^[ >]*(你现在精不足，无法修行精力.*|你现在精严重不足，无法满足吐纳最小要求。)$",
     NOT_ENOUGH_JING_DAZUO = "^[ >]*你现在精不够，无法控制内息的流动！$",
     JINGLI_MAX = "^[ >]*你现在精力接近圆满状态。$",
     NOT_ENOUGH_QI = "^[ >]*(你现在的气太少了，无法产生内息运行全身经脉.*|你现在气血严重不足，无法满足打坐最小要求。)$",
@@ -303,8 +303,9 @@ local define_kkndlearn = function()
         if status.currJing == status.maxJing then
           SendNoEcho(self.learnCmd)
           status:hpbrief()
-        elseif self.requireNeili then
-          SendNoEcho("dazuo 300")
+        end
+        if self.requireNeili then
+          SendNoEcho("dazuo 1000")
           return
 --          wait.regexp(REGEXP.DAZUO_FINISH, 6)
         end
@@ -315,15 +316,20 @@ local define_kkndlearn = function()
         --            SendNoEcho(self.lianCmd)
         --          end
         if status.currQi > 200 then
-          SendNoEcho("lian dodge 5")
+          SendNoEcho("jifa parry hunyuan-zhang")
+          SendNoEcho("lian parry 5")
+          SendNoEcho("jifa parry poyu-quan")
+          SendNoEcho("lian parry 5")
+
+--          SendNoEcho("lian dodge 5")
 --          SendNoEcho("wield jian")
-          SendNoEcho("jifa sword kuangfeng-kuaijian")
-          SendNoEcho("lian sword 5")
-          SendNoEcho("jifa sword huashan-jianfa")
-          SendNoEcho("lian sword 5")
+--          SendNoEcho("jifa sword kuangfeng-kuaijian")
+--          SendNoEcho("lian sword 5")
+--          SendNoEcho("jifa sword yunushijiu-jianfa")
+--          SendNoEcho("lian sword 5")
 --          SendNoEcho("unwield jian")
-          SendNoEcho("jifa sword yangwu-jian")
-          SendNoEcho("lian sword 5")
+--          SendNoEcho("jifa sword yangwu-jian")
+--          SendNoEcho("lian sword 5")
         end
       end
     end

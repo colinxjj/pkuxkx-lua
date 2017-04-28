@@ -114,7 +114,8 @@ values
   ('yuewangmu', '岳王墓', 'yuewangmumuqianxiaodao'),
   ('murong', '姑苏慕容', 'muronghubian'),
   ('riyue', '日月神教', 'riyuexiaoshancun'),
-  ('taohuadao', '桃花岛', 'taohaodaodating')
+  ('taohuadao', '桃花岛', 'taohaodaodating'),
+  ('kangqinwangfu', '康亲王府', 'kangqinwangfudating')
 ;
 
 create table if not exists zone_connectivity (
@@ -292,7 +293,8 @@ values
   ('riyue', 'jinyang', 8),
   ('mingzhou', 'taohuadao', 14),
   ('taohuadao', 'mingzhou', 14),
-  --
+  ('beijing', 'kangqinwangfu', 14),
+  ('kangqinwangfu', 'beijing', 14)
 ;
 
 update zone_connectivity set boat = 1
