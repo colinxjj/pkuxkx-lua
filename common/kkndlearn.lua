@@ -11,6 +11,7 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local status = require "pkuxkx.status"
 local travel = require "pkuxkx.travel"
+local nanjue = require "job.nanjue"
 
 local define_kkndlearn = function()
   local prototype = FSM.inheritedMeta()
@@ -316,9 +317,10 @@ local define_kkndlearn = function()
         --            SendNoEcho(self.lianCmd)
         --          end
         if status.currQi > 200 then
-          SendNoEcho("jifa parry hunyuan-zhang")
+          SendNoEcho("lian dodge 5")
+          SendNoEcho("jifa parry huashan-jianfa")
           SendNoEcho("lian parry 5")
-          SendNoEcho("jifa parry poyu-quan")
+          SendNoEcho("jifa parry yunushijiu-jian")
           SendNoEcho("lian parry 5")
 
 --          SendNoEcho("lian dodge 5")
