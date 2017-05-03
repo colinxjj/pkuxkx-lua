@@ -16,11 +16,14 @@ local define_xiulian = function()
 
   local REGEXP = {
     XIULIAN_FINISH = "^[ >]*你从玄幻之境回过神来，顿觉内功修为增进不小。$",
+    NEILI_ADDED = "^[ >]*你的内力增加了！！$",
+    DZ_FINISH = "^[ >]*(你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。)$",
     ALIAS_START = "xlforce\\s+start\\s*$",
     ALIAS_STOP = "xlforce\\s+stop\\s*$",
     ALIAS_DEBUG = "xlforce\s+debug\\s+(on|off)\\s*$",
     ALIAS_ROOM = "xlforce\\s+room\\s+(\\d+)\\s*$",
     ALIAS_FORCE = "xlforce\\s+force\\s+(.*?)\\s*$",
+    ALIAS_DZ = "xlforce\\s+dz\\s*$",
   }
 
   function prototype:new()
@@ -39,12 +42,26 @@ local define_xiulian = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("xiulian")
+    helper.removeTriggerGroups("xiulian", "xiulian_dz")
     helper.addTrigger {
       group = "xiulian",
       regexp = REGEXP.XIULIAN_FINISH,
       response = function()
         return self:doXiulian()
+      end
+    }
+    helper.addTrigger {
+      group = "xiulian_dz",
+      regexp = REGEXP.NEILI_ADDED,
+      response = function()
+        return self:doDz()
+      end
+    }
+    helper.addTrigger {
+      group = "xiulian_dz",
+      regexp = REGEXP.DZ_FINISH,
+      response = function()
+        return self:doDz()
       end
     }
   end
@@ -69,7 +86,7 @@ local define_xiulian = function()
       group = "xiulian",
       regexp = REGEXP.ALIAS_STOP,
       response = function()
-        helper.disableTriggerGroups("xiulian")
+        helper.disableTriggerGroups("xiulian", "xiulian_dz")
       end
     }
     helper.addAlias {
@@ -103,6 +120,20 @@ local define_xiulian = function()
         self.forceName = wildcards[1]
       end
     }
+    helper.addAlias {
+      group = "xiulian",
+      regexp = REGEXP.ALIAS_DZ,
+      response = function(name, line, wildcards)
+        helper.checkUntilNotBusy()
+        helper.enableTriggerGroups("xiulian_dz")
+        if self.roomId then
+          travel:walkto(self.roomId)
+          travel:waitUntilArrived()
+        end
+        wait.time(1)
+        return self:doDz()
+      end
+    }
   end
 
   function prototype:doXiulian()
@@ -115,6 +146,18 @@ local define_xiulian = function()
     end
     helper.checkUntilNotBusy()
     SendNoEcho("xiulian " .. self.forceId)
+  end
+
+  function prototype:doDz()
+    status:hpbrief()
+    if status.food < 150 then
+      SendNoEcho("do 2 eat ganliang")
+    end
+    if status.drink < 150 then
+      SendNoEcho("do 2 drink jiudai")
+    end
+    helper.checkUntilNotBusy()
+    SendNoEcho("dz")
   end
 
   return prototype

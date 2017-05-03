@@ -316,7 +316,7 @@ local define_kkndlearn = function()
         --          if status.currQi > 50 and self.lianCmd then
         --            SendNoEcho(self.lianCmd)
         --          end
-        if status.currQi > 200 then
+        if status.currQi > 400 then
           SendNoEcho("lian dodge 5")
           SendNoEcho("jifa parry huashan-jianfa")
           SendNoEcho("lian parry 5")
