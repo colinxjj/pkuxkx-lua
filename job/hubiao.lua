@@ -293,7 +293,10 @@ local define_hubiao = function()
     ["泉州当铺"] = "泉州泉州当铺"
   }
   local SpecialRelocateRooms = {
-    ["金鸡亭"] = 785
+    -- 嘉兴区域可能分配到明州的金鸡亭
+    ["金鸡亭"] = 785,
+    -- 嘉兴区域可能分配到苏州的南门
+    ["南门"] = 494,
   }
 
   -- 福州福威镖局
@@ -913,6 +916,7 @@ local define_hubiao = function()
           wait.time(2)
           return self:doCancel()
         end
+        ColourNote("green", "", "特殊房间匹配，重新定位至房间：" .. specialRelocateId)
         table.insert(searchRooms, travel.roomsById[specialRelocateId])
       end
       self.searchedRoomIds = {}

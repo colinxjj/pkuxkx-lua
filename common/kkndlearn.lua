@@ -318,9 +318,11 @@ local define_kkndlearn = function()
         --          end
         if status.currQi > 400 then
           SendNoEcho("lian dodge 10")
-          SendNoEcho("jifa parry huashan-jianfa")
+--          SendNoEcho("jifa parry huashan-jianfa")
+          SendNoEcho("jifa parry huanyuan-zhang")
           SendNoEcho("lian parry 10")
-          SendNoEcho("jifa parry yunushijiu-jian")
+--          SendNoEcho("jifa parry yunushijiu-jian")
+          SendNoEcho("jifa parry poyu-quan")
           SendNoEcho("lian parry 10")
 
 --          SendNoEcho("lian dodge 5")
