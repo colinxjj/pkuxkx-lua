@@ -327,7 +327,9 @@ local define_murong = function()
         end
         self:debug("Õ½¶·Ê±¼ä", self.killSeconds)
         if self.killSeconds % 3 == 0 then
-          SendNoEcho("perform dugu-jiujian.po")
+          SendNoEcho("perform dugu-jiujian.poqi")
+          SendNoEcho("perform huashan-jianfa.jianzhang")
+          SendNoEcho("perform yunushijiu-jian.sanqingfeng")
           SendNoEcho("perform dugu-jiujian.pobing")
         end
       end

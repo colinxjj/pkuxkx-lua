@@ -286,6 +286,7 @@ local define_hubiao = function()
     WEAPON_REMOVED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
     WEAPON_WIELDED = "^[ >]*(你已经装备著了。|你从陈旧的剑鞘中拔出一把玄铁剑握在手中。)$",
     GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【劣质】。$",
+    GRADUATED = "^[ >]*你已经在新手镖局获得足够经验了，快到大城市去闯荡一番吧。$",
   }
 
   local SpecialRenameRooms = {
