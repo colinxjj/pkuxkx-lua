@@ -174,7 +174,7 @@ local define_travel = function()
     LOOK_DONE = helper.settingRegexp("travel", "look_done"),
     strange = "你不小心被什么东西绊了一下，差点摔个大跟头。",
     FLOOD_OCCURRED = "^[ >]*(你刚要前行，忽然发现江水决堤，不由暗自庆幸，还好没过去。|你正要前行，有人大喝：黄河决堤啦，快跑啊！)$",
-    BLOCKED = "^[ >]*(江百胜伸手拦住你说道|红花会众说道：“阁下不是红花会弟子|号手首领伸手拦住了你的去路|鼓手首领一言不发，闪身拦在你面前|守山弟子说: 非我派弟子不许上峨嵋山|师太拦住了你的去路|官兵拦住了你的去路|中年道长拦住你说道：后面是本派重地，你不是武当弟子).*$",
+    BLOCKED = "^[ >]*(江百胜伸手拦住你说道|红花会众说道：“阁下不是红花会弟子|号手首领伸手拦住了你的去路|鼓手首领一言不发，闪身拦在你面前|守山弟子说: 非我派弟子不许上峨嵋山|师太拦住了你的去路|官兵拦住了你的去路|中年道长拦住你说道：后面是本派重地，你不是武当弟子|保镖向你吼道：小杂种，这也是你来的地方|庄丁挡住了你：喂，你总该意思意思).*$",
   }
   -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_RETRIES = 4
@@ -2000,6 +2000,15 @@ local define_travel = function()
     if plan and #plan > 0 and not skipStart then
       -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path
       table.insert(plan, dal:getPseudoPath(plan[#plan].startid))
+    end
+    if not plan or #(plan) == 0 then
+      print("遍历路径为空")
+    else
+      local ls = {}
+      for i = #(plan), 1, -1 do
+        table.insert(ls, plan[i].path)
+      end
+      print("遍历路径为：", table.concat(ls, ";"))
     end
     return plan
   end

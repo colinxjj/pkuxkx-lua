@@ -308,7 +308,6 @@ local define_kkndlearn = function()
         if self.requireNeili then
           SendNoEcho("dazuo 1000")
           return
---          wait.regexp(REGEXP.DAZUO_FINISH, 6)
         end
         if status.currJing > 200 and self.learnCmd then
           SendNoEcho(self.learnCmd)
@@ -317,23 +316,13 @@ local define_kkndlearn = function()
         --            SendNoEcho(self.lianCmd)
         --          end
         if status.currQi > 400 then
-          SendNoEcho("lian dodge 10")
---          SendNoEcho("jifa parry huashan-jianfa")
-          SendNoEcho("jifa parry huanyuan-zhang")
-          SendNoEcho("lian parry 10")
---          SendNoEcho("jifa parry yunushijiu-jian")
-          SendNoEcho("jifa parry poyu-quan")
-          SendNoEcho("lian parry 10")
-
---          SendNoEcho("lian dodge 5")
---          SendNoEcho("wield jian")
---          SendNoEcho("jifa sword kuangfeng-kuaijian")
---          SendNoEcho("lian sword 5")
---          SendNoEcho("jifa sword yunushijiu-jianfa")
---          SendNoEcho("lian sword 5")
---          SendNoEcho("unwield jian")
---          SendNoEcho("jifa sword yangwu-jian")
---          SendNoEcho("lian sword 5")
+          SendNoEcho("lian dodge 5")
+          SendNoEcho("jifa parry yunushijiu-jian")
+--          SendNoEcho("jifa parry huanyuan-zhang")
+          SendNoEcho("lian parry 5")
+          SendNoEcho("jifa parry huashan-jianfa")
+--          SendNoEcho("jifa parry poyu-quan")
+          SendNoEcho("lian parry 5")
         end
       end
     end

@@ -285,7 +285,7 @@ local define_hubiao = function()
     ROBBER_ASSIST = "^[ >]*劫匪大喊：点子爪子硬！赶紧来帮忙！$",
     WEAPON_REMOVED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
     WEAPON_WIELDED = "^[ >]*(你已经装备著了。|你从陈旧的剑鞘中拔出一把玄铁剑握在手中。)$",
-    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【劣质】。$",
+    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【.*?】。$",
     GRADUATED = "^[ >]*你已经在新手镖局获得足够经验了，快到大城市去闯荡一番吧。$",
   }
 
@@ -649,9 +649,13 @@ local define_hubiao = function()
     helper.addTrigger {
       group = "hubiao_submit_done",
       regexp = REGEXP.GARBAGE,
-      response = function()
-        SendNoEcho("drop shi tan")
-        SendNoEcho("drop xuan bing")
+      response = function(name, line, wildcards)
+        local item = wildcards[1]
+        if item == "石炭" then
+          SendNoEcho("drop shi tan")
+        elseif item == "玄冰" then
+          SendNoEcho("drop xuan bing")
+        end
       end
     }
     -- mixin

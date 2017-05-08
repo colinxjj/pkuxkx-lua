@@ -57,6 +57,7 @@ local define_murong = function()
     START = "start",  -- stop -> ask
     NEW_JOB = "new_job",  -- ask -> search
     NEW_JOB_CAPTCHA = "new_job_captcha",
+    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【.*?】。$",
     NEXT_SEARCH = "next_search",  -- search -> search
     JIAZEI_FOUND = "jiazei_found",  -- search -> kill
     JIAZEI_MISS = "jiazei_miss", -- kill -> search
@@ -72,6 +73,14 @@ local define_murong = function()
     WORK_TOO_FAST = "^[ >]*仆人对着你摇了摇头说：「你刚做过任务，先去休息休息吧。」$",
     JIAZEI_DESC = "^\\s*(.*?)发现的 慕容世家内鬼\\((.*)\\).*$",
     JIAZEI_KILLED = "^[ >]*慕容世家内鬼死了。$",
+    JIAZEI_MISSED = "^[ >]*你想杀谁？$",
+  }
+
+  local ExcludedZones = {
+    ["黄河南岸"] = true,
+    ["黄河北岸"] = true,
+    ["长江"] = true,
+    ["长江北岸"] = true
   }
 
   function prototype:FSM()
@@ -88,11 +97,12 @@ local define_murong = function()
     self:initTransitions()
     self:initTriggers()
     self:initAliases()
+    self:initTimers()
     self:setState(States.stop)
     self.precondition = {
       jing = 1,
       qi = 1,
-      neili = 1.5,
+      neili = 1.6,
       jingli = 1
     }
 
@@ -199,6 +209,8 @@ local define_murong = function()
         return self:doKill()
       end
     }
+    self:addTransitionToStop(States.search)
+    -- transition from state<kill>
     self:addTransition {
       oldState = States.kill,
       newState = States.search,
@@ -249,6 +261,13 @@ local define_murong = function()
         self.captchaLink = wildcards[1]
       end
     }
+    helper.addTrigger {
+      group = "murong_ask_done",
+      regexp = REGEXP.WORK_TOO_FAST,
+      response = function(name, line, wildcards)
+        self.workTooFast = true
+      end
+    }
     -- jiazei名称固定
     helper.addTrigger {
       group = "murong_search",
@@ -272,6 +291,14 @@ local define_murong = function()
       response = function()
         self:debug("JIAZEI_KILLED triggered")
         self.jiazeiKilled = true
+      end
+    }
+    helper.addTrigger {
+      group = "murong_kill",
+      regexp = REGEXP.JIAZEI_MISSED,
+      response = function()
+        self:debug("JIAZEI_MISSED triggered")
+
       end
     }
   end
@@ -316,7 +343,7 @@ local define_murong = function()
 
   function prototype:initTimers()
     helper.removeTimerGroups("murong_kill")
-    helper.addAlias {
+    helper.addTimer {
       group = "murong_kill",
       interval = 2,
       response = function()
@@ -327,9 +354,10 @@ local define_murong = function()
         end
         self:debug("战斗时间", self.killSeconds)
         if self.killSeconds % 3 == 0 then
-          SendNoEcho("perform dugu-jiujian.poqi")
+--          SendNoEcho("perform dugu-jiujian.poqi")
+          SendNoEcho("wield sword")
           SendNoEcho("perform huashan-jianfa.jianzhang")
-          SendNoEcho("perform yunushijiu-jian.sanqingfeng")
+--          SendNoEcho("perform yunushijiu-jian.sanqingfeng")
           SendNoEcho("perform dugu-jiujian.pobing")
         end
       end
@@ -352,12 +380,16 @@ local define_murong = function()
     travel:waitUntilArrived()
     self.searchLocation = nil
     self.captchaLink = nil
+    self.workTooFast = false
     SendNoEcho("set murong ask_start")
     SendNoEcho("ask pu about job")
     SendNoEcho("set murong ask_done")
     helper.checkUntilNotBusy()
-
-    if self.captchaLink then
+    if self.workTooFast then
+      self:debug("工作太快，无法获取任务，等待5秒后重新询问")
+      wait.time(5)
+      return self:doAsk()
+    elseif self.captchaLink then
       return self:fire(Events.NEW_JOB_CAPTCHA)
     elseif self.searchLocation then
       return self:fire(Events.NEW_JOB)
@@ -368,6 +400,11 @@ local define_murong = function()
   end
 
   function prototype:doPrepareSearch()
+    local place = helper.ch2place(self.searchLocation)
+    if place and place.area and ExcludedZones[place.area] then
+      ColourNote("yellow", "", "任务失败，特殊区域不建议搜索 " .. self.searchLocation)
+      return self:doCancel()
+    end
     local searchRooms = travel:getMatchedRooms {
       fullname = self.searchLocation
     }
@@ -426,6 +463,8 @@ local define_murong = function()
     helper.checkUntilNotBusy()
     travel:walkto(479)
     travel:waitUntilArrived()
+    SendNoEcho("drop shi tan")
+    SendNoEcho("drop xuan bing")
     SendNoEcho("give xin to pu")
     helper.checkUntilNotBusy()
     return self:fire(Events.STOP)
@@ -456,15 +495,15 @@ local define_murong = function()
   end
 
   function prototype:doCancel()
-    ColourNote("red", "", "调试模式，请手动取消任务")
+--    ColourNote("red", "", "调试模式，请手动取消任务")
 
---    helper.assureNotBusy()
---    travel:walkto(479)
---    travel:waitUntilArrived()
---    wait.time(1)
---    SendNoEcho("ask pu about fail")
---    helper.checkUntilNotBusy()
---    return self:fire(Events.STOP)
+    helper.assureNotBusy()
+    travel:walkto(479)
+    travel:waitUntilArrived()
+    wait.time(1)
+    SendNoEcho("ask pu about fail")
+    helper.checkUntilNotBusy()
+    return self:fire(Events.STOP)
   end
 
   return prototype

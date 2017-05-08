@@ -343,6 +343,9 @@ local define_jobs = function()
     TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
   }
 
+  -- 食堂
+  local DiningRoomId = 3797
+
   function prototype:FSM()
     local obj = FSM:new()
     setmetatable(obj, self or prototype)
@@ -370,7 +373,8 @@ local define_jobs = function()
   function prototype:initJobs()
     self.jobs = {}
 --    self.jobs.songxin = self.definedJobs.songxin
-    self.jobs.hubiao = self.definedJobs.hubiao
+--    self.jobs.hubiao = self.definedJobs.hubiao
+    self.jobs.murong = self.definedJobs.murong
   end
 
   function prototype:defineAllJobs()
@@ -391,7 +395,6 @@ local define_jobs = function()
       def = JobDefinition.murong,
       impl = murong
     }
---    self.definedJobs.
   end
 
   function prototype:initStates()
@@ -637,7 +640,7 @@ local define_jobs = function()
     helper.assureNotBusy()
     print("任务信息检查完毕（待完善）")
     -- 确定任务
-    self.currJob = self.jobs.hubiao
+    self.currJob = self.jobs.murong
     print("确定当前任务类型：", self.currJob.def.name)
     wait.time(1)
     helper.assureNotBusy()
@@ -667,7 +670,7 @@ local define_jobs = function()
 
   --
   function prototype:doDining()
-    travel:walkto(3798)
+    travel:walkto(DiningRoomId)
     travel:waitUntilArrived()
     helper.assureNotBusy()
     SendNoEcho("do 2 eat")
