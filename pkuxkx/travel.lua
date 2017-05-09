@@ -14,6 +14,8 @@
 -- 2017/3/24 修改，添加busy事件，同时考虑flood事件，配套解决方法可以是
 -- 对可能发生map change的路径标记并禁用quick模式；同时，当flood时，比对
 -- 当前房间出口直到出口发生变化，再进行后续行走。
+-- 2017/5/9 修改，添加遍历方法与获取附近房间列表方法的是否过河参数
+-- 2017/5/9 在同一区域仍然可能出现无法从房间A到达房间B的情况，例如无量山后山洞内洞外
 --
 -- 该模块采用了FSM设计模式，目标是稳定，易用，容错。
 -- FSM状态有：
@@ -167,7 +169,21 @@ local define_travel = function()
     WALK_LOST_SPECIAL = "^[ >]*泼皮一把拦住你：要向从此过，留下买路财！泼皮一把拉住了你。$",
     WALK_RESUME = "^[ >]*(你终于来到了对面，心里的石头终于落地|突然间蓬一声，屁股撞上了什么物事，|你终于一步步的终于挨到了桥头|不知过了多久，船终于靠岸了，你累得满头大汗|小舟终于划到近岸，你从船上走了出来|你沿着踏板走了上去|绿衣少女将小船系在树枝之上，你跨上岸去|突然你突然脚下踏了个空，向下一滑，身子登时堕下了去).*$",
     -- 添加武当沼泽busy
-    WALK_BUSY = "^[ >]*(你走到门前，轻轻地扣了两下门环。|吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的。|你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步。|你还在山中跋涉，一时半会恐怕走不出.*|青海湖畔美不胜收，你不由停下脚步，欣赏起了风景。|你不小心被什么东西绊了一下.*|你的动作还没有完成，不能移动。|沙石地几乎没有路了，你走不了那么快。)$",
+    WALK_BUSY =  table.concat({
+      "^[ >]*(", -- 匹配开头
+      table.concat({
+        "你走到门前，轻轻地扣了两下门环",  -- dalunsi
+        "吊桥还没有升起来，你就这样走了，可能会给外敌可乘之机的",  -- lingxiao
+        "你小心翼翼往前挪动，遇到艰险难行处，只好放慢脚步",  -- chengdu
+        "你还在山中跋涉，一时半会恐怕走不出",  -- huizuxiaozhen
+        "青海湖畔美不胜收，你不由停下脚步，欣赏起了风景",  -- dalunsi
+        "你不小心被什么东西绊了一下",  -- unknown
+        "你的动作还没有完成，不能移动",  -- busy
+        "沙石地几乎没有路了，你走不了那么快",  -- huangzhong
+        "荒路几乎没有路了，你走不了那么快",  -- huangzhong
+      }, "|"), -- 挡路触发
+      ").*$", -- 匹配结束
+    }, ""),
     WALK_BLOCK = "^[> ]*你的动作还没有完成，不能移动.*$",
     WALK_STEP = helper.settingRegexp("travel", "walk_step"),
     ARRIVED = helper.settingRegexp("travel", "arrived"),
@@ -369,8 +385,18 @@ local define_travel = function()
           end
           self:debug("出发地与目的地处于同一区域，共" .. roomCnt .. "个房间")
         end
-        return roomsearch {
+        local result = roomsearch {
           rooms = startZone.rooms,
+          startid = fromid,
+          targetid = toid
+        }
+        if result then
+          return result
+        end
+        -- 修改，当同一区域但无法到达时，使用备用全图搜索！
+        ColourNote("yellow", "", "注意，当前区域无法从房间" .. fromid .. "到达房间" .. toid .. "，尝试全局搜索")
+        return roomsearch {
+          rooms = self.roomsById,
           startid = fromid,
           targetid = toid
         }
@@ -417,8 +443,8 @@ local define_travel = function()
   end
 
   -- 获取指定房间周围指定距离内的遍历路径栈
-  function prototype:generateNearbyTraversePlan(centerRoomId, depth, skipStart)
-    local rooms = self:getNearbyRooms(centerRoomId, depth)
+  function prototype:generateNearbyTraversePlan(centerRoomId, depth, skipStart, crossRiver)
+    local rooms = self:getNearbyRooms(centerRoomId, depth, crossRiver)
     return self:generateTraversePlan(rooms, centerRoomId, skipStart)
   end
 
@@ -713,11 +739,11 @@ local define_travel = function()
 
   -- 功能受限的自动遍历
   -- 遍历当前房间范围为depth内的所有房间
-  function prototype:traverseNearby(depth, check, action)
+  function prototype:traverseNearby(depth, check, action, crossRiver)
     if not self.currRoomId then
       print("失败。当前房间未定位，无法进行范围内自动遍历")
     else
-      local traverseRooms = self:getNearbyRooms(self.currRoomId, depth)
+      local traverseRooms = self:getNearbyRooms(self.currRoomId, depth, crossRiver)
     -- todo need to consider situation that rooms in maze may not be bi-directional reachable
 --      local RoomsInZone = self.zonesByCode[self.roomsById[self.currRoomId].zone].rooms
       if not traverseRooms then
@@ -1188,6 +1214,7 @@ local define_travel = function()
         self.snapshotExits = nil
         self:debug("洪水结束，补足由于洪水少走的一步并继续前进")
         table.insert(self.walkPlan, self.prevMove)
+        SendNoEcho("halt")
         return self:walking()
       end
     }
@@ -2056,7 +2083,7 @@ local define_travel = function()
   end
 
   -- 获取附近房间列表
-  function prototype:getNearbyRooms(centerRoomId, maxDepth)
+  function prototype:getNearbyRooms(centerRoomId, maxDepth, crossRiver)
     if maxDepth < 1 then return nil end
     local startroom = self.roomsById[centerRoomId]
     if not startroom then return nil end
@@ -2075,7 +2102,10 @@ local define_travel = function()
           for _, exit in pairs(room.paths) do
             local nextRoom = self.roomsById[exit.endid]
             if nextRoom then
-              deque:addLast({room=nextRoom, depth=depth+1})
+              -- 添加对过河的判断
+              if crossRiver or not string.find(exit.path, "boat") then
+                deque:addLast({room=nextRoom, depth=depth+1})
+              end
             end
           end
         end

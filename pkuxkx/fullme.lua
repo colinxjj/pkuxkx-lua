@@ -43,7 +43,6 @@ local define_fullme = function()
   local WINDOW_TEXT_COLOUR = ColourNameToRGB ("black")
   local TEXT_INSET = 5
 
-
   function prototype:new()
     local obj = {}
     setmetatable(obj, self or prototype)

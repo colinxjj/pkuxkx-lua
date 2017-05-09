@@ -18,7 +18,11 @@ local define_touxue = function()
   local Events = {
     STOP = "stop"
   }
-  local REGEXP = {}
+  local REGEXP = {
+    ALIAS_START = "^touxue\\s+start\\s*$",
+    ALIAS_STOP = "^touxue\\s+stop\\s*$",
+    ALIAS_DEBUG = "^touxue\\s+debug\\s+(on|off)\\s*$",
+  }
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -58,7 +62,26 @@ local define_touxue = function()
   end
 
   function prototype:initAliases()
+    helper.removeAliasGroups("touxue")
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_START,
+      response = function()
 
+      end
+    }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_STOP,
+      response = function() end
+    }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_DEBUG,
+      response = function()
+
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)

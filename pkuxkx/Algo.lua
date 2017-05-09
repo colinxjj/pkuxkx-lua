@@ -10,6 +10,7 @@
 -- Algo.lua
 -- Implement algorithm of searching path
 -- current solution is based on A*
+-- changelog:
 --------------------------------------------------------------
 local minheap = require "pkuxkx.minheap"
 local Distance = require "pkuxkx.Distance"
@@ -152,7 +153,7 @@ local define_Algo = function()
       if not reached[c] then
         reached[c] = true
         table.insert(queue, c)
-        for endid, path in pairs(rooms[c].paths) do
+        for endid, move in pairs(rooms[c].paths) do
           -- 增加一个判断，path的endid必须也在rooms列表中
           if rooms[endid] and not reached[endid] then
             table.insert(candidates, endid)
