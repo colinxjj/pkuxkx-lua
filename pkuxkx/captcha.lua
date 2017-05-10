@@ -1,24 +1,29 @@
 --
--- Created by IntelliJ IDEA.
+-- captcha.lua
 -- User: zhe.jiang
--- Date: 2017/3/28
--- Time: 15:53
--- To change this template use File | Settings | File Templates.
---
+-- Date: 2017/5/10
+-- Desc:
+-- Change:
+-- 2017/5/10 - created
+
 local helper = require "pkuxkx.helper"
 local http = require "socket.http"
 assert(package.loadlib("luagd.dll", "luaopen_gd"))()
 require "movewindow"
 
-local define_fullme = function()
+local define_captcha = function()
   local prototype = {}
   prototype.__index = prototype
 
   local REGEXP = {
+    ALIAS_START = "^captcha\\s+start\\s*$",
+    ALIAS_STOP = "^captcha\\s+stop\\s*$",
+    ALIAS_DEBUG = "^captcha\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_SHOW = "^captcha\\s+show\\s*$",
     URL = "^(http://pkuxkx.net/antirobot/.+)$"
   }
---  local WINDOW_WIDTH = 306
---  local WINDOW_HEIGHT = 146
+  --  local WINDOW_WIDTH = 306
+  --  local WINDOW_HEIGHT = 146
   local EDGE_WIDTH = 3
   local WINDOW_POSITION = 6
   --[[
@@ -51,29 +56,101 @@ local define_fullme = function()
   end
 
   function prototype:postConstruct()
+    self:initTriggers()
+    self:initAliases()
+    self.DEBUG = true
     -- create folder first
     self.pngs = {}
-    self.pngDir = "png-fullme"
+    self.pngDir = "png-captcha"
     os.execute("md " .. self.pngDir)
     self.win = GetUniqueID()
     self.windowInfo = movewindow.install(self.win, WINDOW_POSITION, 0)
     self.windowWidth = 300
     self.windowHeight = 150
+    self.picThread = nil
+    self.url = nil
+    self.pngStr = nil
+  end
+
+  function prototype:debug(...)
+    if self.DEBUG then
+      print(...)
+    end
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("fullme")
+    helper.removeTriggerGroups("captcha")
     helper.addTrigger {
-      group = "fullme",
+      group = "captcha",
       regexp = REGEXP.URL,
       response = function(name, line, wildcards)
-        local url = wildcards[1]
+        self:debug("URL triggered")
+        if self.picThread then
+          self.url = wildcards[1]
+          self.picThread = coroutine.create(function()
+            local html = self:doGetHTML(self.url)
+            if not html then
+              ColourNote("yellow", "", "无法获取到网页信息")
+            else
+              local jpgUrl = self:doGetJpgUrl(html)
+              if not jpgUrl then
+                ColourNote("yellow", "", "无法从网页中查找到图片url")
+              else
+                local jpgStr = self:doDownloadJpg(jpgUrl)
+                if not jpgStr then
+                  ColourNote("yellow", "", "无法获取到图片实体")
+                else
+                  local filename = self.pngDir .. "\\" .. os.time() .. ".jpg"
+                  self.pngStr = self:doConvertJpgToPng(jpgStr, filename)
+                end
+              end
+            end
+            self.picThread = nil
+          end)
+
+          self.picThread.resume()
+        else
+          ColourNote("red", "", "已有线程在获取验证码，忽略当前url")
+        end
       end
     }
   end
 
   function prototype:initAliases()
-
+    helper.removeAliasGroups("captcha")
+    helper.addAlias {
+      group = "captcha",
+      regexp = REGEXP.ALIAS_START,
+      response = function()
+        return self:start()
+      end
+    }
+    helper.addAlias {
+      group = "captcha",
+      regexp = REGEXP.ALIAS_STOP,
+      response = function()
+        return self:stop()
+      end
+    }
+    helper.addAlias {
+      group = "captcha",
+      regexp = REGEXP.ALIAS_DEBUG,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self.DEBUG = true
+        else
+          self.DEBUG = false
+        end
+      end
+    }
+    helper.addAlias {
+      group = "captcha",
+      regexp = REGEXP.ALIAS_SHOW,
+      response = function()
+        return self.show()
+      end
+    }
   end
 
   function prototype:doGetHTML(url)
@@ -86,7 +163,7 @@ local define_fullme = function()
     if string.len(htmlText) >= 25 then
       local jpgUrl = string.match(htmlText, "/b2evo_captcha_tmp.-jpg")
       if not jpgUrl then return nil end
-      return "http://pkuxkx.net:9999/antirobot" .. jpgUrl
+      return "http://pkuxkx.net/antirobot" .. jpgUrl
     else
       return nil
     end
@@ -118,9 +195,9 @@ local define_fullme = function()
       self.windowInfo.window_mode,
       self.windowInfo.window_flags,
       WINDOW_BACKGROUND_COLOUR)
-    WindowLoadImageMemory(self.win, "png-fullme", png)
-    self.windowWidth = WindowImageInfo(self.win, "png-fullme", 2)
-    self.windowHeight = WindowImageInfo(self.win, "png-fullme", 3)
+    WindowLoadImageMemory(self.win, "png-captcha", png)
+    self.windowWidth = WindowImageInfo(self.win, "png-captcha", 2)
+    self.windowHeight = WindowImageInfo(self.win, "png-captcha", 3)
     -- recreate window
     WindowCreate(
       self.win,
@@ -142,6 +219,8 @@ local define_fullme = function()
     --WindowAddHotspot(self.win, "png-fullme", )
   end
 
+
   return prototype
 end
-return define_fullme():new()
+return define_captcha():new()
+

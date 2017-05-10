@@ -11,6 +11,7 @@
 -- Implement algorithm of searching path
 -- current solution is based on A*
 -- changelog:
+-- 2017/5/10 bug fix for traversal
 --------------------------------------------------------------
 local minheap = require "pkuxkx.minheap"
 local Distance = require "pkuxkx.Distance"
@@ -177,6 +178,8 @@ local define_Algo = function()
       startid = startid
     }
     if not dfs then return nil end
+    -- 当给定的房间列表本身无法完成遍历时，会增加外部的房间列表（全局列表）
+    local useGlobal = false
     local fullTraversal = {}
     table.insert(fullTraversal, startid)
     for i = 2, #dfs do
@@ -198,6 +201,7 @@ local define_Algo = function()
           -- print("rooms: ", table.concat(roomIds, ","))
           -- error("cannot find path from " .. prevRoomId .. " to " .. roomId)
           print("无法从当前房间列表找寻到从" .. prevRoomId .. "到" .. roomId .. "的路径，使用全局搜索")
+          useGlobal = true
           astar = Algo.astar {
             rooms = fallbackRooms,
             startid = prevRoomId,
@@ -214,7 +218,11 @@ local define_Algo = function()
       end
     end
     -- generate path stack
-    return reverseRoomArrayToPathStack(rooms, fullTraversal)
+    if useGlobal then
+      return reverseRoomArrayToPathStack(fallbackRooms, fullTraversal)
+    else
+      return reverseRoomArrayToPathStack(rooms, fullTraversal)
+    end
   end
 
   ---- simple test case

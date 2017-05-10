@@ -117,7 +117,8 @@ values
   ('taohuadao', '桃花岛', 'taohaodaodating'),
   ('kangqinwangfu', '康亲王府', 'kangqinwangfudating'),
   ('emeihoushan', '峨眉后山', 'emeihoushanshandao'),
-  ('wuliangshan', '无量山', 'wuliangshanhoushan')
+  ('wuliangshan', '无量山', 'wuliangshanhoushan'),
+  ('tidufu', '杭州提督府', 'tidufuzhengting')
 ;
 
 create table if not exists zone_connectivity (
@@ -300,7 +301,9 @@ values
   ('emeihoushan', 'emei', 6),
   ('emei', 'emeihoushan', 6),
   ('tianlongsi', 'wuliangshan', 6),
-  ('wuliangshan', 'tianlongsi', 6)
+  ('wuliangshan', 'tianlongsi', 6),
+  ('linan', 'tidufu', 13),
+  ('tidufu', 'linan', 13)
 ;
 
 update zone_connectivity set boat = 1
