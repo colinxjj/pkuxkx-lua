@@ -152,8 +152,12 @@ local define_murong = function()
     }
     self:addState {
       state = States.submit,
-      enter = function() end,
-      exit = function() end
+      enter = function()
+        helper.enableTriggerGroups("murong_submit_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("murong_submit_start", "murong_submit_done")
+      end
     }
   end
 
@@ -489,13 +493,13 @@ local define_murong = function()
     helper.checkUntilNotBusy()
     travel:walkto(479)
     travel:waitUntilArrived()
-    SendNoEcho("drop shi tan")
-    SendNoEcho("drop xuan bing")
     self.puBusy = false
     SendNoEcho("set murong submit_start")
     SendNoEcho("give xin to pu")
     SendNoEcho("set murong submit_done")
     helper.checkUntilNotBusy()
+    SendNoEcho("drop shi tan")
+    SendNoEcho("drop xuan bing")
     if self.puBusy then
       return self:fire(Events.PU_BUSY)
     else
