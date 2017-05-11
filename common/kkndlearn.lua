@@ -316,13 +316,13 @@ local define_kkndlearn = function()
         --            SendNoEcho(self.lianCmd)
         --          end
         if status.currQi > 400 then
-          SendNoEcho("lian dodge 5")
-          SendNoEcho("jifa parry yunushijiu-jian")
---          SendNoEcho("jifa parry huanyuan-zhang")
-          SendNoEcho("lian parry 5")
-          SendNoEcho("jifa parry huashan-jianfa")
---          SendNoEcho("jifa parry poyu-quan")
-          SendNoEcho("lian parry 5")
+--          SendNoEcho("lian dodge 5")
+--          SendNoEcho("jifa parry yunushijiu-jian")
+          SendNoEcho("jifa parry huanyuan-zhang")
+          SendNoEcho("lian parry 6")
+--          SendNoEcho("jifa parry huashan-jianfa")
+          SendNoEcho("jifa parry poyu-quan")
+          SendNoEcho("lian parry 6")
         end
       end
     end

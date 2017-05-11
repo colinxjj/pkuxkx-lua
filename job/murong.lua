@@ -64,6 +64,7 @@ local define_murong = function()
     JIAZEI_FOUND = "jiazei_found",  -- search -> kill
     JIAZEI_MISS = "jiazei_miss", -- kill -> search
     JIAZEI_KILLED = "jiazei_killed", -- kill -> submit
+    PU_BUSY = "pu_busy",  -- submit -> submit
   }
   local REGEXP = {
     ALIAS_START = "^murong\\s+start\\s*$",
@@ -76,6 +77,7 @@ local define_murong = function()
     JIAZEI_DESC = "^\\s*(.*?)发现的 慕容世家内鬼\\((.*)\\).*$",
     JIAZEI_KILLED = "^[ >]*慕容世家内鬼死了。$",
     JIAZEI_MISSED = "^[ >]*你想杀谁？$",
+    PU_BUSY = "^[ >]*仆人忙着呢，等会吧。$",
   }
 
   local ExcludedZones = {
@@ -238,6 +240,15 @@ local define_murong = function()
     }
     self:addTransitionToStop(States.kill)
     -- transition from state<submit>
+    self:addTransition {
+      oldState = States.submit,
+      newState = States.submit,
+      event = Events.PU_BUSY,
+      action = function()
+        wait.time(2)
+        return self:doSubmit()
+      end
+    }
     self:addTransitionToStop(States.submit)
   end
 
@@ -301,6 +312,19 @@ local define_murong = function()
       response = function()
         self:debug("JIAZEI_MISSED triggered")
 
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "murong",
+      start = "submit_start",
+      done = "submit_done"
+    }
+    helper.addTrigger {
+      group = "murong_submit_done",
+      regexp = REGEXP.PU_BUSY,
+      response = function()
+        self:debug("PU_BUSY triggered")
+        self.puBusy = true
       end
     }
   end
@@ -467,9 +491,16 @@ local define_murong = function()
     travel:waitUntilArrived()
     SendNoEcho("drop shi tan")
     SendNoEcho("drop xuan bing")
+    self.puBusy = false
+    SendNoEcho("set murong submit_start")
     SendNoEcho("give xin to pu")
+    SendNoEcho("set murong submit_done")
     helper.checkUntilNotBusy()
-    return self:fire(Events.STOP)
+    if self.puBusy then
+      return self:fire(Events.PU_BUSY)
+    else
+      return self:fire(Events.STOP)
+    end
   end
 
   function prototype:doKill()
