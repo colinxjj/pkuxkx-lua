@@ -20,29 +20,27 @@ local define_captcha = function()
     ALIAS_START = "^captcha\\s+start\\s*$",
     ALIAS_STOP = "^captcha\\s+stop\\s*$",
     ALIAS_DEBUG = "^captcha\\s+debug\\s+(on|off)\\s*$",
-    ALIAS_SHOW = "^captcha\\s+show\\s*$",
     URL = "^(http://pkuxkx.net/antirobot/.+)$"
   }
   --  local WINDOW_WIDTH = 306
   --  local WINDOW_HEIGHT = 146
   local EDGE_WIDTH = 3
-  local WINDOW_POSITION = 6
   --[[
   Useful positions:
-  0 = stretch to output view size
-  1 = stretch with aspect ratio
-  2 = strech to owner size
-  3 = stretch with aspect ratio
-  4 = top left
-  5 = center left-right at top
-  6 = top right
-  7 = on right, center top-bottom
-  8 = on right, at bottom
-  9 = center left-right at bottom
-  10 = on left, at bottom
-  11 = on left, center top-bottom
-  12 = centre all
-  13 = tile
+  0	Stretch to output view size	      miniwin.pos_stretch_to_view
+  1	Stretch with aspect ratio	        miniwin.pos_stretch_to_view_with_aspect
+  2	Strech to owner size	            miniwin.pos_stretch_to_owner
+  3	Stretch with aspect ratio	        miniwin.pos_stretch_to_owner_with_aspect
+  4	Top left	                        miniwin.pos_top_left
+  5	Center left-right at top	        miniwin.pos_top_center
+  6	Top right	                        miniwin.pos_top_right
+  7	On right, center top-bottom	      miniwin.pos_center_right
+  8	On right, at bottom	              miniwin.pos_bottom_right
+  9	Center left-right at bottom	      miniwin.pos_bottom_center
+  10	On left, at bottom	            miniwin.pos_bottom_left
+  11	On left, center top-bottom	    miniwin.pos_center_left
+  12	Centre all	                    miniwin.pos_center_all
+  13	Tile	                          miniwin.pos_tile
   --]]
   local WINDOW_BACKGROUND_COLOUR = ColourNameToRGB ("darkgray")
   local BOX_COLOUR = ColourNameToRGB ("royalblue") -- Box boarder's colour
@@ -64,13 +62,23 @@ local define_captcha = function()
     self.pngs = {}
     self.pngDir = "png-captcha"
     os.execute("md " .. self.pngDir)
-    self.win = GetUniqueID()
-    self.windowInfo = movewindow.install(self.win, WINDOW_POSITION, 0)
     self.windowWidth = 300
     self.windowHeight = 150
+    self.windowName = "mini_captcha"
+    self.imageName = "captcha"
+    self.scriptName = "captcha_hotspot_callback"
     self.picThread = nil
     self.url = nil
     self.pngStr = nil
+
+    local im = gd.createFromJpeg(self.pngDir .. "/" .. "abc.jpg")
+    self.pngStr = im:pngStr()
+
+    world[self.scriptName] = function()
+      self:refreshWindow()
+    end
+
+    -- self:drawWindow()
   end
 
   function prototype:debug(...)
@@ -87,31 +95,10 @@ local define_captcha = function()
       response = function(name, line, wildcards)
         self:debug("URL triggered")
         if self.picThread then
-          self.url = wildcards[1]
-          self.picThread = coroutine.create(function()
-            local html = self:doGetHTML(self.url)
-            if not html then
-              ColourNote("yellow", "", "无法获取到网页信息")
-            else
-              local jpgUrl = self:doGetJpgUrl(html)
-              if not jpgUrl then
-                ColourNote("yellow", "", "无法从网页中查找到图片url")
-              else
-                local jpgStr = self:doDownloadJpg(jpgUrl)
-                if not jpgStr then
-                  ColourNote("yellow", "", "无法获取到图片实体")
-                else
-                  local filename = self.pngDir .. "\\" .. os.time() .. ".jpg"
-                  self.pngStr = self:doConvertJpgToPng(jpgStr, filename)
-                end
-              end
-            end
-            self.picThread = nil
-          end)
-
-          self.picThread.resume()
-        else
           ColourNote("red", "", "已有线程在获取验证码，忽略当前url")
+        else
+          self.url = wildcards[1]
+          self:refreshWindow()
         end
       end
     }
@@ -123,14 +110,17 @@ local define_captcha = function()
       group = "captcha",
       regexp = REGEXP.ALIAS_START,
       response = function()
-        return self:start()
+        print("开启捕捉captcha")
+        helper.enableTriggerGroups("captcha")
       end
     }
     helper.addAlias {
       group = "captcha",
       regexp = REGEXP.ALIAS_STOP,
       response = function()
-        return self:stop()
+        print("关闭捕捉captcha")
+        helper.disableTriggerGroups("captcha")
+        WindowDelete(self.windowName)
       end
     }
     helper.addAlias {
@@ -145,13 +135,43 @@ local define_captcha = function()
         end
       end
     }
-    helper.addAlias {
-      group = "captcha",
-      regexp = REGEXP.ALIAS_SHOW,
-      response = function()
-        return self.show()
-      end
-    }
+  end
+
+  function prototype:refreshWindow()
+    if not self.url then
+      ColourNote("red", "", "没有可以搜索的captcha url")
+    elseif self.picThread then
+      ColourNote("red", "", "正在执行刷新操作，无法并行运行")
+    else
+      self.picThread = coroutine.create(function()
+        local html = self:doGetHTML(self.url)
+        if not html then
+          ColourNote("yellow", "", "无法获取到网页信息")
+        else
+          local jpgUrl = self:doGetJpgUrl(html)
+          if not jpgUrl then
+            ColourNote("yellow", "", "无法从网页中查找到图片url")
+          else
+            local jpgStr = self:doDownloadJpg(jpgUrl)
+            if not jpgStr then
+              ColourNote("yellow", "", "无法获取到图片实体")
+            else
+              local filename = self.pngDir .. "\\" .. os.time() .. ".jpg"
+              self.pngStr = self:doConvertJpgToPng(jpgStr, filename)
+              if self.pngStr then
+                ColourNote("green", "", "Captcha file saved as [" .. filename .. "]")
+                self:drawWindow()
+              else
+                ColourNote("red", "", "Failed to get captcha")
+                WindowShow(self.windowName, false)
+              end
+            end
+          end
+        end
+        self.picThread = nil
+      end)
+      coroutine.resume(self.picThread)
+    end
   end
 
   function prototype:doGetHTML(url)
@@ -186,40 +206,45 @@ local define_captcha = function()
     return pngStr
   end
 
-  function prototype:doDrawMiniWin(png)
+  function prototype:createWindow()
     WindowCreate(
-      self.win,
-      self.windowInfo.window_left,
-      self.windowInfo.window_top,
+      self.windowName,
+      0,
+      0,
       self.windowWidth,
       self.windowHeight,
-      self.windowInfo.window_mode,
-      self.windowInfo.window_flags,
+      miniwin.pos_bottom_right,
+      0,
       WINDOW_BACKGROUND_COLOUR)
-    WindowLoadImageMemory(self.win, "png-captcha", png)
-    self.windowWidth = WindowImageInfo(self.win, "png-captcha", 2)
-    self.windowHeight = WindowImageInfo(self.win, "png-captcha", 3)
-    -- recreate window
-    WindowCreate(
-      self.win,
-      self.windowInfo.window_left,
-      self.windowInfo.window_top,
-      self.windowWidth + 6,
-      self.windowHeight + 46,
-      self.windowInfo.window_mode,
-      self.windowInfo.window_flags,
-      WINDOW_BACKGROUND_COLOUR)
-    -- show on top z-index
-    WindowSetZOrder(self.win, 999)
-    movewindow.add_drag_handler(self.win, 0, 0, 0, 0)
-    WindowCircleOp(self.win, 2, 0, 0, 0, 0, BOX_COLOUR, 6, EDGE_WIDTH, 0x000000, 1)
-    WindowDrawImage(self.win, "png-fullme", 3, 3, -3, -43, 1)
-    -- inner border
-    WindowRectOp(self.win, 1, 3, 3, self.windowWidth + 3, self.windowHeight + 3, ColourNameToRGB("gray"))
-    -- refresh once clicked
-    --WindowAddHotspot(self.win, "png-fullme", )
   end
 
+  function prototype:drawWindow()
+    self:createWindow()
+    WindowLoadImageMemory(self.windowName, self.imageName, self.pngStr)
+    self.windowWidth = WindowImageInfo(self.windowName, "png-captcha", 2) + 6
+    self.windowHeight = WindowImageInfo(self.windowName, "png-captcha", 3) + 6
+    -- recreate table
+    self:createWindow()
+    -- show on top z-index
+    WindowSetZOrder(self.windowName, 999)
+    WindowCircleOp(self.windowName, 2, 0, 0, 0, 0, BOX_COLOUR, 6, EDGE_WIDTH, 0x000000, 1)
+    WindowDrawImage(self.windowName, self.imageName, EDGE_WIDTH, EDGE_WIDTH, -EDGE_WIDTH, -EDGE_WIDTH, 1)
+    -- inner border
+    WindowRectOp(self.windowName, 1, EDGE_WIDTH, EDGE_WIDTH, self.windowWidth + EDGE_WIDTH, self.windowHeight + EDGE_WIDTH, ColourNameToRGB("gray"))
+    -- add hot spot
+    WindowDeleteAllHotspots(self.windowName)
+    WindowAddHotspot(self.windowName, "captcha_hotspot", EDGE_WIDTH, EDGE_WIDTH, -EDGE_WIDTH, -EDGE_WIDTH,
+      nil,
+      nil,
+      nil,
+      nil,
+      self.scriptName,
+      "click to refresh captcha",
+      miniwin.cursor_hand,
+      0)
+
+    WindowShow(self.windowName, true)
+  end
 
   return prototype
 end
