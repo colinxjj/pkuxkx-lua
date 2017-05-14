@@ -27,7 +27,7 @@ local define_module = function()
     ALIAS_NANJUE = "^dztn\\s+nanjue\\s+(on|off)\\s*$",
   }
 
-  local DztnRoomId = 2921
+  local DztnRoomId = 2918
   local DiningRoomId = 3798
 
   function prototype:new()

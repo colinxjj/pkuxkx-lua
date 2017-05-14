@@ -147,7 +147,7 @@ local define_pick = function()
       "zhongyuan",
       "qufu",
       "xiaoshancun",
-      "lingzhou"
+      "huashan"
     }
     self.pickedZones = {}
     for _, zone in ipairs(self.pickZones) do

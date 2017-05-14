@@ -229,6 +229,7 @@ local define_travel = function()
         "卫士对你大吼一声：站住，干什么的",  -- lingzhou
         "锦衣卫上前挡住你说道：里面没什么好看的，马上离开这里",  -- tiantan
         "神龙教弟子大声喝道：本教重地，外人不得入内",  -- shenlongdao
+        "王兴隆说道：“后面是我家，没事别瞎转悠",  -- tidufu
       }, "|"), -- 挡路触发
       ").*$", -- 匹配结束
     }, ""),
@@ -1055,7 +1056,8 @@ local define_travel = function()
       action = function()
         -- 这是开始行走的唯一入口，初始化prevMove变量，
         -- 该变量保存前一步的路径信息，用于应对洪水事件
-        helper.assureNotBusy()
+        helper.checkUntilNotBusy()
+        SendNoEcho("halt")  -- the halt command is required in case in combat
         self.prevMove = nil
         self.prevCheck = false
         return self:walking()

@@ -71,14 +71,15 @@ local define_captcha = function()
     self.url = nil
     self.pngStr = nil
 
-    local im = gd.createFromJpeg(self.pngDir .. "/" .. "abc.jpg")
-    self.pngStr = im:pngStr()
-
     world[self.scriptName] = function()
       self:refreshWindow()
     end
 
-    -- self:drawWindow()
+    -- initialize
+    local im = gd.createFromJpeg(self.pngDir .. "\\" .. "abc.jpg")
+    self.pngStr = im:pngStr()
+    self:drawWindow()
+
   end
 
   function prototype:debug(...)
@@ -110,17 +111,14 @@ local define_captcha = function()
       group = "captcha",
       regexp = REGEXP.ALIAS_START,
       response = function()
-        print("开启捕捉captcha")
-        helper.enableTriggerGroups("captcha")
+        self:start()
       end
     }
     helper.addAlias {
       group = "captcha",
       regexp = REGEXP.ALIAS_STOP,
       response = function()
-        print("关闭捕捉captcha")
-        helper.disableTriggerGroups("captcha")
-        WindowDelete(self.windowName)
+        self:stop()
       end
     }
     helper.addAlias {
@@ -149,10 +147,16 @@ local define_captcha = function()
           ColourNote("yellow", "", "无法获取到网页信息")
         else
           local jpgUrl = self:doGetJpgUrl(html)
+          self:debug("jpgUrl:", jpgUrl)
           if not jpgUrl then
             ColourNote("yellow", "", "无法从网页中查找到图片url")
           else
             local jpgStr = self:doDownloadJpg(jpgUrl)
+            if jpgStr then
+              self:debug("cannot load jpgStr")
+            else
+              self:debug("jpgStr size:", string.len(jpgStr))
+            end
             if not jpgStr then
               ColourNote("yellow", "", "无法获取到图片实体")
             else
@@ -161,6 +165,7 @@ local define_captcha = function()
               if self.pngStr then
                 ColourNote("green", "", "Captcha file saved as [" .. filename .. "]")
                 self:drawWindow()
+                WindowShow(self.windowName, true)
               else
                 ColourNote("red", "", "Failed to get captcha")
                 WindowShow(self.windowName, false)
@@ -175,7 +180,7 @@ local define_captcha = function()
   end
 
   function prototype:doGetHTML(url)
-    http.TIMEOUT = 1
+    http.TIMEOUT = 2
     return http.request(url)
   end
 
@@ -213,7 +218,7 @@ local define_captcha = function()
       0,
       self.windowWidth,
       self.windowHeight,
-      miniwin.pos_bottom_right,
+      miniwin.pos_top_right,
       0,
       WINDOW_BACKGROUND_COLOUR)
   end
@@ -221,8 +226,8 @@ local define_captcha = function()
   function prototype:drawWindow()
     self:createWindow()
     WindowLoadImageMemory(self.windowName, self.imageName, self.pngStr)
-    self.windowWidth = WindowImageInfo(self.windowName, "png-captcha", 2) + 6
-    self.windowHeight = WindowImageInfo(self.windowName, "png-captcha", 3) + 6
+    self.windowWidth = WindowImageInfo(self.windowName, self.imageName, 2) + 6
+    self.windowHeight = WindowImageInfo(self.windowName, self.imageName, 3) + 6
     -- recreate table
     self:createWindow()
     -- show on top z-index
@@ -242,11 +247,22 @@ local define_captcha = function()
       "click to refresh captcha",
       miniwin.cursor_hand,
       0)
-
     WindowShow(self.windowName, true)
+  end
+
+  function prototype:start()
+    print("开启捕捉captcha")
+    helper.enableTriggerGroups("captcha")
+  end
+
+  function prototype:stop()
+    print("关闭捕捉captcha")
+    helper.disableTriggerGroups("captcha")
+    WindowDelete(self.windowName)
   end
 
   return prototype
 end
-return define_captcha():new()
-
+local captcha = define_captcha():new()
+captcha:start()
+return captcha

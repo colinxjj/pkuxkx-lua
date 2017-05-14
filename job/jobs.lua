@@ -18,6 +18,7 @@ local murong = require "job.murong"
 
 -- ∞Ôª·»ŒŒÒ
 local banghui = require "common.banghui"
+local captcha = require "pkuxkx.captcha"
 
 local patterns = {[[
 l xiansuo
