@@ -382,6 +382,9 @@ local define_murong = function()
         else
           self.killSeconds = self.killSeconds + 2
         end
+        if self.killSeconds % 8 == 0 then
+          SendNoEcho("yun recover")
+        end
         self:debug("Õ½¶·Ê±¼ä", self.killSeconds)
         if self.killSeconds % 3 == 0 then
 --          SendNoEcho("perform dugu-jiujian.poqi")

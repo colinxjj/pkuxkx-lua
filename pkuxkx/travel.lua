@@ -146,8 +146,8 @@ local define_travel = function()
     ALIAS_WALKTO_CODE = "^walkto\\s+([a-z][a-z0-9]+)\\s*$",
     ALIAS_WALKTO_LIST = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
     ALIAS_WALKTO_MODE = "^walkto\\s+mode\\s+(quick|normal|slow)$",
-    ALIAS_TRAVERSE = "^traverse\\s+(\\d+)\\s*$",
-    ALIAS_TRAVERSE_ZONE = "^traverse\\s+([a-z][a-z0-9]+)\\s*$",
+    ALIAS_TRAVERSE = "^traverse\\s+(\\d+)\\s*([^ ]*)$",
+    ALIAS_TRAVERSE_ZONE = "^traverse\\s+([a-z][a-z0-9]+)\\s*([^ ]*)$",
     ALIAS_LOC_HERE = "^loc\\s+here\\s*$",
     ALIAS_LOC_ID = "^loc\\s+(\\d+)$",
     ALIAS_LOC_GUESS = "^loc\\s+guess\\s*$",
@@ -230,6 +230,7 @@ local define_travel = function()
         "锦衣卫上前挡住你说道：里面没什么好看的，马上离开这里",  -- tiantan
         "神龙教弟子大声喝道：本教重地，外人不得入内",  -- shenlongdao
         "王兴隆说道：“后面是我家，没事别瞎转悠",  -- tidufu
+        "童百熊说道：「你不是我日月神教弟子，来我教干什么",  -- riyue
       }, "|"), -- 挡路触发
       ").*$", -- 匹配结束
     }, ""),
@@ -1603,7 +1604,31 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_TRAVERSE,
       response = function(name, line, wildcards)
         local depth = tonumber(wildcards[1])
-        self:traverseNearby(depth)
+        local checkName = wildcards[2]
+        if checkName ~= "" then
+          self:debug("构建临时触发器，匹配", checkName)
+          local checked = false
+          helper.addOneShotTrigger {
+            group = "travel_one_shot",
+            regexp = checkName,
+            response = function()
+              checked = true
+            end
+          }
+          local onStep = function()
+            return checked
+          end
+          local onArrive = function()
+            helper.removeTriggerGroups("travel_one_shot")
+            if checked then
+              ColourNote("green", "", "已发现目标，停止行走")
+            else
+              ColourNote("yellow", "", "未发现目标，遍历结束")
+            end
+          end
+          return self:traverseNearby(depth, onStep, onArrive)
+        end
+        return self:traverseNearby(depth)
       end
     }
     -- 遍历区域
@@ -1612,7 +1637,31 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_TRAVERSE_ZONE,
       response = function(name, line, wildcards)
         local zone = wildcards[1]
-        self:traverseZone(zone)
+        local checkName = wildcards[2]
+        if checkName ~= "" then
+          print("构建临时触发器，匹配", checkName)
+          local checked = false
+          helper.addOneShotTrigger {
+            group = "travel_one_shot",
+            regexp = checkName,
+            response = function()
+              checked = true
+            end
+          }
+          local onStep = function()
+            return checked
+          end
+          local onArrive = function()
+            helper.removeTriggerGroups("travel_one_shot")
+            if checked then
+              ColourNote("green", "", "已发现目标，停止行走")
+            else
+              ColourNote("yellow", "", "未发现目标，遍历结束")
+            end
+          end
+          return self:traverseZone(zone, onStep, onArrive)
+        end
+        return self:traverseZone(zone)
       end
     }
     -- 更新地图与查看功能
