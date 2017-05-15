@@ -790,7 +790,8 @@ local define_travel = function()
     if args.fullname then
       -- check if the fullname match pattern <zone>的<room>
       local delimStart, delimEnd = string.find(args.fullname, "的")
-      if delimStart then
+      -- bug fix 2017/5/15: 特殊情况 房间名中存在"的"
+      if delimStart and args.fullname ~= "扬州正气山庄的大门" then
         local zone = string.sub(args.fullname, 1, delimStart - 1)
         local name = string.sub(args.fullname, delimEnd + 1)
         self:debug("解析后区域名：", zone)

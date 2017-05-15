@@ -263,7 +263,7 @@ local define_Job = function()
         local currTime = os.time()
         if currTime - self:getLastUpdateTime() >= self.cancelThreshold then
           ColourNote("red", "", "停顿超过5分钟，强制取消任务")
-          return self:cancel()
+          return self.impl:doCancel()
         elseif currTime - self:getLastUpdateTime() >= self.warnThreshold then
           ColourNote("yellow", "", "停顿超过3分钟，警告")
         else
