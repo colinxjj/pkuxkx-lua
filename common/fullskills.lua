@@ -1,0 +1,332 @@
+--
+-- fullskills.lua
+-- User: zhe.jiang
+-- Date: 2017/5/16
+-- Desc:
+-- Change:
+-- 2017/5/16 - created
+
+local helper = require "pkuxkx.helper"
+local travel = require "pkuxkx.travel"
+local status = require "pkuxkx.status"
+
+local Skills = {
+  {
+    basic = "force",
+    special = "zixia-shengong",
+    mode = "lingwu"
+  },
+  {
+    basic = "parry",
+    special = "dugu-jiujian",
+    mode = "lingwu",
+    weapon = "sword",
+  },
+  {
+    basic = "dodge",
+    special = "huashan-shenfa",
+    mode = "lingwu",
+  },
+  {
+    basic = "dodge",
+    special = "huashan-shenfa",
+    mode = "lian",
+  },
+  {
+    basic = "parry",
+    special = "hunyuan-zhang",
+    mode = "lian",
+  },
+  {
+    basic = "sword",
+    special = "dugu-jiujian",
+    mode = "lingwu",
+    weapon = "sword",
+  },
+  {
+    basic = "sword",
+    special = "dugu-jiujian",
+    mode = "lian",
+    weapon = "sword"
+  },
+  {
+    basic = "parry",
+    special = "huashan-jianfa",
+    mode = "lian",
+    weapon = "sword"
+  },
+}
+local SleepInterval = 60
+local DzNumPerSecond = 65
+local LingwuNum = 50  -- 1 - 500
+local LianNum = 50  -- 1 - 500
+local LevelupSwitch = false
+local SleepRoomId = 2921
+local SkillRoomId = 2918
+
+local define_fullskills = function()
+  local prototype = {}
+  prototype.__index = prototype
+
+  local REGEXP = {
+    ALIAS_START = "^fullskills\\s+start\\s*$",
+    ALIAS_STOP = "^fullskills\\s+stop\\s*$",
+    ALIAS_DEBUG = "^fullskills\\s+debug\\s+(on|off)\\s*$",
+    SLEPT = "^[ >]*你往床上一躺，开始睡觉。$",
+    WAKE_UP = "^[ >]*你一觉醒来，精神抖擞地活动了几下手脚。$",
+    CANNOT_SLEEP = "^[ >]*你刚在三分钟内睡过一觉, 多睡对身体有害无益.*$",
+    DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
+    SKILL_LEVEL_UP = "^[ >]*你的「.*?」进步了！$",
+    CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高！|你的.*?的级别还没有.*?的级别高，不能通过练习来提高了。)$",
+    CANNOT_DAZUO = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉。$",
+  }
+
+  function prototype:new()
+    local obj = {}
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
+  end
+
+  function prototype:postConstruct()
+    self:initTriggers()
+    self:initAliases()
+    self.DEBUG = true
+    self.skillStack = {}
+    self:populateSkillStack()
+  end
+
+  function prototype:populateSkillStack()
+    for i = #Skills, 1, -1 do
+      table.insert(self.skillStack, Skills[i])
+    end
+  end
+
+  function prototype:debug(...)
+    if self.DEBUG then
+      print(...)
+    end
+  end
+
+  function prototype:initTriggers()
+    helper.removeTriggerGroups("fullskills")
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.CANNOT_SLEEP,
+      response = function()
+        wait.time(5)
+        SendNoEcho("sleep")
+      end
+    }
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.WAKE_UP,
+      response = function()
+        self.startTime = os.time()
+        travel:walkto(SkillRoomId)
+        travel:waitUntilArrived()
+        return self:doStart()
+      end
+    }
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.DAZUO_FINISH,
+      response = function()
+        return self:doFull()
+      end
+    }
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.CANNOT_IMPROVE,
+      response = function()
+        self.canImprove = false
+      end
+    }
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.SKILL_LEVEL_UP,
+      response = function()
+        self.skillLevelup = true
+      end
+    }
+  end
+
+  function prototype:initAliases()
+    helper.removeAliasGroups("fullskills")
+    helper.addAlias {
+      group = "fullskills",
+      regexp = REGEXP.ALIAS_START,
+      response = function()
+        return self:start()
+      end
+    }
+    helper.addAlias {
+      group = "fullskills",
+      regexp = REGEXP.ALIAS_STOP,
+      response = function()
+        return self:stop()
+      end
+    }
+    helper.addAlias {
+      group = "fullskills",
+      regexp = REGEXP.ALIAS_DEBUG,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self.DEBUG = true
+        else
+          self.DEBUG = false
+        end
+      end
+    }
+  end
+
+  function prototype:start()
+    helper.enableTriggerGroups("fullskills")
+    self.stopped = false
+
+    helper.checkUntilNotBusy()
+    SendNoEcho("halt")
+    travel:walkto(SkillRoomId)
+    travel:waitUntilArrived()
+    self.startTime = os.time()
+    return self:doStart()
+  end
+
+  function prototype:stop()
+    helper.disableTriggerGroups("fullskills")
+    self.stopped = true
+
+    SendNoEcho("halt")
+  end
+
+  function prototype:doStart()
+    local startTime = os.time()
+    local diff = startTime - self.startTime
+    if diff > SleepInterval then
+      self:debug("睡觉间隔已达到" .. diff, "开始fullskills")
+      return self:doFull()
+    else
+      return self:doPrepare()
+    end
+  end
+
+  function prototype:doPrepare()
+    status:hpbrief()
+    if status.food < 150 then
+      SendNoEcho("do 3 eat ganliang")
+    end
+    if status.drink < 150 then
+      SendNoEcho("do 3 drink jiudai")
+    end
+    local neiliDiff = status.maxNeili * 2 - status.currNeili
+    local dzNumPerMin = DzNumPerSecond * 60
+    -- 满内力，直接开搞
+    if neiliDiff <= 10 then
+      return self:doFull()
+    elseif neiliDiff > dzNumPerMin then
+      if status.currQi + status.maxQi * 0.1 < dzNumPerMin then
+        SendNoEcho("yun recover")
+        SendNoEcho("dazuo max")
+      else
+        SendNoEcho("dazuo " .. dzNumPerMin)
+      end
+    else
+      SendNoEcho("dazuo max")
+    end
+  end
+
+  function prototype:doFull()
+    -- check skill pool
+    if #(self.skillStack) == 0 then
+      self:populateSkillStack()
+    end
+    self.currSkill = table.remove(self.skillStack)
+    if self.currSkill.weapon then
+      SendNoEcho("wield " .. self.currSkill.weapon)
+    else
+      SendNoEcho("unwield all")
+    end
+    self.canImprove = true
+    self.skillLevelup = false
+    local workCmd
+    local recoverCmd
+    local testCmd
+    if self.currSkill.mode == "lingwu" then
+      workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
+      testCmd = "lingwu " .. self.currSkill.basic .. " 1"
+      recoverCmd = "yun regenerate"
+    else
+      workCmd = "lian " .. self.currSkill.basic .. " " .. LianNum
+      testCmd = "lian " .. self.currSkill.basic .. " 1"
+      recoverCmd = "yun recover"
+    end
+    -- 检查是否可提高
+    SendNoEcho(testCmd)
+    helper.checkUntilNotBusy()
+    if not self.canImprove then
+      return self:doFull()
+    end
+
+    SendNoEcho(recoverCmd)
+    status:hpbrief()
+    local jing1 = status.currJing
+    local qi1 = status.currQi
+    local neili1 = status.currNeili
+    SendNoEcho(workCmd)
+    status:hpbrief()
+    local jing2 = status.currJing
+    local qi2 = status.currQi
+    local neili2 = status.currNeili
+
+    local jingCost = jing1 - jing2
+    if jingCost < 0 then jingCost = 0 end
+    local qiCost = qi1 - qi2
+    if qiCost < 0 then qiCost = 0 end
+    local neiliCost = neili1 - neili2
+    if neiliCost < 0 then neiliCost = 0 end
+    self.debug("初始测算 - ", "精消耗：", jingCost, "气消耗：", qiCost, "内力消耗：", neiliCost)
+    if jingCost > qiCost then
+      qiCost = 0
+      self:debug("忽略气消耗")
+    else
+      jingCost = 0
+      self:debug("忽略精消耗")
+    end
+    while not self.stopped do
+      wait.time(0.2)
+      status:hpbrief()
+      if (jingCost > 0 and status.currJing < jingCost)
+        or (qiCost > 0 and status.currQi < qiCost) then
+        -- 睡觉前需要将正在联系的技能再次放入栈中
+        -- 考虑参数levelupSwitch
+        if LevelupSwitch and self.skillLevelup then
+          self:debug("技能已升级，选择下一技能作为提升技能")
+        else
+          table.insert(self.skillStack, self.currSkill)
+        end
+        return self:doSleep()
+      end
+      if neiliCost == 0 and status.currNeili > 0 then
+        self:debug("无内力消耗，直接恢复")
+        SendNoEcho(recoverCmd)
+      elseif neiliCost > 0 and qiCost > 0 and status.currQi / qiCost < status.currNeili / neiliCost then
+        self:debug("气消耗大于内力消耗，直接恢复")
+        SendNoEcho(recoverCmd)
+      end
+      SendNoEcho(workCmd)
+    end
+  end
+
+  function prototype:doSleep()
+    travel:walkto(SleepRoomId)
+    travel:waitUntilArrived()
+    SendNoEcho("sleep")
+  end
+
+  return prototype
+end
+return define_fullskills():new()
+
+
+

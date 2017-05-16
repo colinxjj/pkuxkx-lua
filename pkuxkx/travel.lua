@@ -871,6 +871,12 @@ local define_travel = function()
     end
   end
 
+  -- 通过给定名称查找区域
+  function prototype:getMatchedZone(name)
+    local name = SpecialRenamedZones[name] or name
+    return self.zonesByName[name]
+  end
+
   -------- Internal Functions ---------
   -- below functions should not be
   -- called outside this module

@@ -40,21 +40,69 @@ ask murong about job
 
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
+local travel = require "pkuxkx.travel"
+local status = require "pkuxkx.status"
+
+-- 去除掉干扰字符
+local ExcludeCharacters = {}
+for _, c in ipairs({
+  {
+    "大","英", "雄",
+    "盖", "世", "豪", "杰",
+    "，", "。", "「", "」"
+  }
+}) do
+  ExcludeCharacters[c] = true
+end
+
+local define_TouxueMotion = function()
+  local prototype = {}
+  prototype.__index = prototype
+
+  function prototype:new(args)
+    local obj = {}
+    obj.raw = assert(args.raw, "raw of touxue motion cannot be nil")
+    local chars = {}
+    local map = {}
+    for i = 1, string.len(obj.raw), 2 do
+      local char = string.sub(obj.raw, i, i+1) -- 中文gbk为双字节
+      if not ExcludeCharacters[char] then
+        table.insert(chars, char)
+        map[char] = true
+      end
+    end
+    obj.simplified = #chars == 0 and "" or table.concat(chars, "")
+    obj.map = map
+    setmetatable(obj, self or prototype)
+    return obj
+  end
+
+  return prototype
+end
+local TouxueMotion = define_TouxueMotion()
 
 local define_touxue = function()
   local prototype = FSM.inheritedMeta()
 
   local States = {
-    stop = "stop"
+    stop = "stop",
+    ask = "ask"
   }
   local Events = {
-    STOP = "stop"
+    STOP = "stop",  -- any state -> stop
+    START = "start",  -- stop -> ask
   }
   local REGEXP = {
     ALIAS_START = "^touxue\\s+start\\s*$",
     ALIAS_STOP = "^touxue\\s+stop\\s*$",
     ALIAS_DEBUG = "^touxue\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_SHOW = "^touxue\\s+show\\s*$",
+    JOB_SKILL = "^[ >]*慕容复说道：「.*，我近来习武遇到障碍，听说有人擅长(.*)。$」",
+    JOB_MOTION = "^[ >]*慕容复在你的耳边悄声说道：(.*)$",
+    JOB_NPC_ZONE = "^[ >]*慕容复在你的耳边悄声说道：其人名曰(.*?)，正在(.*?)一带活动。$",
   }
+
+  local JobRoomId = 479
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -69,6 +117,7 @@ local define_touxue = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
+    self.excludedChars = {}
   end
 
   function prototype:disableAllTriggers()
@@ -80,17 +129,79 @@ local define_touxue = function()
       state = States.stop,
       enter = function()
         self:disableAllTriggers()
+        SendNoEcho("set jobs job_done")  -- integration with jobs module
       end,
       exit = function() end
+    }
+    self:addState {
+      state = States.ask,
+      enter = function()
+        helper.enableTriggerGroups("touxue_ask_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("touxue_ask_start", "touxue_ask_done")
+      end
     }
   end
 
   function prototype:initTransitions()
-
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.ask,
+      event = Events.START,
+      action = function()
+        helper.checkUntilNotBusy()
+        SendNoEcho("halt")
+        travel:walkto(JobRoomId)
+        travel:waitUntilArrived()
+        self:debug("等待1秒后请求任务")
+        wait.time(1)
+        return self:doAsk()
+      end
+    }
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("touxue_ask_start", "touxue_ask_done")
+    helper.addTriggerSettingsPair {
+      group = "touxue",
+      start = "ask_start",
+      done = "ask_done"
+    }
+    helper.addTrigger {
+      group = "touxue_ask_done",
+      regexp = REGEXP.JOB_SKILL,
+      response = function(name, line, wildcards)
+        self:debug("JOB_SKILL triggered")
+        self.skill = wildcards[1]
+      end
+    }
+    helper.addTrigger {
+      group = "touxue_ask_done",
+      regexp = REGEXP.JOB_MOTION,
+      response = function(name, line, wildcards)
+        self:debug("JOB_MOTION triggered")
+        if not self.rawMotions then
+          self.rawMotions = {}
+        end
+        -- 当有奇数字节时，警告
+        local rawMotion = wildcards[1]
+        local len = string.len(rawMotion)
+        if len % 2 ~= 0 then
+          ColourNote("yellow", "", "异常长度描述出现，长度为" .. len)
+        end
+        table.insert(self.rawMotions, wildcards[1])
+      end
+    }
+    helper.addTrigger {
+      group = "touxue_ask_done",
+      regexp = REGEXP.JOB_NPC_ZONE,
+      response = function(name, line, wildcards)
+        self:debug("JOB_NPC_ZONE triggered")
+        self.npc = wildcards[1]
+        self.zoneName = wildcards[2]
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -99,19 +210,33 @@ local define_touxue = function()
       group = "touxue",
       regexp = REGEXP.ALIAS_START,
       response = function()
-
+        return self:fire(Events.START)
       end
     }
     helper.addAlias {
       group = "touxue",
       regexp = REGEXP.ALIAS_STOP,
-      response = function() end
+      response = function()
+        return self:fire(Events.STOP)
+      end
     }
     helper.addAlias {
       group = "touxue",
       regexp = REGEXP.ALIAS_DEBUG,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self:debugOn()
+        else
+          self:debugOff()
+        end
+      end
+    }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_SHOW,
       response = function()
-
+        self:show()
       end
     }
   end
@@ -125,6 +250,70 @@ local define_touxue = function()
         print("停止 - 当前状态", self.currState)
       end
     }
+  end
+
+  function prototype:doAsk()
+    -- reset all job info
+    self.zoneName = nil
+    self.npc = nil
+    self.skill = nil
+    self.rawMotions = nil
+    SendNoEcho("set touxue ask_start")
+    SendNoEcho("ask murong fu about job")
+    SendNoEcho("set touxue ask_done")
+    helper.checkUntilNotBusy()
+    if not self.zoneName or not self.npc or not self.skill or not self.rawMotions or #(self.rawMotions) == 0 then
+      -- todo
+      ColourNote("yellow", "", "无法获取到任务信息，任务失败")
+      return self:doCancel()
+    end
+    if self.DEBUG then self:show() end
+    return self:doPrepare()
+  end
+
+  function prototype:doPrepare()
+    -- 确定区域
+    local zone = travel:getMatchedZone(self.zoneName)
+    if not zone then
+      ColourNote("red", "", "区域 " .. self.zoneName .. " 不可达，任务失败")
+      wait.time(1)
+      return self:doCancel()
+    end
+    -- 从区域中心开始遍历
+    local startRoomCode = zone.centercode
+    local startRoom = travel.roomsByCode[startRoomCode]
+    if not startRoom then
+      ColourNote("red", "", "区域 " .. self.zoneName .. " 中心节点无效，任务失败")
+      wait.time(1)
+      return self:doCancel()
+    end
+
+    self.startRoom = startRoom
+    self.zone = zone
+
+    -- 对招式进行分解
+    self.motions = {}
+    for _, rawMotion in ipairs(self.rawMotions) do
+      local motion = TouxueMotion:new(rawMotion)
+      self.motions[motion.simplified] = motion
+    end
+  end
+
+  function prototype:doCancel()
+    helper.checkUntilNotBusy()
+    SendNoEcho("halt")
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    SendNoEcho("ask murong fu about fail")
+    helper.checkUntilNotBusy()
+    return self:fire(Events.STOP)
+  end
+
+  function prototype:show()
+    print("偷学人名：", self.npc)
+    print("偷学区域：", self.zoneName)
+    print("偷学技能：", self.skill)
+    print("偷学招式数：", self.rawMotions and #(self.rawMotions) or 0)
   end
 
   return prototype

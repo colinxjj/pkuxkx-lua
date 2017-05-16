@@ -20,6 +20,8 @@ local define_captcha = function()
     ALIAS_START = "^captcha\\s+start\\s*$",
     ALIAS_STOP = "^captcha\\s+stop\\s*$",
     ALIAS_DEBUG = "^captcha\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_SHOW = "^captcha\\s+show\\s*$",
+    ALIAS_HIDE = "^captcha\\s+hide\\s*$",
     URL = "^(http://pkuxkx.net/antirobot/.+)$"
   }
   --  local WINDOW_WIDTH = 306
@@ -76,7 +78,7 @@ local define_captcha = function()
     end
 
     -- initialize
-    local im = gd.createFromJpeg(self.pngDir .. "\\" .. "abc.jpg")
+    local im = gd.createFromJpeg(self.pngDir .. "\\" .. "empty.jpg")
     self.pngStr = im:pngStr()
     self:drawWindow()
 
@@ -131,6 +133,20 @@ local define_captcha = function()
         else
           self.DEBUG = false
         end
+      end
+    }
+    helper.addAlias {
+      group = "captcha",
+      regexp = REGEXP.ALIAS_HIDE,
+      response = function()
+        WindowShow(self.windowName, false)
+      end
+    }
+    helper.addAlias {
+      group = "captcha",
+      regexp = REGEXP.ALIAS_SHOW,
+      response = function()
+        WindowShow(self.windowName, true)
       end
     }
   end
