@@ -53,6 +53,9 @@ for _, c in ipairs({
 }) do
   ExcludeCharacters[c] = true
 end
+local PrecisionThreshold = 0.5
+local RecallThreshold = 0.5
+local FightTimeThreshold = 60
 
 local define_TouxueMotion = function()
   local prototype = {}
@@ -93,7 +96,7 @@ local define_touxue = function()
     ask = "ask",
     search = "search",
     fight = "fight",
-    submit = "submit"
+    submit = "submit",
   }
   local Events = {
     STOP = "stop",  -- any state -> stop
@@ -107,6 +110,8 @@ local define_touxue = function()
     ALIAS_STOP = "^touxue\\s+stop\\s*$",
     ALIAS_DEBUG = "^touxue\\s+debug\\s+(on|off)\\s*$",
     ALIAS_SHOW = "^touxue\\s+show\\s*$",
+    ALIAS_PRECISION = "^touxue\\s+precision\\s+(\\d+)\\s*$",
+    ALIAS_RECALL = "^touxue\\s+recall\\s+(\\d+)\\s*$",
     JOB_SKILL = "^[ >]*慕容复说道：「.*，我近来习武遇到障碍，听说有人擅长(.*)。$」",
     JOB_MOTION = "^[ >]*慕容复在你的耳边悄声说道：(.*)$",
     JOB_NPC_ZONE = "^[ >]*慕容复在你的耳边悄声说道：其人名曰(.*?)，正在(.*?)一带活动。$",
@@ -127,12 +132,13 @@ local define_touxue = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.excludedChars = {}
+    self.precisionPercent = PrecisionThreshold
+    self.recallPercent = RecallThreshold
   end
 
   function prototype:disableAllTriggers()
     helper.disableTriggerGroups("touxue_ask_start", "touxue_ask_done")
-    helper.removeTriggerGroups("touxue_one_shot")
+    helper.removeTriggerGroups("touxue_search", "touxue_fight")
   end
 
   function prototype:initStates()
@@ -151,6 +157,33 @@ local define_touxue = function()
       end,
       exit = function()
         helper.disableTriggerGroups("touxue_ask_start", "touxue_ask_done")
+      end
+    }
+    self:addState {
+      state = States.search,
+      enter = function() end,
+      exit = function()
+        helper.disableTriggerGroups("touxue_search")
+      end
+    }
+    self:addState {
+      state = States.fight,
+      enter = function() end,
+      exit = function()
+        -- be sure all skills are set as before
+        SendNoEcho("halt")
+        SendNoEcho("bei strike")
+        SendNoEcho("bei cuff")
+        helper.disableTriggerGroups("touxue_fight")
+      end
+    }
+    self:addState {
+      state = States.submit,
+      enter = function()
+        helper.enableTriggerGroups("touxue_submit_start")
+      end,
+      exit = function()
+        helper.disableTimerGroups("touxue_submit_start", "touxue_submit_done")
       end
     }
   end
@@ -191,6 +224,17 @@ local define_touxue = function()
         return self:doFight()
       end
     }
+    self:addTransitionToStop(States.search)
+    -- transition from state<fight>
+    self:addTransition {
+      oldState = States.fight,
+      newState = States.submit,
+      event = Events.LEARNED,
+      action = function()
+        return self:doSubmit()
+      end
+    }
+    self:addTransitionToStop(States.submit)
   end
 
   function prototype:initTriggers()
@@ -271,6 +315,30 @@ local define_touxue = function()
         self:show()
       end
     }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_PRECISION,
+      response = function(name, line, wildcards)
+        local pct = tonumber(wildcards[1])
+        if pct < 0 or pct > 100 then
+          ColourNote("red", "", "准确百分比必须在0-100之间")
+        else
+          self.precisionPercent = pct
+        end
+      end
+    }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_RECALL,
+      response = function(name, line, wildcards)
+        local pct = tonumber(wildcards[1])
+        if pct < 0 or pct > 100 then
+          ColourNote("red", "", "召回百分比必须在0-100之间")
+        else
+          self.recallPercent = pct
+        end
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -341,10 +409,10 @@ local define_touxue = function()
     -- 寻找目标
     self.npcId = nil
     helper.addOneShotTrigger {
-      group = "touxue_one_shot",
+      group = "touxue_search",
       regexp = "^[ >]*" .. self.npc .. "\\(.*?\\)$",
       response = function(name, line, wildcards)
-        self:debug("NPC_ONE_SHOT triggered")
+        self:debug("NPC_SEARCH triggered")
         self.npcId = string.lower(wildcards[1])
       end
     }
@@ -362,49 +430,117 @@ local define_touxue = function()
     end
     helper.checkUntilNotBusy()
     SendNoEcho("halt")
+    return travel:traverseZone(self.zone.code, onStep, onArrive)
   end
 
   function prototype:doFight()
     -- 增加招式跟踪信息
     self.motionsLearned = {}
     self.motionsToLearn = {}
+    local motionCnt = 0
     for name, motion in pairs(self.motions) do
       self.motionsToLearn[name] = motion
+      motionCnt = motionCnt + 1
     end
     -- 添加触发
     helper.addTrigger {
-      group = "touxue_one_shot",
+      group = "touxue_fight",
       regexp = "^[ >]*[^\\(]*" .. self.npc .. ".*$",
       response = function(name, line, widlcards)
         self:debug("NPC_MOTION triggered")
+        if #(self.motionsLearned) == motionCnt then
+          ColourNote("green", "", "已经学会全部招式")
+          return
+        end
         for name, motion in pairs(self.motionsToLearn) do
           if self.motionsLeared[name] then
             self:debug("此招已学习", name)
             break
           else
-
+            local result = self:evaluateMotion(motion, line)
+            if result.success then
+              self:debug(motion.simplified, "准确百分比：", result.precision, "召回百分比：", result.recall);
+              if result.precision >= self.precisionPercent and result.recall >= self.recallPercent then
+                self:debug("符合条件，执行偷学")
+                SendNoEcho("touxue " .. self.npcId)
+                self.motionsToLearn[motion.simplified] = nil
+                table.insert(self.motionsLearned, motion)
+                break
+              end
+            else
+              ColourNote("yellow", "", result.message)
+            end
           end
         end
       end
     }
+
+    helper.checkUntilNotBusy()
+    SendNoEcho("halt")
+    -- 接触装备和武功
+    SendNoEcho("follow " .. self.npcId)
+    SendNoEcho("unwield all")
+    SendNoEcho("bei none")
+    local fightStartTime = os.time()
+    helper.enableTriggerGroups("touxue_fight")
+    SendNoEcho("fight " .. self.npcId)
+    while true do
+      wait.time(4)
+      if #(self.motionsLearned) == motionCnt then
+        return self:fire(Events.LEARNED)
+      end
+      local currTime = os.time()
+      if currTime - fightStartTime >= 40 then
+        ColourNote("yellow", "", "偷学时间超过" .. FightTimeThreshold .. "秒，停止fight")
+        break
+      end
+    end
+    return self:fire(Events.LEARNED)
+  end
+
+  function prototype:doSubmit()
+    SendNoEcho("halt")
+    helper.checkUntilNotBusy()
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    wait.time(1)
+--    self.submitSuccess = false
+--    SendNoEcho("set touxue submit_start")
+--    SendNoEcho("ask touxue fu about finish")
+--    SendNoEcho("set touxue submit_done")
+--    helper.checkUntilNotBusy()
+    -- todo
   end
 
   function prototype:evaluateMotion(motion, line)
-    local len = string.len(line)
-    if len % 2 ~= 0 then
-      ColourNote("yellow", "", "当前句子可能存在非中文字符，忽略")
+    if string.len(line) % 2 ~= 0 then
+      return {
+        success = false,
+        message = "当前句子可能存在非中文字符，忽略",
+        precision = 0,
+        recall = 0,
+      }
     else
-      local charCnt = len / 2
+      local chars = {}
+      local charCnt = 0
       local matchedChars = {}
       local matchedCharCnt = 0
       for i = 1, len, 2 do
         local char = string.sub(line, i, i+1)
+        if not chars[char] then
+          chars[char] = true
+          charCnt = charCnt + 1
+        end
         if motion.map[char] and not matchedChars[char] then
           matchedChars[char] = true
           matchedCharCnt = matchedCharCnt + 1
         end
       end
---      local precision =
+      return {
+        success = true,
+        precision = math.floor(matchedCharCnt / charCnt * 100),
+        recall = math.floor(matchedCharCnt / motion.cnt * 100),
+      }
     end
   end
 

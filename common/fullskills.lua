@@ -9,6 +9,8 @@
 local helper = require "pkuxkx.helper"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
+local captcha = require "pkuxkx.captcha"
+local nanjue = require "job.nanjue"
 
 local Skills = {
   {
@@ -17,15 +19,15 @@ local Skills = {
     mode = "lingwu"
   },
   {
-    basic = "dodge",
-    special = "huashan-shenfa",
-    mode = "both",
-  },
-  {
     basic = "sword",
     special = "dugu-jiujian",
     mode = "both",
     weapon = "sword",
+  },
+  {
+    basic = "dodge",
+    special = "huashan-shenfa",
+    mode = "both",
   },
   {
     basic = "parry",
@@ -35,18 +37,24 @@ local Skills = {
   },
   {
     basic = "parry",
+    special = "huashan-jianfa",
+    mode = "lian",
+    weapon = "sword"
+  },
+  {
+    basic = "parry",
     special = "hunyuan-zhang",
     mode = "lian",
   },
   {
     basic = "parry",
-    special = "huashan-jianfa",
+    parry = "yunushijiu-jian",
     mode = "lian",
     weapon = "sword"
-  },
+  }
 }
 local SleepInterval = 60
-local DzNumPerSecond = 65
+local DzNumPerSecond = 66
 local LingwuNum = 50  -- 1 - 500
 local LianNum = 50  -- 1 - 500
 local LevelupSwitch = false
@@ -66,7 +74,7 @@ local define_fullskills = function()
     CANNOT_SLEEP = "^[ >]*你刚在三分钟内睡过一觉, 多睡对身体有害无益.*$",
     DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
     SKILL_LEVEL_UP = "^[ >]*你的「.*?」进步了！$",
-    CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高|你的.*?的级别还没有.*?的级别高，不能通过练习来提高).*$",
+    CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高|你的.*?的级别还没有.*?的级别高，不能通过练习来提高|你需要提高基本功，不然练得再多也没有用).*$",
     CANNOT_DAZUO = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉。$",
   }
 
@@ -171,6 +179,10 @@ local define_fullskills = function()
   end
 
   function prototype:start()
+    status:sk()
+    self.limit = status.skillLimit
+    self:debug("当前技能上限为", self.limit)
+
     helper.enableTriggerGroups("fullskills")
     self.stopped = false
 
@@ -226,7 +238,7 @@ local define_fullskills = function()
   end
 
   function prototype:doFull()
-    -- check skill pool
+    -- 从技能栈获取当前技能
     if #(self.skillStack) == 0 then
       self:populateSkillStack()
     end
@@ -236,25 +248,57 @@ local define_fullskills = function()
     else
       SendNoEcho("unwield all")
     end
+    -- 激发相应技能
+    SendNoEcho("jifa " .. self.currSkill.basic .. " " .. self.currSkill.special)
     self.canImprove = true
     self.skillLevelup = false
     local workCmd
     local recoverCmd
     local testCmd
     if self.currSkill.mode == "lingwu" then
+      -- 检查技能是否不大于上限
+      status:skbrief(self.currSkill.basic)
+      print(status.skillLevel)
+      print(self.limit)
+      if status.skillLevel >= self.limit then
+        self:debug("技能", self.currSkill.basic, "达到技能上限")
+        return self:doFull()
+      end
       workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
       testCmd = "lingwu " .. self.currSkill.basic .. " 1"
       recoverCmd = "yun regenerate"
-    else -- 包含both的情况
+    elseif self.currSkill.mode == "lian" then
+      status:skbrief(self.currSkill.special)
+      if status.skillLevel >= self.limit then
+        self:debug("技能", self.currSkill.special, "达到技能上限")
+        return self:doFull()
+      end
       workCmd = "lian " .. self.currSkill.basic .. " " .. LianNum
       testCmd = "lian " .. self.currSkill.basic .. " 1"
       recoverCmd = "yun recover"
+    elseif self.currSkill.mode == "both" then -- both的情况，先尝试练
+      status:skbrief(self.currSkill.special)
+      if status.skillLevel >= self.limit then
+        self:debug("both! 技能", self.currSkill.special, "达到技能上限")
+        status:skbrief(self.currSkill.basic)
+        if status.skillLevel >= self.limit then
+          self:debug("both! 技能", self.currSkill.basic, "达到技能上限")
+          return self:doFull()
+        end
+      end
+      workCmd = "lian " .. self.currSkill.basic .. " " .. LianNum
+      testCmd = "lian " .. self.currSkill.basic .. " 1"
+      recoverCmd = "yun recover"
+    else
+      error("unknown mode for fullskills")
     end
     -- 检查是否可提高
     SendNoEcho(testCmd)
     helper.checkUntilNotBusy()
     if not self.canImprove then
       if self.currSkill.mode == "both" then
+        -- 重置标记位
+        self.canImprove = true
         -- 尝试领悟
         workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
         testCmd = "lingwu " .. self.currSkill.basic .. " 1"
@@ -287,7 +331,7 @@ local define_fullskills = function()
     if qiCost < 0 then qiCost = 0 end
     local neiliCost = neili1 - neili2
     if neiliCost < 0 then neiliCost = 0 end
-    self.debug("初始测算 - ", "精消耗：", jingCost, "气消耗：", qiCost, "内力消耗：", neiliCost)
+    self:debug("初始测算 - ", "精消耗：", jingCost, "气消耗：", qiCost, "内力消耗：", neiliCost)
     if jingCost > qiCost then
       qiCost = 0
       self:debug("忽略气消耗")
@@ -299,6 +343,10 @@ local define_fullskills = function()
       wait.time(0.2)
       status:hpbrief()
       if not self.canImprove then
+        if self.currSkill.mode == "both" then
+          self:debug("对于同时提高技能，将其放回技能栈重新判断")
+          table.insert(self.skillStack, self.currSkill)
+        end
         return self:doFull()
       end
       if (jingCost > 0 and status.currJing < jingCost)

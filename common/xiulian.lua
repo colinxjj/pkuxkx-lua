@@ -17,6 +17,7 @@ local define_xiulian = function()
   local REGEXP = {
     XIULIAN_FINISH = "^[ >]*你从玄幻之境回过神来，顿觉内功修为增进不小。$",
     NEILI_ADDED = "^[ >]*你的内力增加了！！$",
+    EXP_LIMIT = "^[ >]*由于缺乏实战经验，你无法领会更高深的武功。$",
     DZ_FINISH = "^[ >]*(你将运转于任督二脉间的内息收回丹田，深深吸了口气，站了起来。)$",
     ALIAS_START = "xlforce\\s+start\\s*$",
     ALIAS_STOP = "xlforce\\s+stop\\s*$",

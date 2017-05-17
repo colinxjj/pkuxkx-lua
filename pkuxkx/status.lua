@@ -70,6 +70,8 @@ local define_status = function()
     inventory = "inventory",
     money = "money",
     score = "score",
+    skbrief = "skbrief",
+    sk = "sk",
   }
   local Events = {
     STOP = "stop",
@@ -79,6 +81,8 @@ local define_status = function()
     INVENTORY = "inventory",
     MONEY = "money",
     SCORE = "score",
+    SKBRIEF = "skbrief",
+    SK = "SK",
   }
   local REGEXP = {
     ALIAS_STATUS_HP = "^status\\s+hp\\s*$",
@@ -102,6 +106,8 @@ local define_status = function()
     SYSTEM_BUSY = "^[ >]*等等，系统喘气中......$",
     TITLE_DESC = "^\\s*【\\s*(.*?)\\s*】([^ ]+) (.*?)\\(([A-Z][a-z]*)\\)$",
     MURDEROUS_LEVEL = "^\\s*杀    气：\\s*(.+)$",
+    SKBRIEF = "^[ >]*#(\\d+)/(\\d+)$",
+    SKILL_LIMIT = "^[ >]*你目前所学过的技能：（共(.*?)项技能，你的技能等级最多能达到(.*?)级）$",
   }
 
   function prototype:FSM()
@@ -154,6 +160,13 @@ local define_status = function()
     self.rank = nil
     self.title = nil
     self.murderousLevel = 0
+    -- skbrief
+    self.skill = nil
+    self.skillLevel = nil
+    self.skillPot = nil
+    -- sk
+    self.skillCnt = nil
+    self.skillLimit = nil
   end
 
   function prototype:initStates()
@@ -210,6 +223,24 @@ local define_status = function()
       end,
       exit = function()
         helper.disableTriggerGroups("status_score_start", "status_score_done")
+      end
+    }
+    self:addState {
+      state = States.skbrief,
+      enter = function()
+        helper.enableTriggerGroups("status_skbrief_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("status_skbrief_start", "status_skbrief_done")
+      end
+    }
+    self:addState {
+      state = States.sk,
+      enter = function()
+        helper.enableTriggerGroups("status_sk_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("status_sk_start", "status_sk_done")
       end
     }
   end
@@ -291,6 +322,29 @@ local define_status = function()
         return self:fire(Events.STOP)
       end
     }
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.skbrief,
+      event = Events.SKBRIEF,
+      action = function()
+        assert(self.skill, "skill cannot be nil")
+        self.skillLevel = nil
+        self.skillPot = nil
+        self:doSkbrief()
+        return self:fire(Events.STOP)
+      end
+    }
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.sk,
+      event = Events.SK,
+      action = function()
+        self.skillCnt = nil
+        self.skillLimit = nil
+        self:doSk()
+        return self:fire(Events.STOP)
+      end
+    }
     self:addTransitionToStop(States.stop)
     -- transition from state<hpbrief>
     self:addTransitionToStop(States.hpbrief)
@@ -302,6 +356,10 @@ local define_status = function()
     self:addTransitionToStop(States.money)
     -- transition from state<score>
     self:addTransitionToStop(States.score)
+    -- transition from state<skbrief>
+    self:addTransitionToStop(States.skbrief)
+    -- transition from state<sk>
+    self:addTransitionToStop(States.sk)
   end
 
   function prototype:initTriggers()
@@ -310,7 +368,9 @@ local define_status = function()
       "status_id_start", "status_id_done",
       "status_inventory_start", "status_inventory_done",
       "status_money_start", "status_money_done",
-      "status_score_start", "status_score_done")
+      "status_score_start", "status_score_done",
+      "status_skbrief_start", "status_skbrief_done",
+      "status_sk_start", "status_sk_done")
     -- hpbrief check
     helper.addTrigger {
       group = "status_hpbrief_start",
@@ -571,6 +631,72 @@ local define_status = function()
         end
       end
     }
+    -- skbrief check
+    helper.addTrigger {
+      group = "status_skbrief_start",
+      regexp = helper.settingRegexp("status", "skbrief_start"),
+      response = function()
+        helper.enableTriggerGroups("status_skbrief_done")
+      end
+    }
+    helper.addTrigger {
+      group = "status_skbrief_done",
+      regexp = helper.settingRegexp("status", "skbrief_done"),
+      response = function()
+        helper.disableTriggerGroups("status_skbrief_done")
+        local thread = self.waitThread
+        if thread then
+          self.waitThread = nil
+          local ok, err = coroutine.resume(thread)
+          if not ok then
+            ColourNote ("deeppink", "black", "Error raised in trigger function (in wait module)")
+            ColourNote ("darkorange", "black", debug.traceback (thread))
+            error (err)
+          end -- if
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "status_skbrief_done",
+      regexp = REGEXP.SKBRIEF,
+      response = function(name, line, wildcards)
+        self.skillLevel = tonumber(wildcards[1])
+        self.skillPot = tonumber(wildcards[2])
+      end
+    }
+    -- sk check
+    helper.addTrigger {
+      group = "status_sk_start",
+      regexp = helper.settingRegexp("status", "sk_start"),
+      response = function()
+        helper.enableTriggerGroups("status_sk_done")
+      end
+    }
+    helper.addTrigger {
+      group = "status_sk_done",
+      regexp = helper.settingRegexp("status", "sk_done"),
+      response = function()
+        helper.disableTriggerGroups("status_sk_done")
+        local thread = self.waitThread
+        if thread then
+          self.waitThread = nil
+          local ok, err = coroutine.resume(thread)
+          if not ok then
+            ColourNote ("deeppink", "black", "Error raised in trigger function (in wait module)")
+            ColourNote ("darkorange", "black", debug.traceback (thread))
+            error (err)
+          end -- if
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "status_sk_done",
+      regexp = REGEXP.SKILL_LIMIT,
+      response = function(name, line, wildcards)
+        self.skillCnt = helper.ch2number(wildcards[1])
+        self.skillLimit = helper.ch2number(wildcards[2])
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -720,6 +846,29 @@ local define_status = function()
     return coroutine.yield()
   end
 
+  function prototype:doSkbrief()
+    assert(self.skill, "skill cannot be nil")
+    if self.waitThread then
+      error("Previous thread is not disposed")
+    end
+    self.waitThread = assert(coroutine.running(), "Must be in coroutine")
+    SendNoEcho("set status skbrief_start")
+    SendNoEcho("skbrief " .. self.skill)
+    SendNoEcho("set status skbrief_done")
+    return coroutine.yield()
+  end
+
+  function prototype:doSk()
+    if self.waitThread then
+      error("Previous thread is not disposed")
+    end
+    self.waitThread = assert(coroutine.running(), "Must be in coroutine")
+    SendNoEcho("set status sk_start")
+    SendNoEcho("sk")
+    SendNoEcho("set status sk_done")
+    return coroutine.yield()
+  end
+
   function prototype:showHp()
     print("精：", self.currJing, "/", self.maxJing)
     print("气：", self.currQi, "/", self.maxQi)
@@ -782,6 +931,15 @@ local define_status = function()
 
   function prototype:score()
     return self:fire(Events.SCORE)
+  end
+
+  function prototype:skbrief(skill)
+    self.skill = skill
+    return self:fire(Events.SKBRIEF)
+  end
+
+  function prototype:sk()
+    return self:fire(Events.SK)
   end
 
   return prototype

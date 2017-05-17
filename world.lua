@@ -196,6 +196,8 @@ function GetTimerInfo() end
 
 function Note() end
 
+function EnableTimerGroup() end
+
 utils = {}
 
 function utils.split(str, delim)
