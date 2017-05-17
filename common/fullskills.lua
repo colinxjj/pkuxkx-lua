@@ -17,37 +17,26 @@ local Skills = {
     mode = "lingwu"
   },
   {
+    basic = "dodge",
+    special = "huashan-shenfa",
+    mode = "both",
+  },
+  {
+    basic = "sword",
+    special = "dugu-jiujian",
+    mode = "both",
+    weapon = "sword",
+  },
+  {
     basic = "parry",
     special = "dugu-jiujian",
     mode = "lingwu",
     weapon = "sword",
-  },
-  {
-    basic = "dodge",
-    special = "huashan-shenfa",
-    mode = "lingwu",
-  },
-  {
-    basic = "dodge",
-    special = "huashan-shenfa",
-    mode = "lian",
   },
   {
     basic = "parry",
     special = "hunyuan-zhang",
     mode = "lian",
-  },
-  {
-    basic = "sword",
-    special = "dugu-jiujian",
-    mode = "lingwu",
-    weapon = "sword",
-  },
-  {
-    basic = "sword",
-    special = "dugu-jiujian",
-    mode = "lian",
-    weapon = "sword"
   },
   {
     basic = "parry",
@@ -77,7 +66,7 @@ local define_fullskills = function()
     CANNOT_SLEEP = "^[ >]*你刚在三分钟内睡过一觉, 多睡对身体有害无益.*$",
     DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
     SKILL_LEVEL_UP = "^[ >]*你的「.*?」进步了！$",
-    CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高！|你的.*?的级别还没有.*?的级别高，不能通过练习来提高了。)$",
+    CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高|你的.*?的级别还没有.*?的级别高，不能通过练习来提高).*$",
     CANNOT_DAZUO = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉。$",
   }
 
@@ -256,7 +245,7 @@ local define_fullskills = function()
       workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
       testCmd = "lingwu " .. self.currSkill.basic .. " 1"
       recoverCmd = "yun regenerate"
-    else
+    else -- 包含both的情况
       workCmd = "lian " .. self.currSkill.basic .. " " .. LianNum
       testCmd = "lian " .. self.currSkill.basic .. " 1"
       recoverCmd = "yun recover"
@@ -265,7 +254,20 @@ local define_fullskills = function()
     SendNoEcho(testCmd)
     helper.checkUntilNotBusy()
     if not self.canImprove then
-      return self:doFull()
+      if self.currSkill.mode == "both" then
+        -- 尝试领悟
+        workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
+        testCmd = "lingwu " .. self.currSkill.basic .. " 1"
+        recoverCmd = "yun regenerate"
+        -- 检查是否可提高
+        SendNoEcho(testCmd)
+        helper.checkUntilNotBusy()
+        if not self.canImprove then
+          return self:doFull()
+        end
+      else
+        return self:doFull()
+      end
     end
 
     SendNoEcho(recoverCmd)
@@ -296,6 +298,9 @@ local define_fullskills = function()
     while not self.stopped do
       wait.time(0.2)
       status:hpbrief()
+      if not self.canImprove then
+        return self:doFull()
+      end
       if (jingCost > 0 and status.currJing < jingCost)
         or (qiCost > 0 and status.currQi < qiCost) then
         -- 睡觉前需要将正在联系的技能再次放入栈中

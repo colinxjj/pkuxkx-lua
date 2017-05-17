@@ -41,7 +41,6 @@ ask murong about job
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
-local status = require "pkuxkx.status"
 
 -- 去除掉干扰字符
 local ExcludeCharacters = {}
@@ -64,14 +63,19 @@ local define_TouxueMotion = function()
     obj.raw = assert(args.raw, "raw of touxue motion cannot be nil")
     local chars = {}
     local map = {}
+    local charUniqCnt = 0
     for i = 1, string.len(obj.raw), 2 do
       local char = string.sub(obj.raw, i, i+1) -- 中文gbk为双字节
       if not ExcludeCharacters[char] then
         table.insert(chars, char)
-        map[char] = true
+        if not map[char] then
+          map[char] = true
+          charUniqCnt = charUniqCnt + 1
+        end
       end
     end
-    obj.simplified = #chars == 0 and "" or table.concat(chars, "")
+    obj.simplified = table.concat(chars, "")
+    obj.cnt = charUniqCnt
     obj.map = map
     setmetatable(obj, self or prototype)
     return obj
@@ -86,11 +90,17 @@ local define_touxue = function()
 
   local States = {
     stop = "stop",
-    ask = "ask"
+    ask = "ask",
+    search = "search",
+    fight = "fight",
+    submit = "submit"
   }
   local Events = {
     STOP = "stop",  -- any state -> stop
     START = "start",  -- stop -> ask
+    PREPARED = "prepared",  -- ask -> search
+    TARGET_FOUND = "target_found",  -- search -> fight
+    LEARNED = "learned",  -- fight -> submit
   }
   local REGEXP = {
     ALIAS_START = "^touxue\\s+start\\s*$",
@@ -121,7 +131,8 @@ local define_touxue = function()
   end
 
   function prototype:disableAllTriggers()
-
+    helper.disableTriggerGroups("touxue_ask_start", "touxue_ask_done")
+    helper.removeTriggerGroups("touxue_one_shot")
   end
 
   function prototype:initStates()
@@ -145,6 +156,7 @@ local define_touxue = function()
   end
 
   function prototype:initTransitions()
+    -- transition from state<stop>
     self:addTransition {
       oldState = States.stop,
       newState = States.ask,
@@ -157,6 +169,26 @@ local define_touxue = function()
         self:debug("等待1秒后请求任务")
         wait.time(1)
         return self:doAsk()
+      end
+    }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<ask>
+    self:addTransition {
+      oldState = States.ask,
+      newState = States.search,
+      event = Events.PREPARED,
+      action = function()
+        return self:doSearch()
+      end
+    }
+    self:addTransitionToStop(States.ask)
+    -- transition from state<search>
+    self:addTransition {
+      oldState = States.search,
+      newState = States.fight,
+      event = Events.TARGET_FOUND,
+      action = function()
+        return self:doFight()
       end
     }
   end
@@ -296,6 +328,83 @@ local define_touxue = function()
     for _, rawMotion in ipairs(self.rawMotions) do
       local motion = TouxueMotion:new(rawMotion)
       self.motions[motion.simplified] = motion
+    end
+    return self:fire(Events.PREPARED)
+  end
+
+  function prototype:doSearch()
+    wait.time(1)
+    helper.checkUntilNotBusy()
+    SendNoEcho("halt")
+    travel:walkto(self.startRoom.id)
+    travel:waitUntilArrived()
+    -- 寻找目标
+    self.npcId = nil
+    helper.addOneShotTrigger {
+      group = "touxue_one_shot",
+      regexp = "^[ >]*" .. self.npc .. "\\(.*?\\)$",
+      response = function(name, line, wildcards)
+        self:debug("NPC_ONE_SHOT triggered")
+        self.npcId = string.lower(wildcards[1])
+      end
+    }
+    local onStep = function()
+      return self.npcId ~= nil
+    end
+    local onArrive = function()
+      if self.npcId then
+        ColourNote("green", "", "发现目标，执行偷学")
+        return self:fire(Events.TARGET_FOUND)
+      else
+        ColourNote("yellow", "", "未发现目标，任务失败")
+        return self:doCancel()
+      end
+    end
+    helper.checkUntilNotBusy()
+    SendNoEcho("halt")
+  end
+
+  function prototype:doFight()
+    -- 增加招式跟踪信息
+    self.motionsLearned = {}
+    self.motionsToLearn = {}
+    for name, motion in pairs(self.motions) do
+      self.motionsToLearn[name] = motion
+    end
+    -- 添加触发
+    helper.addTrigger {
+      group = "touxue_one_shot",
+      regexp = "^[ >]*[^\\(]*" .. self.npc .. ".*$",
+      response = function(name, line, widlcards)
+        self:debug("NPC_MOTION triggered")
+        for name, motion in pairs(self.motionsToLearn) do
+          if self.motionsLeared[name] then
+            self:debug("此招已学习", name)
+            break
+          else
+
+          end
+        end
+      end
+    }
+  end
+
+  function prototype:evaluateMotion(motion, line)
+    local len = string.len(line)
+    if len % 2 ~= 0 then
+      ColourNote("yellow", "", "当前句子可能存在非中文字符，忽略")
+    else
+      local charCnt = len / 2
+      local matchedChars = {}
+      local matchedCharCnt = 0
+      for i = 1, len, 2 do
+        local char = string.sub(line, i, i+1)
+        if motion.map[char] and not matchedChars[char] then
+          matchedChars[char] = true
+          matchedCharCnt = matchedCharCnt + 1
+        end
+      end
+--      local precision =
     end
   end
 
