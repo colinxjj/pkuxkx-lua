@@ -105,10 +105,10 @@ local define_fsm = function()
       event = Events.START,
       action = function()
         assert(self.targetRoomId, "target room id cannot be nil")
-        return travel:walkto(self.targetRoomId, function()
-            self.moveDirection = nil
-            return self:doFind()
-        end)
+        travel:walkto(self.targetRoomId)
+        travel:waitUntilArrived()
+        self.moveDirection = nil
+        return self:doFind()
       end
     }
     self:addTransitionToStop(States.stop)

@@ -390,6 +390,7 @@ local define_nanjue = function()
     },
   }
 
+  local JobRoomId = 2289
   local TraverseDepth = 1
 
   function prototype:FSM()
@@ -497,9 +498,9 @@ local define_nanjue = function()
       newState = States.record,
       event = Events.START,
       action = function()
-        return travel:walkto(2289, function()
-          return self:doAskInfo()
-        end)
+        travel:walkto(JobRoomId)
+        travel:waitUntilArrived()
+        return self:doAskInfo()
       end
     }
     self:addTransitionToStop(States.stop)
@@ -557,9 +558,8 @@ local define_nanjue = function()
       action = function()
         -- we must reset all variables before do next job
         self:resetOnStop()
-        return travel:walkto(2289, function()
-          return self:doAskInfo()
-        end)
+        travel:walkto(JobRoomId)
+        return self:doAskInfo()
       end
     }
     self:addTransitionToStop(States.submit)
@@ -1210,7 +1210,7 @@ local define_nanjue = function()
 
   function prototype:doCancel()
     helper.assureNotBusy()
-    travel:walkto(2289)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     SendNoEcho("record cancel")
     wait.time(2)
@@ -1220,7 +1220,7 @@ local define_nanjue = function()
 
   function prototype:doSubmit()
     helper.assureNotBusy()
-    travel:walkto(2289)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     SendNoEcho("ask shaoyin about ¡Ï…Õ")
     wait.time(2)

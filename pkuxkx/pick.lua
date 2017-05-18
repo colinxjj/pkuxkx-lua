@@ -121,6 +121,10 @@ local define_pick = function()
     CANNOT_STORE_MONEY = "^[ >]*您目前已有存款.*，再存那么多的钱，我们小号可难保管了。$",
   }
 
+  local DiningRoomId = 3798
+  local SellRoomId = 30
+  local StoreRoomId = 91
+
   function prototype:FSM()
     local obj = FSM:new()
     setmetatable(obj, self or prototype)
@@ -481,15 +485,15 @@ local define_pick = function()
   end
 
   function prototype:doEat()
-    travel:walkto(3798, function()
-      helper.assureNotBusy()
-      SendNoEcho("do 2 eat")
-      helper.assureNotBusy()
-      SendNoEcho("do 2 drink")
-      helper.assureNotBusy()
-      wait.time(3)
-      return self:fire(Events.FULL)
-    end)
+    travel:walkto(DiningRoomId)
+    travel:waitUntilArrived()
+    helper.assureNotBusy()
+    SendNoEcho("do 2 eat")
+    helper.assureNotBusy()
+    SendNoEcho("do 2 drink")
+    helper.assureNotBusy()
+    wait.time(3)
+    return self:fire(Events.FULL)
   end
 
   function prototype:doSell()
@@ -516,30 +520,30 @@ local define_pick = function()
         end
       end
       -- todo 未来可优化为在就近的当铺进行出售
-      return travel:walkto(30, function()
-        while #(self.itemsToSell) > 0 do
-          local item = table.remove(self.itemsToSell)
-          local sellRetries = 0
-          -- 尝试卖出三次，如果仍不成功
-          while sellRetries <= 3 do
-            helper.assureNotBusy()
-            SendNoEcho("sell " .. item.id)
-            local line = wait.regexp(REGEXP.CANNOT_SELL_ITEM, 2)
-            if line then
-              -- 检查是否该物品不能买卖
-              if string.find(line, "不值钱") or string.find(line, "不能买卖") then
-                helper.assureNotBusy()
-                if not self.itemsExcluded[item.name] then
-                  SendNoEcho("drop " .. item.id)
-                end
+      travel:walkto(SellRoomId)
+      travel:waitUntilArrived()
+      while #(self.itemsToSell) > 0 do
+        local item = table.remove(self.itemsToSell)
+        local sellRetries = 0
+        -- 尝试卖出三次，如果仍不成功
+        while sellRetries <= 3 do
+          helper.assureNotBusy()
+          SendNoEcho("sell " .. item.id)
+          local line = wait.regexp(REGEXP.CANNOT_SELL_ITEM, 2)
+          if line then
+            -- 检查是否该物品不能买卖
+            if string.find(line, "不值钱") or string.find(line, "不能买卖") then
+              helper.assureNotBusy()
+              if not self.itemsExcluded[item.name] then
+                SendNoEcho("drop " .. item.id)
               end
-              break
             end
-            sellRetries = sellRetries + 1
+            break
           end
+          sellRetries = sellRetries + 1
         end
-        return self:fire(Events.NOT_ENOUGH_ITEMS)
-      end)
+      end
+      return self:fire(Events.NOT_ENOUGH_ITEMS)
     else
       self:debug("无东西可卖")
       return self:fire(Events.NOT_ENOUGH_ITEMS)
@@ -550,32 +554,31 @@ local define_pick = function()
     self:debug("等待1秒前往钱庄存钱")
     wait.time(1)
     helper.assureNotBusy()
-    return travel:walkto(91, function()
-      wait.time(1)
+    travel:walkto(StoreRoomId)
+    wait.time(1)
+    status:money()
+    if status.coins > self.coinThreshold then
+      helper.assureNotBusy()
+      SendNoEcho("convert " .. self.coinThreshold .. " coin to silver")
+      wait.time(2)
       status:money()
-      if status.coins > self.coinThreshold then
-        helper.assureNotBusy()
-        SendNoEcho("convert " .. self.coinThreshold .. " coin to silver")
-        wait.time(2)
-        status:money()
-      end
-      if status.silvers > self.silverThreshold then
-        helper.assureNotBusy()
-        SendNoEcho("convert " .. self.silverThreshold .. " silver to gold")
-        wait.time(2)
-        status:money()
-      end
-      if status.golds > self.goldThreshold then
-        helper.assureNotBusy()
-        SendNoEcho("cun " .. self.goldThreshold .. " gold")
-      end
-      local line = wait.regexp(REGEXP.CANNOT_STORE_MONEY, 3)
-      if line then
-        return self:fire(Events.MAX_MONEY_STORED)
-      else
-        return self:fire(Events.NOT_ENOUGH_MONEY)
-      end
-    end)
+    end
+    if status.silvers > self.silverThreshold then
+      helper.assureNotBusy()
+      SendNoEcho("convert " .. self.silverThreshold .. " silver to gold")
+      wait.time(2)
+      status:money()
+    end
+    if status.golds > self.goldThreshold then
+      helper.assureNotBusy()
+      SendNoEcho("cun " .. self.goldThreshold .. " gold")
+    end
+    local line = wait.regexp(REGEXP.CANNOT_STORE_MONEY, 3)
+    if line then
+      return self:fire(Events.MAX_MONEY_STORED)
+    else
+      return self:fire(Events.NOT_ENOUGH_MONEY)
+    end
   end
 
   function prototype:doPlanCheck()
@@ -605,9 +608,9 @@ local define_pick = function()
 
     local startCode = travel.zonesByCode[currZone].centercode
     local startId = travel.roomsByCode[startCode].id
-    travel:walkto(startId, function()
-      return travel:traverseZone(currZone, check, action)
-    end)
+    travel:walkto(startId)
+    travel:waitUntilArrived()
+    return travel:traverseZone(currZone, check, action)
   end
 
   function prototype:currZone()

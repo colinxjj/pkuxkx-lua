@@ -354,6 +354,7 @@ local define_jobs = function()
 
   -- 食堂
   local DiningRoomId = 3797
+  local StoreRoomId = 91
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -699,27 +700,27 @@ local define_jobs = function()
     print("准备前往钱庄存钱")
     wait.time(1)
     helper.assureNotBusy()
-    return travel:walkto(91, function()
-      wait.time(1)
+    travel:walkto(StoreRoomId)
+    travel:waitUntilArrived()
+    wait.time(1)
+    status:money()
+    if status.silvers > self.silverThreshold then
+      helper.assureNotBusy()
+      SendNoEcho("convert " .. self.silverThreshold .. " silver to gold")
+      wait.time(2)
       status:money()
-      if status.silvers > self.silverThreshold then
-        helper.assureNotBusy()
-        SendNoEcho("convert " .. self.silverThreshold .. " silver to gold")
-        wait.time(2)
-        status:money()
-      end
-      if status.golds > self.goldThreshold then
-        helper.assureNotBusy()
-        SendNoEcho("cun " .. self.goldThreshold .. " gold")
-      end
-      local line = wait.regexp(REGEXP.CANNOT_STORE_MONEY, 3)
-      if line then
-        print("钱庄存储金额到达上限")
-        return self:fire(Events.STOP)
-      else
-        return self:fire(Events.POOR)
-      end
-    end)
+    end
+    if status.golds > self.goldThreshold then
+      helper.assureNotBusy()
+      SendNoEcho("cun " .. self.goldThreshold .. " gold")
+    end
+    local line = wait.regexp(REGEXP.CANNOT_STORE_MONEY, 3)
+    if line then
+      print("钱庄存储金额到达上限")
+      return self:fire(Events.STOP)
+    else
+      return self:fire(Events.POOR)
+    end
   end
 
   function prototype:doRecover()

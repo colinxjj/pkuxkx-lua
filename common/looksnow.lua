@@ -44,6 +44,7 @@ local define_looksnow = function()
     ALIAS_STOP = "^looksnow\\s+stop\\s*$",
     ALIAS_DEBUG = "^looksnow\\s+debug\\s+(on|off)\\s*$",
   }
+  local LookRoomId = 2003
 
   function prototype:new()
     local obj = FSM:new()
@@ -107,11 +108,11 @@ local define_looksnow = function()
       event = Events.START,
       action = function()
         self.lookCnt = 0
-        return travel:walkto(2003, function()
-          helper.assureNotBusy();
-          print("准备开始看雪，请自备干粮酒袋，基本轻功需要高于50级")
-          return self:fire(Events.CONTINUE_LOOK)
-        end)
+        travel:walkto(LookRoomId)
+        travel:waitUntilArrived()
+        helper.assureNotBusy();
+        print("准备开始看雪，请自备干粮酒袋，基本轻功需要高于50级")
+        return self:fire(Events.CONTINUE_LOOK)
       end
     }
     self:addTransitionToStop(States.stop)

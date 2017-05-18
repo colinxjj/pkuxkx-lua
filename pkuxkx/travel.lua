@@ -16,6 +16,7 @@
 -- 当前房间出口直到出口发生变化，再进行后续行走。
 -- 2017/5/9 修改，添加遍历方法与获取附近房间列表方法的是否过河参数
 -- 2017/5/9 在同一区域仍然可能出现无法从房间A到达房间B的情况，例如无量山后山洞内洞外
+-- 2017/5/18 添加前往第一个同名房间的接口（天珠任务需要）
 --
 -- 该模块采用了FSM设计模式，目标是稳定，易用，容错。
 -- FSM状态有：
@@ -340,11 +341,9 @@ local define_travel = function()
   end
 
   -- 自动行走
-  function prototype:walkto(targetRoomId, action)
+  function prototype:walkto(targetRoomId)
     assert(type(targetRoomId) == "number", "target room id must be number")
-    assert(not action or type(action) == "function", "action must be function or nil")
     self.targetRoomId = targetRoomId
-    self.targetAction = action
     return self:fire(Events.START)
   end
 
@@ -1555,7 +1554,9 @@ local define_travel = function()
       regexp = REGEXP.ALIAS_WALKTO_ID,
       response = function(name, line, wildcards)
         local targetRoomId = tonumber(wildcards[1])
-        self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+        self:walkto(targetRoomId)
+        self:waitUntilArrived()
+        self:debug("到达目的地")
       end
     }
     helper.addAlias {
@@ -1572,11 +1573,15 @@ local define_travel = function()
           local targetRoomCode = self.zonesByCode[target].centercode
           local targetRoomId = self.roomsByCode[targetRoomCode].id
           self:stop()
-          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+          self:walkto(targetRoomId)
+          self:waitUntilArrived()
+          self:debug("到达目的地")
         elseif self.roomsByCode[target] then
           local targetRoomId = self.roomsByCode[target].id
           self:stop()
-          self:walkto(targetRoomId, function() self:debug("到达目的地") end)
+          self:walkto(targetRoomId)
+          self:waitUntilArrived()
+          self:debug("到达目的地")
         else
           print("查询不到相应房间")
           return false

@@ -42,23 +42,23 @@ local define_module = function()
       group = "baifeng",
       regexp = REGEXP.ALIAS_START,
       response = function()
-        return travel:walkto(2916, function()
-          SendNoEcho("ask yue about Áîºü³å")
-          SendNoEcho("ask yue about Ë¼¹ýÑÂ")
-          SendNoEcho("n")
-          SendNoEcho("northwest")
-          SendNoEcho("w")
-          SendNoEcho("wu")
-          SendNoEcho("sd")
-          SendNoEcho("eu")
-          helper.addTimer {
-            group = "baifeng",
-            interval = 10,
-            response = function()
-              self:keepTryingBaiFeng()
-            end
-          }
-        end)
+        travel:walkto(2916)
+        travel:waitUnitlArrived()
+        SendNoEcho("ask yue about Áîºü³å")
+        SendNoEcho("ask yue about Ë¼¹ýÑÂ")
+        SendNoEcho("n")
+        SendNoEcho("northwest")
+        SendNoEcho("w")
+        SendNoEcho("wu")
+        SendNoEcho("sd")
+        SendNoEcho("eu")
+        helper.addTimer {
+          group = "baifeng",
+          interval = 10,
+          response = function()
+            self:keepTryingBaiFeng()
+          end
+        }
       end
     }
     helper.addAlias {

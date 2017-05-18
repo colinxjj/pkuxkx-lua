@@ -111,8 +111,10 @@ local define_teach = function()
     DZ_NEILI_ADDED = "^[ >]*你的内力增加了！！$",
     WENHAO_DESC = "^[ >]*你对着(.+)深深一揖：鄙派掌门向.*问好。$"
   }
+  local JobRoomId = 66
   local teacherId = "luar"
   local teacherName = "撸啊"
+
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -233,9 +235,9 @@ local define_teach = function()
       event = Events.START,
       action = function()
         travel:stop()
-        travel:walkto(66, function()
-          self:doAsk()
-        end)
+        travel:walkto(66)
+        travel:waitUntilArrived()
+        return self:doAsk()
       end
     }
     -- transition from state<ask>
@@ -244,9 +246,9 @@ local define_teach = function()
       newState = States.teaching,
       event = Events.NEW_TEACH,
       action = function()
-        travel:walkto(2918, function()
-          self:doTeach()
-        end)
+        travel:walkto(2918)
+        travel:waitUntilArrived()
+        return self:doTeach()
       end
     }
     self:addTransition {
@@ -262,9 +264,9 @@ local define_teach = function()
       newState = States.wait_ask,
       event = Events.NO_JOB_AVAILABLE,
       action = function()
-        travel:walkto(2921, function()
-          self:doWaitAsk()
-        end)
+        travel:walkto(2921)
+        travel:waitUntilArrived()
+        return self:doWaitAsk()
       end
     }
     self:addTransitionToStop(States.ask)
@@ -274,9 +276,9 @@ local define_teach = function()
       newState = States.ask,
       event = Events.PAUSE_WAIT,
       action = function()
-        travel:walkto(66, function()
-          self:doAsk()
-        end)
+        travel:walkto(66)
+        travel:waitUntilArrived()
+        return self:doAsk()
       end
     }
     self:addTransitionToStop(States.wait_ask)
@@ -313,9 +315,9 @@ local define_teach = function()
       newState = States.submit,
       event = Events.TEACH_DONE,
       action = function()
-        travel:walkto(66, function()
-          self:doSubmit()
-        end)
+        travel:walkto(66)
+        travel:waitUntilArrived()
+        return self:doSubmit()
       end
     }
     self:addTransitionToStop(States.teaching)

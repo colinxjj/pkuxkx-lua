@@ -48,22 +48,23 @@ local define_mingxiang = function()
       if status.drink < 150 then
         SendNoEcho("do 3 drink jiudai")
       end
-      if status.currQi > status.maxQi * 0.7 and status.currNeili > 500 then
-        SendNoEcho("lian sword 2")
-      end
-      if status.currJing > status.maxJing * 0.8 then
-        SendNoEcho("north")
-        SendNoEcho("read shediao 10")
-        SendNoEcho("enter hole")
-      end
+--      if status.currQi > status.maxQi * 0.7 and status.currNeili > 500 then
+--        SendNoEcho("lian sword 2")
+--      end
+--      if status.currJing > status.maxJing * 0.8 then
+--        SendNoEcho("north")
+--        SendNoEcho("read shediao 10")
+--        SendNoEcho("enter hole")
+--      end
       if status.currJingli < 1000 then
-        SendNoEcho("tuna 1000")
+        SendNoEcho("tuna max")
       else
         if #(self.gifts) > 0 then
           print("本次已加天赋：", table.concat(self.gifts, ", "))
         end
         SendNoEcho("mingxiang")
       end
+      SendNoEcho("mingxiang")
     end
     helper.addTrigger {
       group = "mingxiang",

@@ -47,19 +47,49 @@ local Skills = {
     mode = "lian",
   },
   {
+    basic = "strike",
+    special = "hunyuan-zhang",
+    mode = "lingwu",
+  },
+  {
     basic = "parry",
-    parry = "yunushijiu-jian",
+    special = "yunushijiu-jian",
     mode = "lian",
-    weapon = "sword"
-  }
+    weapon = "sword",
+  },
+  {
+    basic = "sword",
+    special = "yangwu-jian",
+    mode = "lian"
+  },
+  {
+    basic = "parry",
+    special = "poyu-quan",
+    mode = "lian",
+  },
+  {
+    basic = "cuff",
+    special = "poyu-quan",
+    mode = "lingwu"
+  },
+
 }
+-- 两次睡觉间间隔秒数
 local SleepInterval = 60
+-- 每秒打坐内力值
 local DzNumPerSecond = 66
+-- 每次领悟次数
 local LingwuNum = 50  -- 1 - 500
+-- 每次练习次数
 local LianNum = 50  -- 1 - 500
+-- 是否在升级时转换技能（设置为true时将平均提升技能）
 local LevelupSwitch = false
+-- 睡觉地点
 local SleepRoomId = 2921
+-- 技能提升地点
 local SkillRoomId = 2918
+-- 保留与上限级差
+local ReservedLimitGap = 1
 
 local define_fullskills = function()
   local prototype = {}
@@ -69,6 +99,7 @@ local define_fullskills = function()
     ALIAS_START = "^fullskills\\s+start\\s*$",
     ALIAS_STOP = "^fullskills\\s+stop\\s*$",
     ALIAS_DEBUG = "^fullskills\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_GAP = "^fullskills\\s+gap\\s+(\\d+)\\s*$",
     SLEPT = "^[ >]*你往床上一躺，开始睡觉。$",
     WAKE_UP = "^[ >]*你一觉醒来，精神抖擞地活动了几下手脚。$",
     CANNOT_SLEEP = "^[ >]*你刚在三分钟内睡过一觉, 多睡对身体有害无益.*$",
@@ -91,6 +122,7 @@ local define_fullskills = function()
     self.DEBUG = true
     self.skillStack = {}
     self:populateSkillStack()
+    self.limitGap = ReservedLimitGap
   end
 
   function prototype:populateSkillStack()
@@ -176,12 +208,21 @@ local define_fullskills = function()
         end
       end
     }
+    helper.addAlias {
+      group = "fullskills",
+      regexp = REGEXP.ALIAS_GAP,
+      response = function(name, line, wildcards)
+        local gap = tonumber(wildcards[1])
+        self:debug("设置上限级差为：", gap)
+        self.limitGap = gap
+      end
+    }
   end
 
   function prototype:start()
     status:sk()
     self.limit = status.skillLimit
-    self:debug("当前技能上限为", self.limit)
+    self:debug("当前技能上限为", self.limit, "上限级差为：", self.limitGap, "技能限制设定为：", self.limit - self.limitGap)
 
     helper.enableTriggerGroups("fullskills")
     self.stopped = false
@@ -258,10 +299,8 @@ local define_fullskills = function()
     if self.currSkill.mode == "lingwu" then
       -- 检查技能是否不大于上限
       status:skbrief(self.currSkill.basic)
-      print(status.skillLevel)
-      print(self.limit)
-      if status.skillLevel >= self.limit then
-        self:debug("技能", self.currSkill.basic, "达到技能上限")
+      if status.skillLevel >= self.limit - self.limitGap then
+        self:debug("技能", self.currSkill.basic, "达到技能限制")
         return self:doFull()
       end
       workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
@@ -269,8 +308,8 @@ local define_fullskills = function()
       recoverCmd = "yun regenerate"
     elseif self.currSkill.mode == "lian" then
       status:skbrief(self.currSkill.special)
-      if status.skillLevel >= self.limit then
-        self:debug("技能", self.currSkill.special, "达到技能上限")
+      if status.skillLevel >= self.limit - self.limitGap then
+        self:debug("技能", self.currSkill.special, "达到技能限制")
         return self:doFull()
       end
       workCmd = "lian " .. self.currSkill.basic .. " " .. LianNum
@@ -278,11 +317,11 @@ local define_fullskills = function()
       recoverCmd = "yun recover"
     elseif self.currSkill.mode == "both" then -- both的情况，先尝试练
       status:skbrief(self.currSkill.special)
-      if status.skillLevel >= self.limit then
-        self:debug("both! 技能", self.currSkill.special, "达到技能上限")
+      if status.skillLevel >= self.limit - self.limitGap then
+        self:debug("both! 技能", self.currSkill.special, "达到技能限制")
         status:skbrief(self.currSkill.basic)
-        if status.skillLevel >= self.limit then
-          self:debug("both! 技能", self.currSkill.basic, "达到技能上限")
+        if status.skillLevel >= self.limit - self.limitGap then
+          self:debug("both! 技能", self.currSkill.basic, "达到技能限制")
           return self:doFull()
         end
       end

@@ -80,12 +80,14 @@ local define_murong = function()
     PU_BUSY = "^[ >]*仆人忙着呢，等会吧。$",
   }
 
-  local ExcludedZones = {
-    ["黄河南岸"] = true,
-    ["黄河北岸"] = true,
-    ["长江"] = true,
-    ["长江北岸"] = true
-  }
+--  local ExcludedZones = {
+--    ["黄河南岸"] = true,
+--    ["黄河北岸"] = true,
+--    ["长江"] = true,
+--    ["长江北岸"] = true
+--  }
+
+  local JobRoomId = 479
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -409,7 +411,7 @@ local define_murong = function()
   end
 
   function prototype:doAsk()
-    travel:walkto(479)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     self.searchLocation = nil
     self.captchaLink = nil
@@ -433,11 +435,11 @@ local define_murong = function()
   end
 
   function prototype:doPrepareSearch()
-    local place = helper.ch2place(self.searchLocation)
-    if place and place.area and ExcludedZones[place.area] then
-      ColourNote("yellow", "", "任务失败，特殊区域不建议搜索 " .. self.searchLocation)
-      return self:doCancel()
-    end
+--    local place = helper.ch2place(self.searchLocation)
+--    if place and place.area and ExcludedZones[place.area] then
+--      ColourNote("yellow", "", "任务失败，特殊区域不建议搜索 " .. self.searchLocation)
+--      return self:doCancel()
+--    end
     local searchRooms = travel:getMatchedRooms {
       fullname = self.searchLocation
     }
@@ -494,7 +496,7 @@ local define_murong = function()
 
   function prototype:doSubmit()
     helper.checkUntilNotBusy()
-    travel:walkto(479)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     self.puBusy = false
     SendNoEcho("set murong submit_start")
@@ -538,7 +540,7 @@ local define_murong = function()
 --    ColourNote("red", "", "调试模式，请手动取消任务")
 
     helper.assureNotBusy()
-    travel:walkto(479)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     wait.time(1)
     SendNoEcho("ask pu about fail")

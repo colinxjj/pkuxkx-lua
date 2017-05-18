@@ -131,6 +131,19 @@ JOB_MOTION triggered
 JOB_NPC_ZONE triggered
 JOB_MOTION triggered
 
+
+慕容复在你的耳边悄声说道：大英雄面带微笑，眼露悲光，全身所散发出的「大悲慈光明势」气劲宛如惊涛核＇垃铁锤一波接一波地涌向盖世豪杰
+慕容复在你的耳边悄声说道：大英雄将手中锤铁抛上半空，跃起一掌砸在锤铁上，这招「大皈依光明势」有如流星坠地，直轰盖世豪杰
+慕容复在你的耳边悄声说道：大英雄双手越转越急，光幕俨如一轮明月，将盖世豪杰笼罩，这「大吉祥光明势」的劲力带着锤铁以山排倒海之势飞旋而出
+慕容复在你的耳边悄声说道：大英雄双眼磕闭向全身衣物却在内劲鼓荡下涨如气球向那铁锤在这「大常乐光明势」的推动下向，盖世豪杰缓缓压去
+慕容复在你的耳边悄声说道：大英雄一招「大赞叹光明势」，右立手掌护胸，左立单臂抡起铁锤，当胸砍向盖世豪杰头的部
+
+慕容复在你的耳边悄声说道：大英雄乘盖世豪袭杰来之际，竟然就地一倒，连滚带爬一从般盖世豪袭的掌风之下绕到左侧，看也不看便用自己的肩部向盖世豪袭撞去
+慕容复在你的耳边悄声说道：英大雄突然一声暴喝,身体跃起丈余！一招「醉龙出水」，身体成龙形，集全身力量于掌心，向盖世豪杰呼啸而来
+慕容复在你的耳边悄声说道：大英雄一招「八醉仙」身，形忽快忽慢身双眼微闭身双拳如游龙戏珠身直取盖世豪杰的双眼
+慕容复在你的耳边悄声说道：大英雄在斗打之间竟突然做摔倒状，双腿却似剪刀一般，连环向盖世豪杰踢出数腿
+慕容复在你的耳边悄声说道：大英雄突然身体前倾，摇摇欲坠，却是一招武「松跌醉」，靠在盖世豪杰身后，一手武洒瓶指」直任淝世豪杰的太阳穴
+
 ]]}
 
 local helper = require "pkuxkx.helper"
@@ -141,16 +154,16 @@ local captcha = require "pkuxkx.captcha"
 -- 去除掉干扰字符
 local ExcludeCharacters = {}
 for _, c in ipairs({
-  {
-    "大","英", "雄",
-    "盖", "世", "豪", "杰",
-    "，", "。", "「", "」", "』", "ｘ", ",", "∞", "≌", "￥"
-  }
-}) do
+  "大","英", "雄",
+  "盖", "世", "豪", "杰",
+  "，", "。", "「", "」", "』", "ｘ", ",", "∞", "≌", "￥" }) do
   ExcludeCharacters[c] = true
 end
-local PrecisionThreshold = 0.5
-local RecallThreshold = 0.5
+local PrecisionThreshold = 50
+local RecallThreshold = 50
+-- 算法时间限制 当超过算法时间限制且没有完成偷学时，定时执行偷学直到战斗结束
+local AlgoTimeThreshold = 40
+-- 战斗时间限制
 local FightTimeThreshold = 60
 
 local define_TouxueMotion = function()
@@ -214,6 +227,7 @@ local define_touxue = function()
     JOB_MOTION = "^[ >]*慕容复在你的耳边悄声说道：(.*)$",
     JOB_NEED_CAPTCHA = "^[ >]*慕容复给了你一张纸，上书：$",
     WORK_TOO_FAST = "^[ >]*慕容复说道：「暂时我没有什么事了。」$",
+    CANNOT_TOUXUE = "^[ >]*你恐怕没有偷学机会了。$",
   }
 
   local JobRoomId = 479
@@ -362,7 +376,7 @@ local define_touxue = function()
             self.rawMotions = {}
           end
           -- 当有奇数字节时，警告
-          local rawMotion = string.gsub(wildcards[1], ",", "")
+          local rawMotion = string.gsub(string.gsub(wildcards[1], ",", ""), "!", "")
           local len = string.len(rawMotion)
           if len % 2 ~= 0 then
             ColourNote("yellow", "", "异常长度描述出现，长度为" .. len)
@@ -382,6 +396,13 @@ local define_touxue = function()
         self.zoneName = wildcards[2]
       end,
       sequence = 5,  -- must be higher than JOB_MOTION
+    }
+    helper.addTrigger {
+      group = "touxue_ask_done",
+      regexp = REGEXP.JOB_NEED_CAPTCHA,
+      response = function()
+        self.needCaptcha = true
+      end
     }
     helper.addTrigger {
       group = "touxue_ask_done",
@@ -529,6 +550,7 @@ local define_touxue = function()
       local motion = TouxueMotion:new {
         raw = rawMotion
       }
+      self:debug("简化后招式：", motion.simplified)
       self.motions[motion.simplified] = motion
     end
     return self:fire(Events.PREPARED)
@@ -571,11 +593,22 @@ local define_touxue = function()
     -- 增加招式跟踪信息
     self.motionsLearned = {}
     self.motionsToLearn = {}
+    self.cannotTouxue = false
     local motionCnt = 0
     for name, motion in pairs(self.motions) do
       self.motionsToLearn[name] = motion
       motionCnt = motionCnt + 1
     end
+
+    helper.checkUntilNotBusy()
+    SendNoEcho("halt")
+    -- 接触装备和武功
+    SendNoEcho("follow " .. self.npcId)
+    SendNoEcho("unwield all")
+    SendNoEcho("bei none")
+    SendNoEcho("yun qi")
+    SendNoEcho("set skip_combat 0")
+    local fightStartTime = os.time()
     -- 添加触发
     helper.addTrigger {
       group = "touxue_fight",
@@ -587,13 +620,13 @@ local define_touxue = function()
           return
         end
         for name, motion in pairs(self.motionsToLearn) do
-          if self.motionsLeared[name] then
+          if self.motionsLearned[name] then
             self:debug("此招已学习", name)
             break
           else
             local result = self:evaluateMotion(motion, line)
             if result.success then
-              self:debug(motion.simplified, "准确百分比：", result.precision, "召回百分比：", result.recall);
+              self:debug(motion.simplified, "准确：", result.precision, "召回：", result.recall);
               if result.precision >= self.precisionPercent and result.recall >= self.recallPercent then
                 self:debug("符合条件，执行偷学")
                 SendNoEcho("touxue " .. self.npcId)
@@ -608,25 +641,35 @@ local define_touxue = function()
         end
       end
     }
-
-    helper.checkUntilNotBusy()
-    SendNoEcho("halt")
-    -- 接触装备和武功
-    SendNoEcho("follow " .. self.npcId)
-    SendNoEcho("unwield all")
-    SendNoEcho("bei none")
-    local fightStartTime = os.time()
-    helper.enableTriggerGroups("touxue_fight")
+    helper.addTrigger {
+      group = "touxue_fight",
+      regexp = REGEXP.CANNOT_TOUXUE,
+      response = function()
+        self:debug("CANNOT_TOUXUE triggered")
+        self.cannotTouxue = true
+      end
+    }
     SendNoEcho("fight " .. self.npcId)
+    wait.time(1)
+    -- 打开触发
+    helper.enableTriggerGroups("touxue_fight")
     while true do
       wait.time(4)
       if #(self.motionsLearned) == motionCnt then
+        ColourNote("green", "", "招数已学满")
         return self:fire(Events.LEARNED)
       end
-      local currTime = os.time()
-      if currTime - fightStartTime >= 40 then
-        ColourNote("yellow", "", "偷学时间超过" .. FightTimeThreshold .. "秒，停止fight")
+      if self.cannotTouxue then
+        self:debug("偷学机会已用完")
+        return self:fire(Events.LEARNED)
+      end
+      local duration = os.time() - fightStartTime
+      if duration >= FightTimeThreshold then
+        ColourNote("yellow", "", "偷学时间达到" .. duration .. "秒，停止fight")
         break
+      elseif duration >= AlgoTimeThreshold then
+        self:debug("算法时间结束，定时出招")
+        SendNoEcho("touxue " .. self.npcId)
       end
     end
     return self:fire(Events.LEARNED)
@@ -634,6 +677,10 @@ local define_touxue = function()
 
   function prototype:doSubmit()
     SendNoEcho("halt")
+    SendNoEcho("follow none")
+    SendNoEcho("bei strike cuff")
+    SendNoEcho("set skip_combat 1")
+    helper.removeTriggerGroups("touxue_fight")
     helper.checkUntilNotBusy()
     travel:walkto(JobRoomId)
     travel:waitUntilArrived()
@@ -649,7 +696,8 @@ local define_touxue = function()
   end
 
   function prototype:evaluateMotion(motion, line)
-    if string.len(line) % 2 ~= 0 then
+    local len = string.len(line)
+    if len % 2 ~= 0 then
       return {
         success = false,
         message = "当前句子可能存在非中文字符，忽略",

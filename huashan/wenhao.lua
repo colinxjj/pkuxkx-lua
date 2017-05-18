@@ -42,6 +42,8 @@ local define_wenhao = function()
     ALIAS_DEBUG = "^wenhao\\s+debug\\s+(on|off)\\s*$",
   }
 
+  local JobRoomId = 66
+
   function prototype:FSM()
     local obj = FSM:new()
     setmetatable(obj, self or prototype)
@@ -272,7 +274,7 @@ local define_wenhao = function()
     print("等待3秒后放弃")
     wait.time(3)
     helper.assureNotBusy();
-    travel:walkto(66)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     -- SendNoEcho("fail")
   end
@@ -280,19 +282,19 @@ local define_wenhao = function()
   function prototype:doWenhao()
     if #(self.searchRooms) > 0 then
       local room = table.remove(self.searchRooms)
-      return travel:walkto(room.id, function()
-        helper.assureNotBusy()
-        SendNoEcho("wenhao " .. self.locatedPlayer.id)
-        local line = wait.regexp(REGEXP.WENHAO_DESC, 3)
-        if line then
-          print("问好成功！等待1秒返回提交任务。")
-          wait.time(1)
-          return self:fire(Events.WENHAO_DONE)
-        else
-          print("找不到该玩家！尝试下一地点")
-          return self:fire(Events.GO_NEXT_ROOM)
-        end
-      end)
+      travel:walkto(room.id)
+      travel:waitUntilArrived()
+      helper.assureNotBusy()
+      SendNoEcho("wenhao " .. self.locatedPlayer.id)
+      local line = wait.regexp(REGEXP.WENHAO_DESC, 3)
+      if line then
+        print("问好成功！等待1秒返回提交任务。")
+        wait.time(1)
+        return self:fire(Events.WENHAO_DONE)
+      else
+        print("找不到该玩家！尝试下一地点")
+        return self:fire(Events.GO_NEXT_ROOM)
+      end
     else
       return self:fire(Events.ROOM_NOT_EXISTS)
     end
@@ -300,15 +302,15 @@ local define_wenhao = function()
 
   function prototype:doSubmit()
     helper.assureNotBusy()
-    travel:walkto(66, function()
-      SendNoEcho("finish")
-      local line = wait.regexp(REGEXP.SUBMITTED, 3)
-      if not line then
-        print("没有完成任务？尝试取消任务！")
-        SendNoEcho("fail")
-      end
-      return self:fire(Events.STOP)
-    end)
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    SendNoEcho("finish")
+    local line = wait.regexp(REGEXP.SUBMITTED, 3)
+    if not line then
+      print("没有完成任务？尝试取消任务！")
+      SendNoEcho("fail")
+    end
+    return self:fire(Events.STOP)
   end
 
   function prototype:setPlayers(players)

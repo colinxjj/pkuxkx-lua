@@ -35,6 +35,9 @@ local define_donate = function()
     NO_MONEY_IN_BANK = "^[ >]*你没有存那么多的钱。$",
     MONEY_WITHDRAWED = "^[ >]*你从银号里取出.*$",
   }
+  local DonateRoomId = 1034
+  local BuyRoomId = 30
+  local WithdrawRoomId = 91
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -97,9 +100,9 @@ local define_donate = function()
       newState = States.donate,
       event = Events.DONATE,
       action = function()
-        return travel:walkto(1034, function()
-          self:doDonate()
-        end)
+        travel:walkto(DonateRoomId)
+        travel:waitUntilArrived()
+        return self:doDonate()
       end
     }
     self:addTransition {
@@ -108,9 +111,9 @@ local define_donate = function()
       event = Events.BUY_WEAPON,
       action = function()
         self.noMoney = false
-        return travel:walkto(30, function()
-          return self:doBuy()
-        end)
+        travel:walkto(BuyRoomId)
+        travel:waitUntilArrived()
+        return self:doBuy()
       end
     }
     self:addTransition {
@@ -118,9 +121,9 @@ local define_donate = function()
       newState = States.donate,
       event = Events.NO_MONEY,
       action = function()
-        return travel:walkto(91, function()
-          return self:doWithdraw()
-        end)
+        travel:walkto(WithdrawRoomId)
+        travel:waitUntilArrived()
+        return self:doWithdraw()
       end
     }
     self:addTransition {
