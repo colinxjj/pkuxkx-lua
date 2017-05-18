@@ -163,6 +163,19 @@ local define_Algo = function()
       end
     end
     if #queue ~= totalRooms then
+      print("queue size:", #queue, "totalRooms:", totalRooms)
+      local missed = {}
+      for id, _ in pairs(rooms) do
+        missed[id] = true
+      end
+      for _, id in ipairs(queue) do
+        missed[id] = nil
+      end
+      local results = {}
+      for id, _ in pairs(missed) do
+        table.insert(results, id)
+      end
+      print("missed rooms:", table.concat(results, ","))
       return nil
     else
       return queue

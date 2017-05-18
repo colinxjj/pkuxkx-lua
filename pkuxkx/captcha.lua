@@ -168,11 +168,6 @@ local define_captcha = function()
             ColourNote("yellow", "", "无法从网页中查找到图片url")
           else
             local jpgStr = self:doDownloadJpg(jpgUrl)
-            if jpgStr then
-              self:debug("cannot load jpgStr")
-            else
-              self:debug("jpgStr size:", string.len(jpgStr))
-            end
             if not jpgStr then
               ColourNote("yellow", "", "无法获取到图片实体")
             else

@@ -219,6 +219,8 @@ local define_travel = function()
         "官兵拦住了你的去路",  -- kangqinwangfu
         "中年道长拦住你说道：后面是本派重地，你不是武当弟子",  -- wudang
         "小道童拦住你说道：师祖正在静修",  -- wudang
+        "土匪把路一挡，狞笑道：怎么，想溜，没那么容易", -- wudang
+        "土匪头咧开大嘴狞笑一声：嘿嘿，既然来了这里，就别想走了",  -- wudang
         "保镖向你吼道：小杂种，这也是你来的地方",  -- pingxiwangfu
         "庄丁挡住了你：喂，你总该意思意思",  -- mingjiao(lvliushanzhuang)
         "颜垣说道：“你非我教弟子，不能上山",  -- mingjiao
