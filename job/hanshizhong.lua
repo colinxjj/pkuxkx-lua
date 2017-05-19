@@ -55,7 +55,7 @@ local define_hanshizhong = function()
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("hanshizhong_ask_")
   end
 
   function prototype:initAliases()

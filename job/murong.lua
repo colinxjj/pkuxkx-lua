@@ -113,8 +113,6 @@ local define_murong = function()
     }
 
     self.myName = "ß£°¡"
-
-    self.DEBUG = true
   end
 
   function prototype:disableAllTriggers()

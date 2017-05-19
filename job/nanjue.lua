@@ -416,6 +416,12 @@ local define_nanjue = function()
       jingli = 0.5,
       neili = 0.1
     }
+
+    self.availableTime = 0
+  end
+
+  function prototype:available()
+    return os.time() > self.availableTime
   end
 
   function prototype:resetOnStop()
@@ -641,7 +647,12 @@ local define_nanjue = function()
           min = tonumber(es[2]),
           sec = tonumber(es[3])
         }
-        -- 只做5分钟内的任务
+
+        if endTime > self.availableTime then
+          self.availableTime = endTime
+        end
+
+        -- 只做1分钟内的任务
         -- 只做没有人认领的任务
         -- 只做新的任务
         local restTime = endTime - currTs
@@ -693,6 +704,8 @@ local define_nanjue = function()
       regexp = REGEXP.RECORD_FAIL,
       response = function()
         self.recordSuccess = false
+        -- 被鉴定为机器人时，将可用时间向后推24小时
+        self.availableTime = os.time() + 86400
       end
     }
     helper.addTrigger {

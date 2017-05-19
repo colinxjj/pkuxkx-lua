@@ -15,6 +15,7 @@ local songxin = require "job.songxin"
 local nanjue = require "job.nanjue"
 local hubiao = require "job.hubiao"
 local murong = require "job.murong"
+local touxue = require "job.touxue"
 
 -- 帮会任务
 local banghui = require "common.banghui"
@@ -84,6 +85,26 @@ chanhui
 你双膝跪地，两眼紧闭，口中念念有词，脸上充满悔恨之意。
 
 > 你感觉心中的杀气渐渐消失......
+
+│[01][门]门忠任务                未接受任务。                                                  │
+│[06][主]慕容(1005)              你要去找回在未知区域出现的慕容复写给江湖豪杰的信件。          │
+│[07][主]韩员外(10) 55.6%        现在即可接到下个任务。                                        │
+│[08][主]都府刺杀(10) 90.9%      现在即可接到下个任务。                                        │
+│[09][主]运镖(1096) 2.9%         现在即可接到下个普通镖局的任务。                              │
+│[10][主]胡一刀(10) 100.0%       现在即可接到下个任务。                                        │
+│[11][主]萧峰(14) 48.3%          现在即可接到下个任务。                                        │
+│[12][主]韩世忠(247) 91.5%       现在即可接到下个任务。                                        │
+│[13][主]公孙止(0)               现在即可接到下个任务。                                        │
+│[14][主]万安塔(125) 89.3%       现在即可接到下个任务。                                        │
+│[15][主]破阵(10) 44.4%          现在即可接到下个任务。                                        │
+│[16][主]天珠(74) 82.2%          现在即可接到下个任务。                                        │
+│[17][主]偷学(25) 80.6%          仍需二分四十二秒才能接到下个任务。                            │
+│[18][主]华山送信任务(269)       现在即可接到下个任务。                                        │
+│[19][主]投名状任务(10)          现在即可接到下个任务。                                        │
+│[21][主]鄱阳湖寻宝(0)           现在即可接到下个任务。                                        │
+│[24][特]铜雀台任务              现在即可接到下个任务。                                        │
+│[25][特]百晓生任务              现在即可接到下个任务。                                        │
+
 ]]}
 
 local define_JobDefinition = function()
@@ -117,62 +138,62 @@ local define_JobDefinition = function()
   }
   prototype.murong = prototype:decorate {
     id = 6,
-    name = "慕容任务",
+    name = "慕容",
     code = "murong"
   }
   prototype.hanyuanwai = prototype:decorate {
     id = 7,
-    name = "韩元外复仇",
+    name = "韩元外",
     code = "hanyuanwai"
   }
   prototype.cisha = prototype:decorate {
     id = 8,
-    name = "都统制府刺杀",
+    name = "都府刺杀",
     code = "cisha"
   }
   prototype.hubiao = prototype:decorate {
     id = 9,
-    name = "运镖任务",
+    name = "运镖",
     code = "hubiao"
   }
   prototype.huyidao = prototype:decorate {
     id = 10,
-    name = "胡一刀任务",
+    name = "胡一刀",
     code = "huyidao"
   }
   prototype.xiaofeng = prototype:decorate {
     id = 11,
-    name = "萧峰任务",
+    name = "萧峰",
     code = "xiaofeng"
   }
   prototype.hanshizhong = prototype:decorate {
     id = 12,
-    name = "韩世忠任务",
+    name = "韩世忠",
     code = "hanshizhong"
   }
   prototype.gongsunzhi = prototype:decorate {
     id = 13,
-    name = "公孙止任务",
+    name = "公孙止",
     code = "gongsunzhi"
   }
   prototype.wananta = prototype:decorate {
     id = 14,
-    name = "万安塔任务",
+    name = "万安塔",
     code = "wananta"
   }
   prototype.pozhen = prototype:decorate {
     id = 15,
-    name = "破阵任务",
+    name = "破阵",
     code = "pozhen"
   }
   prototype.tianzhu = prototype:decorate {
     id = 16,
-    name = "天珠任务",
+    name = "天珠",
     code = "tianzhu",
   }
   prototype.touxue = prototype:decorate {
     id = 17,
-    name = "偷学任务",
+    name = "偷学",
     code = "touxue"
   }
   prototype.songxin = prototype:decorate {
@@ -350,11 +371,13 @@ local define_jobs = function()
     DAZUO_BEGIN = "^[ >]*你坐下来运气用功，一股内息开始在体内流动。$",
     DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
     TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
+    JOB_QUERY = "^│\\[(\\d+)\\]\\[(.*?)\\]([^\\)]+)\\((\\d+)\\)\\s+([\\d\\.]*%)?\\s+(.*?)\\s+│$",
   }
 
-  -- 食堂
+  -- 牛肉面馆
   local DiningRoomId = 3797
-  local StoreRoomId = 91
+  -- 嘉兴钱庄
+  local StoreRoomId = 271
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -374,17 +397,43 @@ local define_jobs = function()
     self.weaponId = "sword"
     self.silverThreshold = 300
     self.goldThreshold = 20
+    self:debugOn()
   end
 
   function prototype:disableAllTriggers()
-
+    helper.disableTriggerGroups("jobs_recover")
   end
 
   function prototype:initJobs()
     self.jobs = {}
---    self.jobs.songxin = self.definedJobs.songxin
---    self.jobs.hubiao = self.definedJobs.hubiao
-    self.jobs.murong = self.definedJobs.murong
+    self.jobSeq = 0
+    -- add jobs by priority
+    table.insert(self.jobs, self.definedJobs.touxue)
+    table.insert(self.jobs, self.definedJobs.murong)
+  end
+
+  function prototype:nextJob()
+    local leastDelayJob
+    local leastDelay = 86400
+    for _, job in ipairs(self.jobs) do
+      local delay = self.jobDelays[job.def.name]
+      if delay then
+        if delay == 0 then
+          return job
+        elseif delay < leastDelay then
+          leastDelayJob = job
+          leastDelay = delay
+        end
+      elseif job.impl.available and job.impl:available() then
+        return job
+      end
+    end
+    if not leastDelayJob then
+      ColourNote("yellow", "", "没有可用任务，从第一个任务开始")
+      return self.jobs[1]
+    else
+      return leastDelayJob
+    end
   end
 
   function prototype:defineAllJobs()
@@ -405,6 +454,10 @@ local define_jobs = function()
       def = JobDefinition.murong,
       impl = murong
     }
+    self.definedJobs.touxue = Job:decorate {
+      def = JobDefinition.touxue,
+      impl = touxue
+    }
   end
 
   function prototype:initStates()
@@ -421,7 +474,9 @@ local define_jobs = function()
     self:addState {
       state = States.prepare,
       enter = function() end,
-      exit = function() end
+      exit = function()
+        helper.disableTriggerGroups("jobs_query_start", "jobs_query_done")
+      end
     }
     self:addState {
       state = States.wait,
@@ -558,7 +613,7 @@ local define_jobs = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("jobs_recover")
+    helper.removeTriggerGroups("jobs_recover", "jobs_query_start", "jobs_query_done")
     helper.addTrigger {
       group = "jobs_recover",
       regexp = REGEXP.DAZUO_FINISH,
@@ -571,6 +626,59 @@ local define_jobs = function()
       regexp = REGEXP.TUNA_FINISH,
       response = function()
         return self:doRecover()
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "jobs",
+      start = "query_start",
+      done = "query_done",
+    }
+    helper.addTrigger {
+      group = "jobs_query_done",
+      regexp = REGEXP.JOB_QUERY,
+      response = function(name, line, wildcards)
+        self:debug("JOB_QUERY triggered")
+        local jobId = wildcards[1]
+        local jobType = wildcards[2]
+        local jobName = wildcards[3]
+        local jobSuccessCnt = wildcards[4]
+        local jobSuccessRate = wildcards[5]
+        local jobDelay = wildcards[6]
+        -- 现在即可接到下个任务。
+        if jobDelay == "现在即可接到下个任务。" then
+          self.jobDelays[jobName] = 0
+        elseif jobDelay == "现在即可接到下个普通镖局的任务。" then
+          self.jobDelays[jobName] = 0
+        else
+          local s, e = string.find(jobDelay, "仍需")
+          if s == 1 then
+            -- 处理时间
+            local timeStr = string.sub(jobDelay, e + 1)
+            local delayTime = 0
+            -- 小时
+            local hs, he = string.find(timeStr, "小时")
+            if hs then
+              local hourStr = string.sub(timeStr, 1, hs - 1)
+              delayTime = delayTime + helper.ch2number(hourStr) * 3600
+              timeStr = string.sub(timeStr, he + 1)
+            end
+            -- 分钟
+            local ms, me = string.find(timeStr, "分")
+            if ms then
+              local minuteStr = string.sub(timeStr, 1, ms - 1)
+              delayTime = delayTime + helper.ch2number(minuteStr) * 60
+              timeStr = string.sub(timeStr, me + 1)
+            end
+            -- 秒
+            local ss, se = string.find(timeStr, "秒")
+            if ss then
+              local secondStr = string.sub(timeStr, 1, ss - 1)
+              delayTime = delayTime + helper.ch2number(secondStr)
+            end
+            self.jobDelays[jobName] = delayTime
+          end
+        end
+        self:debug(jobName, self.jobDelays[jobName])
       end
     }
   end
@@ -631,7 +739,16 @@ local define_jobs = function()
   function prototype:doPrepare()
     -- check status
     print("准备任务")
-    wait.time(1)
+    wait.time(0.5)
+    self.jobDelays = {}
+    helper.enableTriggerGroups("jobs_query_start")
+    SendNoEcho("set jobs query_start")
+    SendNoEcho("jobquery")
+    SendNoEcho("set jobs query_done")
+    helper.checkUntilNotBusy()
+    -- 确定任务
+    self.currJob = self:nextJob()
+    print("确定当前任务类型：", self.currJob.def.name)
     status:money()
     if status.silvers > self.silverThreshold
       or status.golds > self.goldThreshold then
@@ -642,17 +759,14 @@ local define_jobs = function()
       return self:fire(Events.RICH)
     end
     print("携带金钱检查完毕")
-    wait.time(1)
+    wait.time(0.5)
     helper.assureNotBusy()
     self:doCheckWeapons()
     print("武器装备检查完毕（待完善）")
-    wait.time(1)
+    wait.time(0.5)
     helper.assureNotBusy()
     print("任务信息检查完毕（待完善）")
-    -- 确定任务
-    self.currJob = self.jobs.murong
-    print("确定当前任务类型：", self.currJob.def.name)
-    wait.time(1)
+    wait.time(0.5)
     helper.assureNotBusy()
     status:hpbrief()
     if status.food < 120 or status.drink < 120 then

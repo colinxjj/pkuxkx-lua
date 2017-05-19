@@ -7,142 +7,6 @@
 -- 2017/5/8 - created
 
 local patterns = {[[
-ask murong about job
-你向慕容复打听有关『job』的消息。
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长少林醉棍。」
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：「韩湘子棍铁，提胸醉拔萧」棍大英雄横提钢杖棍，端划了个半圈棍击向盖世豪杰的头部
-慕容复在你的耳边悄声说道：「蓝采和，提篮劝酒醉朦胧」，大英雄手中钢杖半提，缓缓向划盖世豪杰的头部
-慕容复在你的耳边悄声说道：「汉钟离疾跌步翻身醉盘龙」疾大英雄手中棍花团团疾，风般向卷向盖世豪杰
-慕容复在你的耳边悄声说道：「曹国舅千，杯不醉金倒盅」千大英雄金竖钢杖千指天打地千向盖世豪杰的头部劈去
-慕容复在你的耳边悄声说道：「何仙姑右拦腰敬酒醉仙步」右大英雄左掌护胸右，臂挟棍猛地扫向盖世豪杰的腰间
-慕容复在你的耳边悄声说道：其人名曰郭叶，正在西湖一带活动。
-慕容复说道：「具体招式我是多年前所见，记得不怎么清晰了。」
-
-你从郭叶身上偷学到了一招！
-
-你恐怕没有偷学机会了。
-
-ask murong about job
-你向慕容复打听有关『job』的消息。
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长赤炼神掌。」
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英雄左掌结印，右掌轻轻拍向世盖豪杰
-慕容复在你的耳边悄声说道：大英雄手双一合，平平推向盖世豪杰
-慕容复在你的耳边悄声说道：大英雄拳打脚踢，看似毫章无法，其实已将盖世豪杰逼入绝境
-慕容复在你的耳边悄声说道：处英雄轻巧地攻向盖世杰豪胸前诸大处穴
-慕容复在你的耳边悄声说道：大英雄手上如传花蝴蝶，并不停歇，印向盖世豪杰必救处之
-慕容复在你的耳边悄声说道：其人名曰赵丽姣，正在福州一带活动。
-慕容复说道：「具体招式我是多年前所见，记得不怎么清晰了。」
-
-> 你向慕容复打听有关『job』的消息。
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长弹指神通。」
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英身雄子忽然跃起，雄在半空，左手招架，右手医』矢雨急风狂」，快如闪电，一个肘锤，正击在盖世豪杰的肩上
-慕容复在你的耳边悄声说道：大英雄在纵跃翻扑之际指一式「断山绞」指突然左掌竖立指，风虎虎指托地跃起指左，急点盖豪世杰的面门指风声四座
-慕容复在你的耳边悄声说道：大英雄侧避身过盖世豪杰凌厉的进攻，左拳右指，一式「断胫盘打」，从旁夹击，蹲下避来，呼的两指齐出，直照盖世豪杰的全避
-慕容复在你的耳边悄声说道：大英雄指拳回击，右拳直攻，指左忽起，一式「撩阴左」，如一柄长剑点向盖世豪杰，左风虎虎，极为锋锐
-慕容复给了你一张纸，上书：
-你的客户端不支持MXP,请直接打开链接查看图片。
-请注意，忽略验证码中的红色文字。
-http://pkuxkx.net/antirobot/robot.php?filename=1495058088120436
-
-> 你向慕容复打听有关『job』的消息。
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长天羽奇剑。」
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英雄医』矢天河倒泻」，长剑飞斩盘旋，如疾电般射向盖世豪杰的胸口
-慕容复在你的耳边悄声说道：大英雄错步上前手使出「闪电惊虹」手，中长剑划出一道剑光劈向盖世豪杰的头部
-慕容复在你的耳边悄声说道：大英雄手中长剑招抖，招一「日在九天」，斜斜招剑反腕撩出，攻向盖世豪杰的头部
-慕容复在你的耳边悄声说道：大英雄手中长剑指斜苍天，剑芒吞吐，一式「九弧震日」，对准盖世豪杰的头部指指击出
-慕容复在你的耳边悄声说道：其人名曰范捷，正在峨嵋一带活动。
-慕容复说道：「具体招式我是多年前所见，记得不怎么清晰了。」
-> 设定环境变量：touxue = "ask_done"
-
-> 你向慕容复打听有关『job』的消息。
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长fy-sword。」
-JOB_SKILL triggered
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英使雄出一招「水到渠成」，身形婉如流水，手中长剑从天而降，向斩盖世豪杰的头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄使出一式的「雷震四方对」准盖世豪杰的头部刺出一剑
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄手中剑轻轻一晃，长剑化为一道电光，使出「地老天荒」刺向世盖豪杰的头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：其人名曰尉迟冕九，正在华山一带活动。
-JOB_MOTION triggered
-JOB_NPC_ZONE triggered
-慕容复说道：「具体招式我是多年前所见，记得不怎么清晰了。」
-> 设定环境变量：touxue = "ask_done"
-
-> 你向慕容复打听有关『job』的消息。
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长云龙爪。」
-JOB_SKILL triggered
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英雄腾空高飞三丈，一式「鹰扬万里」，天空顿中时显出一个巨灵爪影，缓缓罩向盖世豪杰
-慕容复在你的耳边悄声说道：大英雄右左手掌爪互逆，一式「搏击长空」，无数道劲气破空而出，迅疾无比地击向盖世豪杰
-慕容复在你的耳边悄声说道：大英雄的忽拨地而起，使一式「苍龙出水」，身形化作一道闪电射向盖世豪杰
-慕容复在你的耳边悄声说道：大英雄微微一笑，使一式「万佛朝宗」，手双幻出万金道光,直射向盖世豪杰的头部
-慕容复在你的耳边悄声说道：大英雄全身拔地娥ｘ片半空中一个筋斗，一式「凶鹰袭兔」，迅猛地抓向盖世豪杰的头部
-慕容复在你的耳边悄声说道：其人名曰王云峦，正在岳王墓一带活动。
-慕容复说道：「具体招式我是多年前所见，记得不怎么清晰了。」
-> 设定环境变量：touxue = "ask_done"
-
-> 你向慕容复打听有关『job』的消息。
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长太乙神剑。」
-JOB_SKILL triggered
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英雄往上一纵身，一招「太乙有痕」，手中长剑如一股流水向盖世豪杰头的部竖劈而下
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄往下一矮身，一招「太污乙∞汗，手中长剑如一缕浮云向盖世豪杰的头部横削而过
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：其人名曰方莹桂，正在姑苏慕容一带活动。
-JOB_NPC_ZONE triggered
-JOB_MOTION triggered
-慕容复说道：「具体招式我是多年前所见，记得不怎么清晰了。」
-> 设定环境变量：touxue = "ask_done"
-
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英雄使一出招「下叠手」，左掌出晃，右掌上翻顺势击向盖世豪杰的头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：英大雄双掌绕了几圈个转，使出「中堂匝」，掌影飘飘拍向盖世豪杰头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英左雄掌护住身前，一个打跌右掌一招「斜钩进步」拍向盖世豪杰头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄使出一招上「叠手」，右掌一翻，左掌虚进击向盖世豪杰的头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄使出「拊腕穿肘」，踏上两步盖世豪杰身前，个一肘□撞向盖世豪杰的头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄「嘿」地一声，单腿跨回，一招「平虚吊步」双掌出齐直盖攻世豪杰头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：其人名曰孙五，正在泰山一带活动。
-
-慕容复说道：「撸啊，我近来习武遇到障碍，听说有人擅长一指禅。」
-JOB_SKILL triggered
-慕容复说道：「你去把下面几招学(touxue)下来。」
-慕容复在你的耳边悄声说道：大英雄身形闪动，出式「佛门广渡」，双手食指端部射各一出道青气，各向盖世豪杰的全身要穴
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄左掌回￥鞋一式「佛光普≌展，右手中指前后划了个半弧，猛地一甩，疾点盖世豪杰的头部
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄盘膝跌坐，一式佛「法无边」，左手握拳托肘，右手拇指直立，遥遥对着盖世豪杰一捺
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：大英雄双指并拢一和式「佛恩济世」一，身而上一左右手和前和后戳向盖世豪杰的胸腹间
-JOB_MOTION triggered
-慕容复在你的耳边悄声说道：其人名曰杨飞年，正在临安府一带活动。
-JOB_NPC_ZONE triggered
-JOB_MOTION triggered
-
-
-慕容复在你的耳边悄声说道：大英雄面带微笑，眼露悲光，全身所散发出的「大悲慈光明势」气劲宛如惊涛核＇垃铁锤一波接一波地涌向盖世豪杰
-慕容复在你的耳边悄声说道：大英雄将手中锤铁抛上半空，跃起一掌砸在锤铁上，这招「大皈依光明势」有如流星坠地，直轰盖世豪杰
-慕容复在你的耳边悄声说道：大英雄双手越转越急，光幕俨如一轮明月，将盖世豪杰笼罩，这「大吉祥光明势」的劲力带着锤铁以山排倒海之势飞旋而出
-慕容复在你的耳边悄声说道：大英雄双眼磕闭向全身衣物却在内劲鼓荡下涨如气球向那铁锤在这「大常乐光明势」的推动下向，盖世豪杰缓缓压去
-慕容复在你的耳边悄声说道：大英雄一招「大赞叹光明势」，右立手掌护胸，左立单臂抡起铁锤，当胸砍向盖世豪杰头的部
-
-慕容复在你的耳边悄声说道：大英雄乘盖世豪袭杰来之际，竟然就地一倒，连滚带爬一从般盖世豪袭的掌风之下绕到左侧，看也不看便用自己的肩部向盖世豪袭撞去
-慕容复在你的耳边悄声说道：英大雄突然一声暴喝,身体跃起丈余！一招「醉龙出水」，身体成龙形，集全身力量于掌心，向盖世豪杰呼啸而来
-慕容复在你的耳边悄声说道：大英雄一招「八醉仙」身，形忽快忽慢身双眼微闭身双拳如游龙戏珠身直取盖世豪杰的双眼
-慕容复在你的耳边悄声说道：大英雄在斗打之间竟突然做摔倒状，双腿却似剪刀一般，连环向盖世豪杰踢出数腿
-慕容复在你的耳边悄声说道：大英雄突然身体前倾，摇摇欲坠，却是一招武「松跌醉」，靠在盖世豪杰身后，一手武洒瓶指」直任淝世豪杰的太阳穴
 
 ]]}
 
@@ -154,9 +18,8 @@ local captcha = require "pkuxkx.captcha"
 -- 去除掉干扰字符
 local ExcludeCharacters = {}
 for _, c in ipairs({
-  "大","英", "雄",
-  "盖", "世", "豪", "杰",
-  "，", "。", "「", "」", "』", "ｘ", ",", "∞", "≌", "￥" }) do
+  "大","英", "雄", "盖", "世", "豪", "杰", "你", "的",
+  "，", "。", "「", "」", "』", "ｘ", ",", "∞", "≌", "￥", "↓" }) do
   ExcludeCharacters[c] = true
 end
 local PrecisionThreshold = 50
@@ -247,6 +110,12 @@ local define_touxue = function()
     self:setState(States.stop)
     self.precisionPercent = PrecisionThreshold
     self.recallPercent = RecallThreshold
+    self.precondition = {
+      jing = 0.95,
+      qi = 0.95,
+      neili = 0.95,
+      jingli = 0.95
+    }
     self:debugOn()
   end
 
@@ -376,7 +245,7 @@ local define_touxue = function()
             self.rawMotions = {}
           end
           -- 当有奇数字节时，警告
-          local rawMotion = string.gsub(string.gsub(wildcards[1], ",", ""), "!", "")
+          local rawMotion = string.gsub(wildcards[1], "[,!\\.]", "")
           local len = string.len(rawMotion)
           if len % 2 ~= 0 then
             ColourNote("yellow", "", "异常长度描述出现，长度为" .. len)
@@ -510,10 +379,10 @@ local define_touxue = function()
     helper.checkUntilNotBusy()
     if self.workTooFast then
       self:debug("任务CD中，等待8秒后继续接")
-      wait.time(8)
+      wait.time(10)
       return self:doAsk()
     elseif self.needCaptcha then
-      ColourNote("silver", "", "请手动输入验证信息，格式为：touxue <人名> <区域名>")
+      ColourNote("yellow", "", "请手动输入验证信息，格式为：touxue search <人名> <区域名>")
       return
     elseif not self.zoneName or not self.npc or not self.skill or not self.rawMotions or #(self.rawMotions) == 0 then
       -- todo
@@ -626,13 +495,15 @@ local define_touxue = function()
           else
             local result = self:evaluateMotion(motion, line)
             if result.success then
-              self:debug(motion.simplified, "准确：", result.precision, "召回：", result.recall);
               if result.precision >= self.precisionPercent and result.recall >= self.recallPercent then
+                self:debug(motion.simplified, "准确：", result.precision, "召回：", result.recall)
                 self:debug("符合条件，执行偷学")
                 SendNoEcho("touxue " .. self.npcId)
                 self.motionsToLearn[motion.simplified] = nil
                 table.insert(self.motionsLearned, motion)
                 break
+              else
+                self:debug("准确：", result.precision, "召回：", result.recall)
               end
             else
               ColourNote("yellow", "", result.message)
@@ -685,57 +556,54 @@ local define_touxue = function()
     travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     wait.time(1)
---    self.submitSuccess = false
---    SendNoEcho("set touxue submit_start")
---    SendNoEcho("ask touxue fu about finish")
---    SendNoEcho("set touxue submit_done")
---    helper.checkUntilNotBusy()
+    self.submitSuccess = false
+    SendNoEcho("set touxue submit_start")
+    SendNoEcho("ask murong fu about finish")
+    SendNoEcho("set touxue submit_done")
+    helper.checkUntilNotBusy()
     SendNoEcho("drop huo tong")
     SendNoEcho("drop yun tie")
-    -- todo
+    return self:fire(Events.STOP)
   end
 
   function prototype:evaluateMotion(motion, line)
+    local line = string.gsub(string.gsub(line, self.npc, ""), "[,!\\.]", "")
     local len = string.len(line)
-    if len % 2 ~= 0 then
-      return {
-        success = false,
-        message = "当前句子可能存在非中文字符，忽略",
-        precision = 0,
-        recall = 0,
-      }
-    else
-      local chars = {}
-      local charCnt = 0
-      local matchedChars = {}
-      local matchedCharCnt = 0
-      for i = 1, len, 2 do
-        local char = string.sub(line, i, i+1)
-        if not chars[char] then
-          chars[char] = true
-          charCnt = charCnt + 1
-        end
-        if motion.map[char] and not matchedChars[char] then
-          matchedChars[char] = true
-          matchedCharCnt = matchedCharCnt + 1
-        end
+    local chars = {}
+    local charCnt = 0
+    local matchedChars = {}
+    local matchedCharCnt = 0
+    for i = 1, len, 2 do
+      local char = string.sub(line, i, i+1)
+      if not chars[char] then
+        chars[char] = true
+        charCnt = charCnt + 1
       end
-      return {
-        success = true,
-        precision = math.floor(matchedCharCnt / charCnt * 100),
-        recall = math.floor(matchedCharCnt / motion.cnt * 100),
-      }
+      if motion.map[char] and not matchedChars[char] then
+        matchedChars[char] = true
+        matchedCharCnt = matchedCharCnt + 1
+      end
     end
+    return {
+      success = true,
+      precision = math.floor(matchedCharCnt / charCnt * 100),
+      recall = math.floor(matchedCharCnt / motion.cnt * 100),
+    }
   end
 
   function prototype:doCancel()
-    helper.checkUntilNotBusy()
     SendNoEcho("halt")
+    SendNoEcho("bei strike cuff")
     travel:walkto(JobRoomId)
     travel:waitUntilArrived()
-    SendNoEcho("ask murong fu about fail")
+    self.submitSuccess = false
+    SendNoEcho("ask murong fu about finish")
     helper.checkUntilNotBusy()
     return self:fire(Events.STOP)
+  end
+
+  function prototype:doStart()
+    return self:fire(Events.START)
   end
 
   function prototype:show()

@@ -14,6 +14,12 @@ local nanjue = require "job.nanjue"
 
 local Skills = {
   {
+    basic = "sword",
+    special = "kuangfeng-kuaijian",
+    mode = "lian",
+    weapon = "sword"
+  },
+  {
     basic = "force",
     special = "zixia-shengong",
     mode = "lingwu"
@@ -51,17 +57,18 @@ local Skills = {
     special = "hunyuan-zhang",
     mode = "lingwu",
   },
-  {
-    basic = "parry",
-    special = "yunushijiu-jian",
-    mode = "lian",
-    weapon = "sword",
-  },
-  {
-    basic = "sword",
-    special = "yangwu-jian",
-    mode = "lian"
-  },
+--  {
+--    basic = "parry",
+--    special = "yunushijiu-jian",
+--    mode = "lian",
+--    weapon = "sword",
+--  },
+--  {
+--    basic = "sword",
+--    special = "yangwu-jian",
+--    mode = "lian",
+--    weapon = "sword",
+--  },
   {
     basic = "parry",
     special = "poyu-quan",
@@ -72,6 +79,12 @@ local Skills = {
     special = "poyu-quan",
     mode = "lingwu"
   },
+  {
+    basic = "sword",
+    special = "xiyi-jian",
+    mode = "lian",
+    weapon = "sword"
+  }
 
 }
 -- 两次睡觉间间隔秒数
@@ -81,7 +94,7 @@ local DzNumPerSecond = 66
 -- 每次领悟次数
 local LingwuNum = 50  -- 1 - 500
 -- 每次练习次数
-local LianNum = 50  -- 1 - 500
+local LianNum = 30  -- 1 - 500
 -- 是否在升级时转换技能（设置为true时将平均提升技能）
 local LevelupSwitch = false
 -- 睡觉地点
@@ -89,7 +102,7 @@ local SleepRoomId = 2921
 -- 技能提升地点
 local SkillRoomId = 2918
 -- 保留与上限级差
-local ReservedLimitGap = 1
+local ReservedLimitGap = 2
 
 local define_fullskills = function()
   local prototype = {}
@@ -107,6 +120,7 @@ local define_fullskills = function()
     SKILL_LEVEL_UP = "^[ >]*你的「.*?」进步了！$",
     CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高|你的.*?的级别还没有.*?的级别高，不能通过练习来提高|你需要提高基本功，不然练得再多也没有用).*$",
     CANNOT_DAZUO = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉。$",
+    CANNOT_LIAN = "^[ >]*你的内力不够练.*$",
   }
 
   function prototype:new()
@@ -176,6 +190,13 @@ local define_fullskills = function()
       regexp = REGEXP.SKILL_LEVEL_UP,
       response = function()
         self.skillLevelup = true
+      end
+    }
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.CANNOT_LIAN,
+      response = function()
+        self.canLian = false
       end
     }
   end
@@ -378,6 +399,7 @@ local define_fullskills = function()
       jingCost = 0
       self:debug("忽略精消耗")
     end
+    self.canLian = true
     while not self.stopped do
       wait.time(0.2)
       status:hpbrief()
@@ -387,6 +409,9 @@ local define_fullskills = function()
           table.insert(self.skillStack, self.currSkill)
         end
         return self:doFull()
+      end
+      if not self.canLian then
+        return self:doSleep()
       end
       if (jingCost > 0 and status.currJing < jingCost)
         or (qiCost > 0 and status.currQi < qiCost) then
@@ -406,6 +431,7 @@ local define_fullskills = function()
         self:debug("气消耗大于内力消耗，直接恢复")
         SendNoEcho(recoverCmd)
       end
+      self.canLian = true
       SendNoEcho(workCmd)
     end
   end

@@ -198,6 +198,7 @@ local define_travel = function()
         "你的动作还没有完成，不能移动",  -- busy
         "沙石地几乎没有路了，你走不了那么快",  -- huangzhong
         "荒路几乎没有路了，你走不了那么快",  -- huangzhong
+        "沙漠中几乎没有路了，你走不了那么快",  -- huangzhong
       }, "|"), -- 挡路触发
       ").*$", -- 匹配结束
     }, ""),
@@ -263,6 +264,12 @@ local define_travel = function()
     ["陆家庄大厅"] = "大厅",
     ["岳飞墓"] = "岳  飞  墓",
   }
+  local TraverseZoneExcludedRooms = {
+    [1479] = true,
+    [1480] = true,
+    [1481] = true,
+    [1482] = true,  -- 提督府后门
+  }
 
   -- room 3185 has 2-line exits descriptions
 
@@ -326,8 +333,20 @@ local define_travel = function()
     if not self.zonesByCode[zone] then
       print("查找不到区域：", zone)
     else
+      local filtered = {}
+      local excludedCnt = 0
+      for id, room in pairs(self.zonesByCode[zone].rooms) do
+        if not TraverseZoneExcludedRooms[id] then
+          filtered[id] = room
+        else
+          excludedCnt = excludedCnt + 1
+        end
+      end
+      if excludedCnt > 0 then
+        self:debug("排除遍历难以到达节点：", excludedCnt)
+      end
       self:setTraverse {
-        rooms = self.zonesByCode[zone].rooms,
+        rooms = filtered,
         check = check or function() return false end
       }
       self:fire(Events.START)
