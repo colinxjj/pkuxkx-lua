@@ -68,8 +68,8 @@
 -- travel:generateWalkPlan(fromRoomId, toRoomId) 获取指定两地点间的路径栈
 --
 -- 特殊，提供可编程的接口（无直接别名）
--- travel:traverse(rooms, check, action)
--- 指定目标房间与范围（默认每两个相邻房间距离为1），进行遍历（dfs算法），untilCheck为
+-- travel:setTraverse(args)
+-- 指定目标房间与范围（默认每两个相邻房间距离为1），进行遍历（dfs算法），check为
 -- 遍历中每一步前执行的检查，必须返回true或false，当检查为true时，walk将直接跳跃其后
 -- 所有需要遍历的房间，进入到达状态，并执行action。
 -- 注意，当前房间必须被定位为rooms中的房间，否则直接失败，建议walkto到指定房间再调用
@@ -315,28 +315,26 @@ local define_travel = function()
   function prototype:setTraverse(args)
     local rooms = assert(type(args.rooms) == "table" and args.rooms, "rooms must be a table")
     local check = assert(type(args.check) == "function" and args.check, "check must be a function")
-    local action = assert(not args.action or type(args.action) == "function" and args.action, "action must be nil or function")
     -- no defensive copy, user should make sure immutable :)
     self.traverseRooms = rooms
     self.traverseCheck = check
-    self.targetAction = action
-  end
-
-  function prototype:traverse(args)
-    self:setTraverse(args)
-    self:fire(Events.START)
   end
 
   function prototype:traverseZone(zone, check, action)
     assert(zone, "zone cannot be nil")
+    assert(action == nil or type(action) == "function", "action can only nil or function")
     if not self.zonesByCode[zone] then
       print("查找不到区域：", zone)
     else
-      self:traverse {
+      self:setTraverse {
         rooms = self.zonesByCode[zone].rooms,
-        check = check or function() return false end,
-        action = action or function() print("遍历结束") end
+        check = check or function() return false end
       }
+      self:fire(Events.START)
+      if action then
+        self:waitUntilArrived()
+        action()
+      end
     end
   end
 
@@ -777,10 +775,13 @@ local define_travel = function()
       else
         self:setTraverse {
           rooms = traverseRooms,
-          check = check or function() return false end,
-          action = action or function() print("遍历结束") end
+          check = check or function() return false end
         }
         self:fire(Events.START)
+        if action then
+          self:waitUntilArrived()
+          action()
+        end
       end
     end
   end
@@ -1116,10 +1117,7 @@ local define_travel = function()
           self.currRoomId = self.targetRoomId
           self:refreshRoomInfo()
         end
-        SendNoEcho("set travel arrived")  -- this is for
-        if self.targetAction then
-          return self.targetAction()
-        end
+        SendNoEcho("set travel arrived")  -- this is for other callbacks
       end
     }
     self:addTransition {
@@ -1776,7 +1774,6 @@ local define_travel = function()
     self.currRoomId = nil
     self.currRoomName = nil
     self.targetRoomId = nil -- 当该变量不为空时，为直达任务
-    self.targetAction = nil
     self.busyLook = false  -- 重定位时该变量记录当前look是否被系统判定为频繁
     self.relocMoves = 0  -- 进入located状态时重置
     self.relocRetries = 0  -- STOP, ARRIVED, LOCATION_CONFIRMED_ONLY 时重置

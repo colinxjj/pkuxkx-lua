@@ -559,6 +559,7 @@ local define_nanjue = function()
         -- we must reset all variables before do next job
         self:resetOnStop()
         travel:walkto(JobRoomId)
+        travel:waitUntilArrived()
         return self:doAskInfo()
       end
     }
@@ -948,8 +949,6 @@ local define_nanjue = function()
     SendNoEcho("ask " .. self.currStranger.id .. " about ÏûÏ¢")
     SendNoEcho("set nanjue ask_done")
   end
-
-
 
   function prototype:doCollect()
     self.checkedRoomIds = {}
