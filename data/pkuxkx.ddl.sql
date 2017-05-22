@@ -121,7 +121,8 @@ values
   ('tidufu', '杭州提督府', 'tidufuzhengting'),
   ('tiantan', '天坛', 'tiantanxitianmen'),
   ('shenlongdao', '神龙岛', 'shenlongdaofengding'),
-  ('shashoubang', '杀手帮', 'shashoubangguangchang')
+  ('shashoubang', '杀手帮', 'shashoubangguangchang'),
+  ('gaibang', '丐帮', 'gaibangshudongneibu')
 ;
 
 create table if not exists zone_connectivity (
@@ -314,7 +315,18 @@ values
   ('xinyang', 'shashoubang', 6),
   ('shashoubang', 'xinyang', 6),
   ('shashoubang', 'yangzhou', 20),
-  ('yangzhou', 'shashoubang', 20)
+  ('yangzhou', 'shashoubang', 20),
+  ('yangzhou', 'gaibang', 1),
+  ('gaibang', 'yangzhou', 1),
+  ('gaibang', 'xiaoshancun', 5),
+  ('gaibang', 'shaolin', 16),
+  ('shaolin', 'gaibang', 16),
+  ('gaibang', 'huizuxiaozhen', 6),
+  ('gaibang', 'wudang', 8),
+  ('gaibang', 'huanghenan', 10),
+  ('huanghenan', 'gaibang', 10),
+  ('gaibang', 'lingxiao', 16),
+  ('lingxiao', 'gaibang', 16)
 ;
 
 update zone_connectivity set boat = 1

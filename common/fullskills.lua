@@ -13,12 +13,12 @@ local captcha = require "pkuxkx.captcha"
 local nanjue = require "job.nanjue"
 
 local Skills = {
-  {
-    basic = "sword",
-    special = "kuangfeng-kuaijian",
-    mode = "lian",
-    weapon = "sword"
-  },
+--  {
+--    basic = "sword",
+--    special = "kuangfeng-kuaijian",
+--    mode = "lian",
+--    weapon = "sword"
+--  },
   {
     basic = "force",
     special = "zixia-shengong",
@@ -57,27 +57,22 @@ local Skills = {
     special = "hunyuan-zhang",
     mode = "lingwu",
   },
---  {
---    basic = "parry",
---    special = "yunushijiu-jian",
---    mode = "lian",
---    weapon = "sword",
---  },
---  {
---    basic = "sword",
---    special = "yangwu-jian",
---    mode = "lian",
---    weapon = "sword",
---  },
+  {
+    basic = "parry",
+    special = "yunushijiu-jian",
+    mode = "lian",
+    weapon = "sword",
+  },
+  {
+    basic = "sword",
+    special = "yangwu-jian",
+    mode = "lian",
+    weapon = "sword",
+  },
   {
     basic = "parry",
     special = "poyu-quan",
     mode = "lian",
-  },
-  {
-    basic = "cuff",
-    special = "poyu-quan",
-    mode = "lingwu"
   },
   {
     basic = "sword",
@@ -102,7 +97,7 @@ local SleepRoomId = 2921
 -- 技能提升地点
 local SkillRoomId = 2918
 -- 保留与上限级差
-local ReservedLimitGap = 2
+local ReservedLimitGap = 3
 
 local define_fullskills = function()
   local prototype = {}
