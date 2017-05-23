@@ -493,6 +493,9 @@ local define_travel = function()
 
   -- 检查两个房间的出口列表是否一致
   function prototype:checkExitsIdentical(exits1, exits2)
+    if exits1 == nil or exits2 == nil then
+      return false
+    end
     local ls1 = utils.split(exits1, ";")
     local ls2 = utils.split(exits2, ";")
     if #ls1 ~= #ls2 then

@@ -74,12 +74,12 @@ local Skills = {
     special = "poyu-quan",
     mode = "lian",
   },
-  {
-    basic = "sword",
-    special = "xiyi-jian",
-    mode = "lian",
-    weapon = "sword"
-  }
+--  {
+--    basic = "sword",
+--    special = "xiyi-jian",
+--    mode = "lian",
+--    weapon = "sword"
+--  }
 
 }
 -- 两次睡觉间间隔秒数
@@ -115,7 +115,7 @@ local define_fullskills = function()
     SKILL_LEVEL_UP = "^[ >]*你的「.*?」进步了！$",
     CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高|你的.*?的级别还没有.*?的级别高，不能通过练习来提高|你需要提高基本功，不然练得再多也没有用).*$",
     CANNOT_DAZUO = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉。$",
-    CANNOT_LIAN = "^[ >]*你的内力不够练.*$",
+    CANNOT_LIAN = "^[ >]*(你的内力不够练|你的内力不够了，休息一下再练).*$",
   }
 
   function prototype:new()
@@ -406,6 +406,7 @@ local define_fullskills = function()
         return self:doFull()
       end
       if not self.canLian then
+        table.insert(self.skillStack, self.currSkill)
         return self:doSleep()
       end
       if (jingCost > 0 and status.currJing < jingCost)
