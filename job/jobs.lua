@@ -13,7 +13,7 @@ local status = require "pkuxkx.status"
 -- 导入所有任务实现
 local songxin = require "job.songxin"
 local nanjue = require "job.nanjue"
-local hubiao = require "job.hubiao"
+-- local hubiao = require "job.hubiao"
 local murong = require "job.murong"
 local touxue = require "job.touxue"
 
@@ -446,10 +446,10 @@ local define_jobs = function()
       def = JobDefinition.nanjue,
       impl = nanjue
     }
-    self.definedJobs.hubiao = Job:decorate {
-      def = JobDefinition.hubiao,
-      impl = hubiao
-    }
+--    self.definedJobs.hubiao = Job:decorate {
+--      def = JobDefinition.hubiao,
+--      impl = hubiao
+--    }
     self.definedJobs.murong = Job:decorate {
       def = JobDefinition.murong,
       impl = murong

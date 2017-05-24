@@ -1,228 +1,22 @@
+----------------------------------------
+-- 对护镖做重新设计，不参与jobs框架
+-- 对行走模块有重要影响，屏蔽特殊区域
 --
--- Created by IntelliJ IDEA.
--- User: Administrator
--- Date: 2017/4/8
--- Time: 8:10
--- To change this template use File | Settings | File Templates.
---
+----------------------------------------
+
+-- 增加全局屏蔽区域
+ExcludedZones = {
+  "dali", "emei",
+  "gaibang", "jiaxing",
+  "lingjiu", "lingzhou",
+  "miaoling", "mingjiao",
+  "pingxiwangfu", "riyue",
+  "shaolin", "tiantan",
+  "wudang", "xihu",
+  "xingxiu"
+}
 
 local patterns = {[[
-listesc
-福州福威镖局押镖任务列表：
-任务序号  任务目的地               任务发布时间   任务状态 认领玩家
-=============================================================================
-16975     临安府江南钱庄                    510秒   已认领 gengfeng
-16976     嘉兴钱庄                          510秒   已认领 akking
-16977     归云庄太湖街                      510秒   待认领 0
-16984     牙山小荒地                        353秒   待认领 0
-16985     泉州当铺                          353秒   已完成 atomy
-16986     嘉兴陆家庄大厅                    353秒   待认领 0
-=============================================================================
-使用命令【getesc 任务序号】来认领押镖任务。
-
-getesc 34854
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到泉州当铺王福贵那里，他已经派了个伙计名叫令狐轩梅到泉州码头附近接你，把镖车送到他那里就行了。
-
-gan che to west
-西大街
-你赶着镖车驶了过来。
-镖车隆隆驶了过来。
->
-gan che to west
-镖车还没有跟上来呢,走慢点.
-
-gan che to north
-劫匪伸手一拦道：“想跑？没那么容易！”
-
-你累了个半死，终于把镖运到了地头。
-
-令狐轩梅对你说道：“终于到了！小兄弟辛苦了！”
-
-围上来几个伙计将镖车拉了进去。
-
-ask lin about finish
-你向林震南打听有关『finish』的消息。
-你一共被奖励了：
-三百零四点经验；
-一百十点潜能；
-六十七点江湖声望。
-林震南吩咐了旁边的镖头几句，转头对你道：「辛苦了，有几两银子略表心意，已经吩咐人存入你的钱庄账户。」
-林震南拍了拍撸啊的头，说道：「好孩子，乖。」
-林震南说道：「小兄弟果然是栋梁之才！」
-
-getesc 34853
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到苏州聚宝斋孙剥皮那里，他已经派了个伙计名叫樊柏慕到沧浪亭附近接你，把镖车送到他那里就行了。
-
-你赶着镖车驶了过来。
-镖车隆隆驶了过来。
-> 你累了个半死，终于把镖运到了地头。
-
-樊柏慕对你说道：“终于到了！小兄弟辛苦了！”
-
-围上来几个伙计将镖车拉了进去。
-
-getesc 34882
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到泉州当铺王福贵那里，他已经派了个伙计名叫包云永到南门附近接你，把镖车送到他那里就行了。
-
-gan che to northwest
-这个方向过不去。
-
-listesc
-福州福威镖局押镖任务列表：
-任务序号  任务目的地               任务发布时间   任务状态 认领玩家
-=============================================================================
-34882     泉州当铺                          471秒   已完成 luar
-34883     镇江飞龙镖局                      471秒   已认领 crafting
-34884     嘉兴陆家庄大厅                    471秒   待认领 0
-34891     岳王墓墓前广场                    154秒   待认领 0
-34892     泉州当铺                          154秒   待认领 0
-34893     牙山小荒地                        154秒   待认领 0
-=============================================================================
-使用命令【getesc 任务序号】来认领押镖任务。
-
-getesc 34893
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到牙山小荒地黄毛鬼那里，他已经派了个伙计名叫樊慕郎到破屋附近接你，把镖车送到他那里就行了。
-
-劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”
-
-getesc 34901
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到镇江飞龙镖局张经那里，他已经派了个伙计名叫余坚七到土路附近接你，把镖车送到他那里就行了。
-
-劫匪伸手一拦道：“想跑？没那么容易！”
-
-劫匪趁你不注意，推着镖车就跑，你赶紧追了上去。
-
-你赶着镖车驶了过来。
-镖车隆隆驶了过来。
-> 你累了个半死，终于把镖运到了地头。
-
-余坚七对你说道：“终于到了！小兄弟辛苦了！”
-
-围上来几个伙计将镖车拉了进去。
-劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”
-你在攻击中不断积蓄攻势。(气势：4%)
-劫匪正盯著你的一举一动，随时准备发动攻势。
-
-getesc 34922
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到岳王墓墓前广场包打听那里，他已经派了个伙计名叫侯征永到墓边小道附近接你，把镖车送到他那里就行了。
-
-getesc 34916
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到归云庄太湖街商人那里，他已经派了个伙计名叫阮明到太湖街附近接你，把镖车送到他那里就行了。
-
-劫匪叫道：点子扎手，扯呼！
-
-劫匪个起纵遁入暗里不见了。
-
-> 劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”
-
-忽然一阵刺骨的奇寒袭来，你中的星宿毒掌毒发作了！
-
-gan che to northwest
-你还是先把对手解决了再说吧！
-
-斜刺里冲出来小偷,猛地对你痛下杀手！
-趟子手大呼：有人劫镖阿，快护镖，快快！
-
-gan che to east
-你现在正忙着哩。
-
-getesc 34923
-你所领的任务在任务列表中并不存在。
-认领任务失败，请选择其他任务。
-
-getesc 34934
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到嘉兴陆家庄大厅陆立鼎那里，他已经派了个伙计名叫左少康到大厅附近接你，把镖车送到他那里就行了。
-
-getesc 47912
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到临安府江南钱庄金乞儿那里，他已经派了个伙计名叫闻火涛到杂货铺附近接你，把镖车送到他那里就行了。
-
-getesc 47955
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到嘉兴陆家庄大厅陆立鼎那里，他已经派了个伙计名叫曹琨到大厅附近接你，把镖车送到他那里就行了。
-
-getesc 47997
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到南昌飞虎镖局楚大业那里，他已经派了个伙计名叫安司卿到城中心附近接你，把镖车送到他那里就行了。
-
-getesc 48026
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到南昌飞虎镖局楚大业那里，他已经派了个伙计名叫余捷到偃月楼附近接你，把镖车送到他那里就行了。
-
-    「店铺伙计」阮威龙(Ruan weilong)
-
-getesc 48027
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到岳王墓墓前广场包打听那里，他已经派了个伙计名叫阮威龙到墓前广场附近接你，把镖车送到他那里就行了。
-
-getesc 48069
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到镇江飞龙镖局张经那里，他已经派了个伙计名叫呼延波亦到北大街附近接你，把镖车送到他那里就行了。
-
-getesc 48118
-林震南点了点头。
-几个伙计将镖推了出来。
-撸啊把这批红货送到泉州当铺王福贵那里，他已经派了个伙计名叫高玄生到山路附近接你，把镖车送到他那里就行了。
-
-你还是先把对手解决了再说吧！
-
-zhao
-一个伙计挖着鼻屎走了出来，道：你找我啥事？
-
-ask tam about yao
-你向唐进打听有关『yao』的消息。
-唐进说道：你在说外国话吧？我不会，你最好带个翻译来。
-
-ask tam about yao
-你向唐进打听有关『yao』的消息。
-唐进把一包财物砸向你，一转眼不见了。
-
-getesc 48916
-你上次运镖太辛苦了，下去休息休息吧。
->
-getesc 48917
-你正忙着呢！
->
-
-xian
-你按照林震南的指示，打开密信……原来要你到以下地方找(zhao/zhaoxun)到潜逃的伙计并要(yao)回其席卷的财物！
-你的客户端不支持MXP,请直接打开链接查看图片。
-请注意，忽略验证码中的红色文字。
-http://pkuxkx.net/antirobot/robot.php?filename=1492599526849159
-
-卷走林震南财物的伙计 佰赏庆(Toes)
-
-（只听见「啪」地一声，你手中的青锋剑已经断为两截！）
-
-（宋悦蓓的钢杖和你的青锋剑重重交击在一起，发出「铛」地一声。）
-
-劫匪卸除了你的兵器玄铁剑。
-
-你从陈旧的剑鞘中拔出一把玄铁剑握在手中。
-
-你已经装备著了。
 
 ]]}
 
@@ -272,7 +66,7 @@ local define_hubiao = function()
     TRANSFER_BUSY = "^[ >]*(劫匪伸手一拦道：“想跑？没那么容易！”|你还是先把对手解决了再说吧！|你现在正忙着哩。|镖车还没有跟上来呢,走慢点.*)$",
     STEP_SUCCESS = "^[ >]*你赶着镖车驶了过来。$",
     REWARDED = "^[ >]*你一共被奖励了：$",
-    MIXIN_DESC = "^[ >]*这是一张林震南给你的密信，需要用特殊的药水才能显形\\(xian\\)。$",
+    MIXIN_DESC = "^[ >]*这是一张.*?给你的密信，需要用特殊的药水才能显形\\(xian\\)。$",
     MIXIN_NPC_DISPLAY = "^[ >]*\\s*卷走.*?财物的伙计 .*?\\((.*?)\\)$",
     MIXIN_NPC_FOUND = "^[ >]*一个伙计挖着鼻屎走了出来，道：你找我啥事？$",
     MIXIN_YAO_SUCCESS = "^[ >]*.*把一包财物砸向你，一转眼不见了。$",
@@ -334,6 +128,7 @@ local define_hubiao = function()
     self.robbersPresent = 0
     self.qiPresent = false
     self.powerupPresent = false
+    self.waitThread = nil
   end
 
   function prototype:disableAllTriggers()
@@ -378,10 +173,11 @@ local define_hubiao = function()
     self:addState {
       state = States.transfer,
       enter = function()
-        helper.enableTriggerGroups("hubiao_step_start", "hubiao_transfer")
+        helper.enableTriggerGroups("hubiao_step_start", "hubiao_transfer", "hubiao_ask_robber_start")
       end,
       exit = function()
-        helper.disableTriggerGroups("hubiao_step_start", "hubiao_step_done", "hubiao_transfer")
+        helper.disableTriggerGroups("hubiao_step_start", "hubiao_step_done", "hubiao_transfer",
+          "hubiao_ask_robber_start", "hubiao_ask_robber_done")
       end
     }
     self:addState {
@@ -903,6 +699,11 @@ local define_hubiao = function()
       self:debug("运镖区域不可达，等待2秒后结束")
       wait.time(2)
       return self:doCancel()
+    elseif #(targets) == 1 then
+      self.targetRoomId = targets[1].id
+      self:debug("目标房间仅有1个，略过预取，直接运输，房间编号：", self.targetRoomId)
+      wait.time(1)
+      return self:fire(Events.PREFETCH_SUCCESS)
     else
       local zone = targets[1].zone
       local searchRooms = {}
@@ -1036,14 +837,19 @@ local define_hubiao = function()
   end
 
   function prototype:doStep()
+    SendNoEcho("set hubiao ask_robber_start")
+    SendNoEcho("ask " .. self.playerId .. "'s robber about 去死")
+    SendNoEcho("set hubiao ask_robber_done")
+
+
     self:debug("当前行走方向", self.currStep.path)
     self.stepSuccess = false
     if not self.powerupPresent then
       SendNoEcho("yun powerup")
     end
-    if not self.qiPresent then
-      SendNoEcho("yun qi")
-    end
+--    if not self.qiPresent then
+--      SendNoEcho("yun qi")
+--    end
     SendNoEcho("set hubiao step_start")
     SendNoEcho("gan che to " .. helper.expandDirection(self.currStep.path))
     SendNoEcho("set hubiao step_done")

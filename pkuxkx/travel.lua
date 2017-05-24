@@ -17,6 +17,7 @@
 -- 2017/5/9 修改，添加遍历方法与获取附近房间列表方法的是否过河参数
 -- 2017/5/9 在同一区域仍然可能出现无法从房间A到达房间B的情况，例如无量山后山洞内洞外
 -- 2017/5/18 添加前往第一个同名房间的接口（天珠任务需要）
+-- 2017/5/24 添加全局参数判断，用于对护镖任务提供部分区域的屏蔽支持
 --
 -- 该模块采用了FSM设计模式，目标是稳定，易用，容错。
 -- FSM状态有：
@@ -94,6 +95,9 @@ local RoomPath = require "pkuxkx.RoomPath"
 local PathCategory = RoomPath.Category
 local Deque = require "pkuxkx.deque"
 local boat = require "pkuxkx.boat"
+
+-- inherit global excluded zones
+local ExcludedZones = ExcludedZones
 
 local define_travel = function()
   local prototype = FSM.inheritedMeta()
@@ -1312,7 +1316,12 @@ local define_travel = function()
       zonesByName[zone.name] = zone
     end
     -- initialize rooms
-    local roomsById = dal:getAllAvailableRooms()
+    local roomsById
+    if ExcludedZones then
+      roomsById = dal:getAllAvailableRoomsExcludedBlockZones(ExcludedZones)
+    else
+      roomsById = dal:getAllAvailableRooms()
+    end
     local roomsByCode = {}
     local paths = dal:getAllAvailablePaths()
     for i = 1, #paths do
@@ -1338,6 +1347,9 @@ local define_travel = function()
     self.roomsByCode = roomsByCode
     print("地图数据加载完毕，共" .. helper.countElements(self.zonesByCode) .. "个区域，" ..
       helper.countElements(self.roomsByCode) .. "个房间")
+    if ExcludedZones then
+      print("屏蔽部分特殊阻碍区域：", table.concat(ExcludedZones, ", "))
+    end
   end
 
   -- 初始化触发器

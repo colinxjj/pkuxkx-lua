@@ -122,7 +122,8 @@ values
   ('tiantan', 'ÃÏÃ≥', 'tiantanxitianmen'),
   ('shenlongdao', '…Ò¡˙µ∫', 'shenlongdaofengding'),
   ('shashoubang', '…± ÷∞Ô', 'shashoubangguangchang'),
-  ('gaibang', 'ÿ§∞Ô', 'gaibangshudongneibu')
+  ('gaibang', 'ÿ§∞Ô', 'gaibangshudongneibu'),
+  ('miaoling', '√Á¡Î', 'miaolingbianyuan')
 ;
 
 create table if not exists zone_connectivity (
@@ -168,14 +169,14 @@ values
   ('changan', 'huanghenan', 18),
   ('luoyang', 'changan', 18),
   ('changan', 'luoyang', 18),
-  ('changan', 'chengdu', 19),
-  ('chengdu', 'changan', 19),
-  ('tianlongsi', 'chengdu', 11),
-  ('chengdu', 'tianlongsi', 11),
+  ('changan', 'chengdu', 40),
+  ('chengdu', 'changan', 40),
+  ('tianlongsi', 'chengdu', 25),
+  ('chengdu', 'tianlongsi', 25),
   ('tianlongsi', 'dali', 11),
   ('dali', 'tianlongsi', 11),
-  ('chengdu', 'yueyang', 15),
-  ('yueyang', 'chengdu', 15),
+  ('chengdu', 'yueyang', 43),
+  ('yueyang', 'chengdu', 43),
   ('yueyang', 'jiangzhou', 10),
   ('jiangzhou', 'yueyang', 10),
   ('jiangzhou', 'nanchang', 10),
@@ -226,8 +227,8 @@ values
   ('lingzhou', 'huanghenan', 17),
   ('lingzhou', 'dalunsi', 16),  -- use zanpu as connect-point
   ('dalunsi', 'lingzhou', 16),
-  ('dalunsi', 'chengdu', 13),  -- use zanpu as connect-point
-  ('chengdu', 'dalunsi', 13),
+  ('dalunsi', 'chengdu', 27),  -- use zanpu as connect-point
+  ('chengdu', 'dalunsi', 27),
   ('huanghenan', 'huizuxiaozhen', 21),
   ('huizuxiaozhen', 'huanghenan', 21),
   ('huizuxiaozhen', 'changan', 10),
@@ -326,7 +327,11 @@ values
   ('gaibang', 'huanghenan', 10),
   ('huanghenan', 'gaibang', 10),
   ('gaibang', 'lingxiao', 16),
-  ('lingxiao', 'gaibang', 16)
+  ('lingxiao', 'gaibang', 16),
+  ('nanchang', 'miaoling', 6),
+  ('miaoling', 'nanchang', 6),
+  ('kunming', 'miaoling', 6),
+  ('miaoling', 'kunming', 6)
 ;
 
 update zone_connectivity set boat = 1

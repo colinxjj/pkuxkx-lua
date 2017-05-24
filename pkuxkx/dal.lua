@@ -11,6 +11,9 @@
 -- data access layer based on db module
 -- it also depends on the value classes
 -- includes query rooms, paths, etc.
+-- changelog:
+-- 2017/05/24 - add query to search rooms without tagged as blockzone
+--              especially for hubiao job
 --------------------------------------------------------------
 
 local Zone = require "pkuxkx.Zone"
@@ -110,6 +113,30 @@ local define_dal = function()
       stmt = "GET_ALL_AVAILABLE_ROOMS",
       constructor = Room.decorate,
       key = function(room) return room.id end
+    }
+  end
+
+  function prototype:getAllAvailableRoomsExcludedBlockZones(excludedZones)
+    assert(#excludedZones > 0, "excluded zones must be more than 1")
+    local ss = {
+      "select * from rooms where name <> '' ",
+      "and zone in (select code from zones) ",
+      "and blockzone is null and blockzone not in ("}
+    for i, _ in ipairs(excludedZones) do
+      if i == 1 then
+        table.insert(ss, "?")
+      else
+        table.insert(ss, ",?")
+      end
+    end
+    table.insert(ss, ")")
+    local sql = table.concat(ss, "")
+    return self.db:fetchRowsAs {
+      stmt = sql,
+      constructor = Room.decorate,
+      key = function(room) return room.id end,
+      params = excludedZones,
+      type = "unprepared",
     }
   end
 

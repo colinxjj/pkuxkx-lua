@@ -113,15 +113,22 @@ local define_db = function()
 
   function prototype:fetchRowsAs(args)
     assert(args.stmt, "stmt cannot be nil")
-    local stmt = assert(self.stmts[args.stmt], "stmt is not prepared")
+    local type = args.type
+    local stmt
+    if type == "unprepared" then
+      stmt = self.db:prepare(args.stmt)
+    else
+      stmt = assert(self.stmts[args.stmt], "stmt is not prepared")
+      -- always reset the statement
+      stmt:reset()
+    end
     local constructor = assert(args.constructor, "constructor cannot be nil")
     local key = args.key
     if key and type(key) ~= "function" then
       error("key must be a function to generate dict", 2)
     end
     local params = args.params
-    -- always reset the statement
-    stmt:reset()
+
     if params then
       if type(params) == "table" then
         assert(stmt:bind_values(unpack(params)) == sqlite3.OK, "failed to bind values")
@@ -143,6 +150,9 @@ local define_db = function()
       else
         table.insert(results, obj)
       end
+    end
+    if type == "unprepared" then
+      stmt:finalize()
     end
     return results
   end
