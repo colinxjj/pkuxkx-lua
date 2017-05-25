@@ -40,11 +40,17 @@ local define_helper = function()
     wd="westdown",
     ed="eastdown",
     u="up",
-    d="down"
+    d="down",
+    enter="enter",
+    out="out",
   }
 
   helper.expandDirection = function(path)
-    return DIRECTIONS[path] or path
+    if DIRECTIONS[path] then
+      return DIRECTIONS[path], true
+    else
+      return path, false
+    end
   end
 
   helper.copyKeys = function(tb)
@@ -559,20 +565,22 @@ local define_helper = function()
   end
 
   -- 保证不busy，必须在coroutine中
-  helper.assureNotBusy = function()
+  helper.assureNotBusy = function(waitTime)
+    local waitTime = waitTime or 3
     while true do
       SendNoEcho("halt")
       -- busy or wait for 3 seconds to resend
-      local line = wait.regexp(REGEXP.NOT_BUSY, 3)
+      local line = wait.regexp(REGEXP.NOT_BUSY, waitTime)
       if line then break end
     end
   end
 
   -- 检查直到不busy，必须在coroutine中
-  helper.checkUntilNotBusy = function()
+  helper.checkUntilNotBusy = function(waitTime)
+    local waitTime = waitTime or 3
     while true do
       SendNoEcho("checkbusy")
-      local line = wait.regexp(REGEXP.CHECKED_NOT_BUSY, 3)
+      local line = wait.regexp(REGEXP.CHECKED_NOT_BUSY, waitTime)
       if line then break end
     end
   end

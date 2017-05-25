@@ -1,6 +1,9 @@
 ----------------------------------------
 -- 对护镖做重新设计，不参与jobs框架
 -- 对行走模块有重要影响，屏蔽特殊区域
+-- 设计思路：
+-- 因为护镖全过程中也在不断战斗，所以使用战斗模块进行战斗
+-- 行走模块也根据护镖需求进行改写
 --
 ----------------------------------------
 
@@ -15,15 +18,20 @@ ExcludedZones = {
   "wudang", "xihu",
   "xingxiu"
 }
+local travel = require "pkuxkx.travel"
 
 local patterns = {[[
 
 ]]}
 
+local ZonePath = require "pkuxkx.ZonePath"
+local RoomPath = require "pkuxkx.RoomPath"
+local PathCategory = RoomPath.Category
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
-local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
+local recover = require "pkuxkx.recover"
+local combat = require "pkuxkx.combat"
 
 local define_hubiao = function()
   local prototype = FSM.inheritedMeta()
@@ -77,16 +85,28 @@ local define_hubiao = function()
     ROBBER_ESCAPE = "^[ >]*劫匪叫道：点子扎手，扯呼！$",
     ROBBER_APPEAR = "^[ >]*劫匪突然从暗处跳了出来，阴笑道：“红货和人命都留下来吧！。”$",
     ROBBER_ASSIST = "^[ >]*劫匪大喊：点子爪子硬！赶紧来帮忙！$",
+    -- ROBBER_ASKED = "^[ >]*你向劫匪打听有关『去死』的消息。$",
+    ROBBER_CHECKED = helper.settingRegexp("hubiao", "check_robber"),
+    ROBBER_NOT_EXISTS = "^[ >]*这里没有这个人。$",
     WEAPON_REMOVED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
     WEAPON_WIELDED = "^[ >]*(你已经装备著了。|你从陈旧的剑鞘中拔出一把玄铁剑握在手中。)$",
     GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【.*?】。$",
     GRADUATED = "^[ >]*你已经在新手镖局获得足够经验了，快到大城市去闯荡一番吧。$",
+    PFM_NOT_IN_COMBAT = "^[ >]*(.*?只能对战斗中的对手使用。|未有对手或者你和对方未处于战斗中，不能使用.*)$",
+    HEAL_IN_COMBAT = "^[ >]* 战斗中运功疗伤？找死吗？$",
+    BOAT_ARRIVED = "^[> ]*(艄公说“到啦，上岸吧”.*|船夫对你说道：“到了.*|你朝船夫挥了挥手.*|小舟终于划到近岸.*|.*你跨上岸去。.*|一个番僧用沙哑的声音道：“大轮寺到啦，出来吧。”，.*|藤筐离地面越来越近，终于腾的一声着了地，众人都吁了口长气.*)$",
   }
 
   local SpecialRenameRooms = {
     ["嘉兴钱庄"] = "嘉兴嘉兴钱庄",
-    ["泉州当铺"] = "泉州泉州当铺"
+    ["泉州当铺"] = "泉州泉州当铺",
+    ["建康府车马行"] = "建康府计氏马车分行",
+    ["岳阳车马行"] = "岳阳计氏马车分行",
   }
+  local ExcludedJobRooms = {
+    ["峨嵋毗卢殿"] = true
+  }
+
   local SpecialRelocateRooms = {
     -- 嘉兴区域可能分配到明州的金鸡亭
     ["金鸡亭"] = 785,
@@ -95,7 +115,11 @@ local define_hubiao = function()
   }
 
   -- 福州福威镖局
-  local StartRoomId = 26
+--  local StartRoomId = 26
+--  local JobNpcId = "lin"
+  -- 苏州镖局
+  local StartRoomId = 456
+  local JobNpcId = "zuo"
   local PrefetchDepth = 5
   local DoubleSearchDepth = 3
 
@@ -128,7 +152,6 @@ local define_hubiao = function()
     self.robbersPresent = 0
     self.qiPresent = false
     self.powerupPresent = false
-    self.waitThread = nil
   end
 
   function prototype:disableAllTriggers()
@@ -173,11 +196,14 @@ local define_hubiao = function()
     self:addState {
       state = States.transfer,
       enter = function()
-        helper.enableTriggerGroups("hubiao_step_start", "hubiao_transfer", "hubiao_ask_robber_start")
+        helper.enableTriggerGroups(
+          "hubiao_step_start",
+          "hubiao_transfer")
       end,
       exit = function()
-        helper.disableTriggerGroups("hubiao_step_start", "hubiao_step_done", "hubiao_transfer",
-          "hubiao_ask_robber_start", "hubiao_ask_robber_done")
+        helper.disableTriggerGroups(
+          "hubiao_step_start", "hubiao_step_done",
+          "hubiao_transfer")
       end
     }
     self:addState {
@@ -277,8 +303,14 @@ local define_hubiao = function()
       action = function()
         -- 设置下一步的路径为当前路径
         if #(self.transferPlan) > 0 then
-          self.currStep = table.remove(self.transferPlan)
-          return self:doStep()
+          if self.currStep and self.currStep == PathCategory.boat and self.inBoat then
+            -- 额外等待5秒
+            wait.time(5)
+            return self:doStep()
+          else
+            self.currStep = table.remove(self.transferPlan)
+            return self:doStep()
+          end
         else
           ColourNote("yellow", "", "已走完全部路径")
           wait.time(4)
@@ -362,7 +394,8 @@ local define_hubiao = function()
       "hubiao_mixin_start", "hubiao_mixin_done",
       "hubiao_transfer",
       "hubiao_robber",
-      "hubiao_force")
+      "hubiao_force"
+    )
     -- info
     helper.addTriggerSettingsPair {
       group = "hubiao",
@@ -379,7 +412,7 @@ local define_hubiao = function()
         local jobRemainedTime = wildcards[3]
         local jobStatus = wildcards[4]
         local jobPlayer = wildcards[5]
-        if jobStatus == "待认领" then
+        if jobStatus == "待认领" and not ExcludedJobRooms[jobLocation] then
           table.insert(self.jobs, {id = jobId, location = SpecialRenameRooms[jobLocation] or jobLocation})
         end
       end
@@ -494,6 +527,13 @@ local define_hubiao = function()
       regexp = REGEXP.WEAPON_WIELDED,
       response = function()
         self.weaponRemoved = false
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.ROBBER_NOT_EXISTS,
+      response = function()
+        self.robberExists = false
       end
     }
     -- robber
@@ -648,7 +688,7 @@ local define_hubiao = function()
     travel:walkto(StartRoomId)
     travel:waitUntilArrived()
     helper.checkUntilNotBusy()
-    SendNoEcho("give cai wu to lin")
+    SendNoEcho("give cai wu to " .. JobNpcId)
     return self:fire(Events.STOP)
   end
 
@@ -790,7 +830,7 @@ local define_hubiao = function()
 --    travel:walkto(StartRoomId)
 --    travel:waitUntilArrived()
 --    helper.assureNotBusy()
---    SendNoEcho("ask lin about fail")
+--    SendNoEcho("ask " .. JobNpcId .. " about fail")
 --    return self:fire(Events.STOP)
   end
 
@@ -836,37 +876,110 @@ local define_hubiao = function()
     return self:fire(Events.STEP_SUCCESS)
   end
 
-  function prototype:doStep()
-    SendNoEcho("set hubiao ask_robber_start")
-    SendNoEcho("ask " .. self.playerId .. "'s robber about 去死")
-    SendNoEcho("set hubiao ask_robber_done")
-
-
-    self:debug("当前行走方向", self.currStep.path)
-    self.stepSuccess = false
-    if not self.powerupPresent then
-      SendNoEcho("yun powerup")
+  function prototype:checkRobberExists()
+    while true do
+      self.robberExists = true
+      SendNoEcho("ask " .. self.playerId .. "'s robber about 去死")
+      SendNoEcho("set hubiao check_robber")
+      local line = wait.regexp(REGEXP.ROBBER_CHECKED, 2)
+      if not line then
+        self:debug("系统超时，重试")
+        wait.time(5)
+      else
+        return self.robbreExists
+      end
     end
---    if not self.qiPresent then
---      SendNoEcho("yun qi")
---    end
-    SendNoEcho("set hubiao step_start")
-    SendNoEcho("gan che to " .. helper.expandDirection(self.currStep.path))
-    SendNoEcho("set hubiao step_done")
-    wait.time(2)
-    helper.checkUntilNotBusy()
-    self:debug("行走一步，是否成功", self.stepSuccess)
-    if self.transferSuccess then
-      self:debug("运镖已成功，准备返回")
+  end
+
+  function prototype:doStep()
+    local robberExists = self:checkRobberExists()
+    self:debug("劫匪存在：", robberExists)
+    if robberExists then
+      wait.time(3)
+      return self:fire(Events.STEP_FAIL)
+    else
+      helper.checkUntilNotBusy()
+      helper.assureNotBusy(6)
+      -- 不存在，检查气血并恢复
+      recover:start()
+      recover:waitUntilRecovered()
+      -- 尝试行走
+      self:debug("当前行走方向", self.currStep.path)
+      self.stepSuccess = false
+      if not self.powerupPresent then
+        SendNoEcho("yun powerup")
+      end
+
+      SendNoEcho("set hubiao step_start")
+      if self.currStep.category == PathCategory.normal then
+        local direction, isExpanded = helper.expandDirection(self.currStep.path)
+        if isExpanded then
+          SendNoEcho("gan che to " .. direction)
+        else
+          ColourNote("red", "", "护镖不支持特殊路径" .. self.currStep.path)
+          return self:doCancel()
+        end
+      elseif self.currStep.category == PathCategory.multiple then
+        -- self:sendPath(move.path)
+        local cmds = utils.split(self.currStep.path, ";")
+        if #cmds == 2 then
+          local direction, isExpanded = helper.expandDirection(cmds[2])
+          if isExpanded then
+            SendNoEcho(cmds[1])
+            SendNoEcho("gan che to " .. direction)
+          else
+            ColourNote("yellow", "", "护镖不支持多命令路径" .. self.currStep.path)
+            return self:doCancel()
+          end
+        else
+          ColourNote("yellow", "", "护镖不支持多命令路径" .. self.currStep.path)
+          return self:doCancel()
+        end
+      elseif self.currStep.category == PathCategory.busy then
+        local direction, isExpanded = helper.expandDirection(self.currStep.path)
+        if isExpanded then
+          SendNoEcho("gan che to " .. direction)
+        else
+          ColourNote("red", "", "护镖不支持特殊路径" .. self.currStep.path)
+          return self:doCancel()
+        end
+      elseif self.currStep.category == PathCategory.boat then
+        if self.inBoat then
+          SendNoEcho("gan che to out")
+        else
+          -- 叫船
+          SendNoEcho(self.currStep.path)
+          SendNoEcho("gan che to enter")
+        end
+      elseif self.currStep.category == PathCategory.pause then
+        ColourNote("red", "", "护镖不支持pause路径")
+        return self:doCancel()
+      elseif self.currStep.category == PathCategory.block then
+        ColourNote("red", "", "护镖不支持block路径")
+        return self:doCancel()
+      else
+        error("current version does not support this path category:" .. self.currStep.category, 2)
+      end
+      SendNoEcho("set hubiao step_done")
       wait.time(2)
       helper.checkUntilNotBusy()
-      return self:fire(Events.TRANSFER_SUCCESS)
-    elseif self.transferLost then
-      return self:fire(Events.GET_LOST)
-    elseif self.stepSuccess then
-      return self:fire(Events.STEP_SUCCESS)
-    else
-      return self:fire(Events.STEP_FAIL)
+      self:debug("行走一步，是否成功", self.stepSuccess)
+      if self.transferSuccess then
+        self:debug("运镖已成功，准备返回")
+        wait.time(2)
+        helper.checkUntilNotBusy()
+        return self:fire(Events.TRANSFER_SUCCESS)
+      elseif self.transferLost then
+        return self:fire(Events.GET_LOST)
+      elseif self.stepSuccess then
+        -- 此处需要考虑是否在船中
+        if self.currStep.category == PathCategory.boat then
+          self.inBoat = not self.inBoat
+        end
+        return self:fire(Events.STEP_SUCCESS)
+      else
+        return self:fire(Events.STEP_FAIL)
+      end
     end
   end
 
@@ -918,7 +1031,7 @@ local define_hubiao = function()
     travel:waitUntilArrived()
     self.submitSuccess = false
     SendNoEcho("set hubiao submit_start")
-    SendNoEcho("ask lin about finish")
+    SendNoEcho("ask " .. JobNpcId .. " about finish")
     SendNoEcho("set hubiao submit_done")
     wait.time(2)
     helper.checkUntilNotBusy()

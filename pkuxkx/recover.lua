@@ -19,11 +19,23 @@ local define_recover = function()
     recover = "recover"
   }
   local Events = {
-    STOP = "stop",
-    HEAL = "heal",
-    RECOVER = "recover",
+    STOP = "stop",  -- stop
+    START = "start",  -- stop -> heal
+    RECOVER = "recover",  -- heal -> recover
+    ENOUGH = "enough",  -- recover -> heal
+    GOOD = "good",  --> heal -> stop
   }
-  local REGEXP = {}
+  local REGEXP = {
+    ALIAS_START = "^recover\\s+start\\s*$",
+    ALIAS_STOP = "^recover\\s+stop\\s*$",
+    ALIAS_DEBUG = "^recover\\s+debug\\s+(on|off)\\s*$",
+    TUNA_FINISH = "^[ >]*你吐纳完毕，睁开双眼，站了起来。$",
+    DAZUO_FINISH = "^[ >]*你运功完毕，深深吸了口气，站了起来。$",
+    NOT_ENOUGH_JING = "^[ >]*(你现在精不足，无法修行精力.*|你现在精严重不足，无法满足吐纳最小要求。|你现在精不够，无法控制内息的流动！)$",
+    NOT_ENOUGH_QI = "^[ >]*(你现在的气太少了，无法产生内息运行全身经脉.*|你现在气血严重不足，无法满足打坐最小要求。|你现在身体状况太差了，无法集中精神！)$",
+    JINGLI_MAX = "^[ >]*你现在精力接近圆满状态。$",
+    NEILI_MAX = "^[ >]*你现在内力接近圆满状态。$",
+  }
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -38,8 +50,13 @@ local define_recover = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.neiliThreshold = 0
-    self.jingliThreshold = 0
+
+    self.jingUpperBound = 1
+    self.jingLowerBound = 0.9
+    self.qiUpperBound = 1
+    self.qiLowerBound = 0.9
+    self.neiliThreshold = 1
+    self.jingliThreshold = 1
   end
 
   function prototype:disableAllTriggers()
@@ -57,10 +74,10 @@ local define_recover = function()
     self:addState {
       state = States.heal,
       enter = function()
-        helper.enableTriggerGroup("recover_heal")
+        helper.enableTriggerGroups("recover_heal")
       end,
       exit = function()
-        helper.disableTriggerGroup("recover_heal")
+        helper.disableTriggerGroups("recover_heal")
       end
     }
     self:addState {
@@ -79,19 +96,107 @@ local define_recover = function()
     self:addTransition {
       oldState = States.stop,
       newState = States.heal,
-      event = Events.HEAL,
+      event = Events.START,
       action = function()
         return self:doHeal()
       end
     }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<heal>
+    self:addTransition {
+      oldState = States.heal,
+      newState = States.recover,
+      event = Events.RECOVER,
+      action = function()
+        return self:doRecover()
+      end
+    }
+    self:addTransition {
+      oldState = States.heal,
+      newState = States.stop,
+      event = Events.GOOD,
+      action = function()
+        SendNoEcho("set recover recovered") -- used for callback
+      end
+    }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<recover>
+    self:addTransition {
+      oldState = States.recover,
+      newState = States.heal,
+      event = Events.ENOUGH,
+      action = function()
+        return self:doHeal()
+      end
+    }
+    self:addTransitionToStop(States.recover)
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("recover_heal", "recover_recover")
+    helper.addTrigger {
+      group = "recover_recover",
+      regexp = REGEXP.TUNA_FINISH,
+      response = function()
+        return self:doRecover()
+      end
+    }
+    helper.addTrigger {
+      group = "recover_recover",
+      regexp = REGEXP.DAZUO_FINISH,
+      response = function()
+        return self:doRecover()
+      end
+    }
+    helper.addTrigger {
+      group = "recover_recover",
+      regexp = REGEXP.NOT_ENOUGH_JING,
+      response = function()
+        SendNoEcho("yun regenerate")
+        wait.time(1)
+        return self:doRecover()
+      end
+    }
+    helper.addTrigger {
+      group = "recover_recover",
+      regexp = REGEXP.NOT_ENOUGH_QI,
+      response = function()
+        SendNoEcho("yun recover")
+        wait.time(1)
+        return self:doRecover()
+      end
+    }
   end
 
   function prototype:initAliases()
-
+    helper.removeTriggerGroups("recover")
+    helper.addAlias {
+      group = "recover",
+      regexp = REGEXP.ALIAS_START,
+      response = function()
+        return self:fire(Events.START)
+      end
+    }
+    helper.addAlias {
+      group = "recover",
+      regexp = REGEXP.ALIAS_STOP,
+      response = function()
+        SendNoEcho("halt")
+        return self:fire(Events.STOP)
+      end
+    }
+    helper.addAlias {
+      group = "recover",
+      regexp = REGEXP.ALIAS_DEBUG,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          return self:debugOn()
+        else
+          return self:debugOff()
+        end
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -106,15 +211,101 @@ local define_recover = function()
   end
 
   function prototype:doHeal()
---    status:hpbrief()
---    if status.effQi < status.maxQi then
---      if status.currNeili > 100 then
---        SendNoEcho("do 2 yun heal")
---        wait.time(1)
---        return self:fire(Events.HEAL)
---      else
---        -- try find a room to sleep
---        wait.time(10)
+    status:hpbrief()
+    local useNeili = false
+    if status.currQi < status.effQi * 0.8 then
+      SendNoEcho("yun recover")
+      useNeili = true
+    end
+    if status.currJing < status.effJing * 0.8 then
+      SendNoEcho("yun regenerate")
+      useNeili = true
+    end
+    if status.effQi < status.maxQi * self.qiLowerBound then
+      while status.effQi < status.maxQi * self.qiUpperBound do
+        SendNoEcho("do 3 yun heal")
+        wait.time(1)
+        status:hpbrief()
+      end
+      useNeili = true
+    end
+    if status.effJing < status.maxJing * self.jingLowerBound then
+      while status.effJing < status.maxJing * self.jingUpperBound do
+        SendNoEcho("yun inspire")
+        wait.time(1)
+        helper.checkUntilNotBusy()
+        status:hpbrief()
+      end
+      useNeili = true
+    end
+    if useNeili then
+      status:hpbrief()
+    end
+    if status.effJing >= status.maxJing * self.jingLowerBound
+      and status.effQi >= status.maxQi * self.qiLowerBound
+      and status.currNeili >= status.maxNeili * self.neiliThreshold
+      and status.currJingli >= status.maxJingli * self.jingliThreshold then
+      return self:fire(Events.GOOD)
+    else
+      return self:fire(Events.RECOVER)
+    end
+  end
+
+  function prototype:doRecover()
+    status:hpbrief()
+    local neiliDiff = status.maxNeili * self.neiliThreshold - status.currNeili
+    local jingliDiff = status.maxJingli * self.jingliThreshold - status.currJingli
+    if neiliDiff > 0 then
+      local maxDiff = status.maxNeili * 2 - status.currNeili
+      local halfQi = math.floor(self.currQi / 2)
+      if halfQi < maxDiff then
+        SendNoEcho("dazuo " .. halfQi)
+      else
+        SendNoEcho("dazuo max")
+      end
+    elseif jingliDiff > 0 then
+      local halfJing = math.floor(self.currJing / 2)
+      if halfJing < jingliDiff then
+        SendNoEcho("tuna " .. halfJing)
+      else
+        SendNoEcho("tuna " .. jingliDiff)
+      end
+    else
+      return self:fire(Events.ENOUGH)
+    end
+  end
+
+  function prototype:start(args)
+    if args.jingUpperBound then
+      self.jingUpperBound = args.jingUpperBound
+    end
+    if args.jingLowerBound then
+      self.jingLowerBound = args.jingLowerBound
+    end
+    if args.qiUpperBound then
+      self.qiUpperBound = args.qiUpperBound
+    end
+    if args.qiLowerBound then
+      self.qiLowerBound = args.qiLowerBound
+    end
+    if args.neiliThreshold then
+      self.neiliThreshold = args.neiliThreshold
+    end
+    if args.jingliThreshold then
+      self.jingliThreshold = args.jingliThreshold
+    end
+    return self:fire(Events.HEAL)
+  end
+
+  function prototype:waitUntilRecovered()
+    local currCo = assert(coroutine.running(), "Must be in coroutine")
+    helper.addOneShotTrigger {
+      group = "recover_one_shot",
+      regexp = helper.settingRegexp("recover", "recovered"),
+      response = helper.resumeCoRunnable(currCo)
+    }
+    coroutine.yield()
+    helper.removeTriggerGroups("recover_one_shot")
   end
 
   return prototype

@@ -85,7 +85,7 @@ local Skills = {
 -- 两次睡觉间间隔秒数
 local SleepInterval = 60
 -- 每秒打坐内力值
-local DzNumPerSecond = 66
+local DzNumPerSecond = 70
 -- 每次领悟次数
 local LingwuNum = 50  -- 1 - 500
 -- 每次练习次数
@@ -115,7 +115,7 @@ local define_fullskills = function()
     SKILL_LEVEL_UP = "^[ >]*你的「.*?」进步了！$",
     CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高|你的.*?的级别还没有.*?的级别高，不能通过练习来提高|你需要提高基本功，不然练得再多也没有用).*$",
     CANNOT_DAZUO = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉。$",
-    CANNOT_LIAN = "^[ >]*(你的内力不够练|你的内力不够了，休息一下再练).*$",
+    CANNOT_LIAN = "^[ >]*你的内力不够.*$",
   }
 
   function prototype:new()

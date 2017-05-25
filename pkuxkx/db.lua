@@ -113,9 +113,9 @@ local define_db = function()
 
   function prototype:fetchRowsAs(args)
     assert(args.stmt, "stmt cannot be nil")
-    local type = args.type
+    local sqlType = args.type
     local stmt
-    if type == "unprepared" then
+    if sqlType == "unprepared" then
       stmt = self.db:prepare(args.stmt)
     else
       stmt = assert(self.stmts[args.stmt], "stmt is not prepared")

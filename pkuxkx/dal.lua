@@ -121,7 +121,7 @@ local define_dal = function()
     local ss = {
       "select * from rooms where name <> '' ",
       "and zone in (select code from zones) ",
-      "and blockzone is null and blockzone not in ("}
+      "and coalesce(blockzone, '') not in ("}
     for i, _ in ipairs(excludedZones) do
       if i == 1 then
         table.insert(ss, "?")

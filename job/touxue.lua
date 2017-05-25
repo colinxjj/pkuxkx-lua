@@ -19,7 +19,8 @@ local captcha = require "pkuxkx.captcha"
 local ExcludeCharacters = {}
 for _, c in ipairs({
   "´ó","Ó¢", "ÐÛ", "¸Ç", "ÊÀ", "ºÀ", "½Ü", "Äã", "µÄ",
-  "£¬", "¡£", "¡¸", "¡¹", "¡»", "£ø", ",", "¡Þ", "¡Õ", "£¤", "¡ý" }) do
+  "£¬", "¡£", "¡¸", "¡¹", "¡»", "£ø", ",", "¡Þ", "¡Õ",
+  "£¤", "¡ý", "¡°", "¡±" }) do
   ExcludeCharacters[c] = true
 end
 local PrecisionThreshold = 50
