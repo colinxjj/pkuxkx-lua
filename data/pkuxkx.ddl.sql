@@ -231,8 +231,8 @@ values
   ('chengdu', 'dalunsi', 27),
   ('huanghenan', 'huizuxiaozhen', 21),
   ('huizuxiaozhen', 'huanghenan', 21),
-  ('huizuxiaozhen', 'changan', 10),
-  ('changan', 'huizuxiaozhen', 10),
+  ('huizuxiaozhen', 'changan', 17),
+  ('changan', 'huizuxiaozhen', 17),
   ('luoyang', 'qilincun', 13),
   ('qilincun', 'luoyang', 13),
   ('dali', 'kunming', 11),
@@ -331,7 +331,8 @@ values
   ('nanchang', 'miaoling', 6),
   ('miaoling', 'nanchang', 6),
   ('kunming', 'miaoling', 6),
-  ('miaoling', 'kunming', 6)
+  ('miaoling', 'yueyang', 6),
+  ('yueyang', 'miaoling', 6)
 ;
 
 update zone_connectivity set boat = 1

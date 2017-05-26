@@ -275,28 +275,40 @@ local define_recover = function()
     end
   end
 
-  function prototype:start(args)
-    if args then
-      if args.jingUpperBound then
-        self.jingUpperBound = args.jingUpperBound
-      end
-      if args.jingLowerBound then
-        self.jingLowerBound = args.jingLowerBound
-      end
-      if args.qiUpperBound then
-        self.qiUpperBound = args.qiUpperBound
-      end
-      if args.qiLowerBound then
-        self.qiLowerBound = args.qiLowerBound
-      end
-      if args.neiliThreshold then
-        self.neiliThreshold = args.neiliThreshold
-      end
-      if args.jingliThreshold then
-        self.jingliThreshold = args.jingliThreshold
-      end
-    end
+  function prototype:start()
     return self:fire(Events.START)
+  end
+
+  function prototype:settings(args)
+    assert(args, "args settings cannot be nil")
+    if args.jingUpperBound then
+      self.jingUpperBound = self:limit(args.jingUpperBound, 0.7, 1)
+    end
+    if args.jingLowerBound then
+      self.jingLowerBound = self:limit(args.jingLowerBound, 0.7, 1)
+    end
+    if args.qiUpperBound then
+      self.qiUpperBound = self:limit(args.qiUpperBound, 0.7, 1)
+    end
+    if args.qiLowerBound then
+      self.qiLowerBound = self:limit(args.qiLowerBound, 0.7, 1)
+    end
+    if args.neiliThreshold then
+      self.neiliThreshold = self:limit(args.neiliThreshold, 0.5, 1.95)
+    end
+    if args.jingliThreshold then
+      self.jingliThreshold = self:limit(args.jingliThreshold, 0.5, 1.95)
+    end
+  end
+
+  function prototype:limit(input, lowerBound, upperBound)
+    if input > upperBound then
+      return upperBound
+    elseif input < lowerBound then
+      return lowerBound
+    else
+      return input
+    end
   end
 
   function prototype:waitUntilRecovered()

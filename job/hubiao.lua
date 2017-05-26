@@ -61,6 +61,7 @@ local define_hubiao = function()
     RELOCATED = "relocated",  -- 重定位成功 lost -> transfer
     TRANSFER_SUCCESS = "transfer_success",  -- 运输成功 transfer -> submit
     MIXIN_FOUND = "mixin_found",  -- 发现密信 submit -> mixin
+    CONTINUE = "continue",  -- submit -> prepare
   }
   local REGEXP = {
     ALIAS_START = "^hubiao\\s+start\\s*$",
@@ -138,22 +139,23 @@ local define_hubiao = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.maxRound = 8
-    self.round = 0
+    self.maxRounds = 10
+    self.rounds = 0
     self.DEBUG = true
-    -- precondition
-    self.precondition = {
-      jing = 0.99,
-      qi = 0.99,
-      jingli = 1,
-      neili = 1.8
-    }
     -- special variable
     self.playerName = "撸啊"
     self.playerId = "luar"
     self.robbersPresent = 0
     self.qiPresent = false
     self.powerupPresent = false
+    self.jingUpperBound = 1
+    self.jingLowerBound = 0.9
+    self.qiUpperBound = 1
+    self.qiLowerBound = 0.9
+    self.neiliUpperBound = 1.8
+    self.neiliLowerBound = 1
+    self.jingliUpperBound = 1.2
+    self.jingliLowerBound = 1
   end
 
   function prototype:disableAllTriggers()
@@ -265,12 +267,12 @@ local define_hubiao = function()
     }
     self:addTransition {
       oldState = States.prepare,
-      newState = States.stop,
+      newState = States.prepare,
       event = Events.NO_JOB_AVAILABLE,
       action = function()
-        self:debug("目前无可用任务，等待2秒后结束")
-        wait.time(2)
-        return self:fire(Events.STOP)
+        self:debug("目前无可用任务，等待5秒后继续询问")
+        wait.time(5)
+        return self:doGetJob()
       end
     }
     self:addTransitionToStop(States.prepare)
@@ -380,6 +382,16 @@ local define_hubiao = function()
       event = Events.MIXIN_FOUND,
       action = function()
         ColourNote("yellow", "", "发现密信，请手动输入密信地点hubiao mixin <地点>")
+      end
+    }
+    self:addTransition {
+      oldState = States.submit,
+      newState = States.prepare,
+      event = States.CONTINUE,
+      action = function()
+        self:debug("等待3秒后领取新任务")
+        wait.time(3)
+        return self:doGetJob()
       end
     }
     self:addTransitionToStop(States.submit)
@@ -705,9 +717,33 @@ local define_hubiao = function()
   end
 
   function prototype:doGetJob()
-    travel:stop()
     travel:walkto(StartRoomId)
     travel:waitUntilArrived()
+    self:debug(
+      "恢复设置 精" .. self.jingLowerBound .. "/" .. self.jingUpperBound ..
+      ", 气" .. self.qiLowerBound .. "/" .. self.qiUpperBound ..
+      ", 内力" .. self.neiliLowerBound .. "/" .. self.neiliUpperBound ..
+      ", 精力" .. self.jingliLowerBound .. "/" .. self.jingliUpperBound)
+    -- 任务前恢复设置，使用恢复上限
+    recover:settings {
+      jingLowerBound = self.jingUpperBound,
+      jingUpperBound = self.jingUpperBound,
+      qiLowerBound = self.qiUpperBound,
+      qiUpperBound = self.qiUpperBound,
+      neiliThreshold = self.neiliUpperBound,
+      jingliThreshold = self.jingliUpperBound,
+    }
+    recover:start()
+    recover:waitUntilRecovered()
+    -- 任务中恢复设置，使用恢复下限
+    recover:settings {
+      jingLowerBound = self.jingLowerBound,
+      jingUpperBound = self.jingUpperBound,
+      qiLowerBound = self.qiLowerBound,
+      qiUpperBound = self.qiUpperBound,
+      neiliThreshold = self.neiliLowerBound,
+      jingliThreshold = self.jingliLowerBound,
+    }
     self:debug("等待1秒后查询任务")
     wait.time(1)
     self.jobs = {}
@@ -1044,6 +1080,13 @@ local define_hubiao = function()
     wait.time(2)
     helper.checkUntilNotBusy()
     if self.submitSuccess then
+      self.rounds = self.rounds + 1
+      self:debug("已成功完成" .. self.rounds .. "轮护镖")
+      if self.rounds > self.maxRounds then
+        self:debug("已超过最大运镖轮次上限，重置任务")
+        SendNoEcho("ask " .. JobNpcId .. " about 重置任务")
+        self.rounds = 0
+      end
       self.findMixin = false
       SendNoEcho("set hubiao mixin_start")
       SendNoEcho("look mixin")

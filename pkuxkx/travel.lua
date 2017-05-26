@@ -16,8 +16,8 @@
 -- 当前房间出口直到出口发生变化，再进行后续行走。
 -- 2017/5/9 修改，添加遍历方法与获取附近房间列表方法的是否过河参数
 -- 2017/5/9 在同一区域仍然可能出现无法从房间A到达房间B的情况，例如无量山后山洞内洞外
--- 2017/5/18 添加前往第一个同名房间的接口（天珠任务需要）
 -- 2017/5/24 添加全局参数判断，用于对护镖任务提供部分区域的屏蔽支持
+-- 2017/5/26 添加specialMode，支持天珠，韩元外
 --
 -- 该模块采用了FSM设计模式，目标是稳定，易用，容错。
 -- FSM状态有：
@@ -368,6 +368,28 @@ local define_travel = function()
     return self:fire(Events.START)
   end
 
+  function prototype:walktoFirst(args)
+    local rooms = self:getMatchedRooms(args)
+    if not rooms or #(rooms) == 0 then
+      ColourNote("red", "", "查询不到目标房间")
+    else
+      self.targetRoomId = rooms[1].id
+      self.specialMode = "first"
+      return self:fire(Events.START)
+    end
+  end
+
+  function prototype:walktoBeforeFirst(args)
+    local rooms = self:getMatchedRooms(args)
+    if not rooms or #(rooms) == 0 then
+      ColourNote("red", "", "查询不到目标房间")
+    else
+      self.targetRoomId = rooms[1].id
+      self.specialMode = "beforeFirst"
+      return self:fire(Events.START)
+    end
+  end
+
   -- 等待直到到达目的地，必须在coroutine中使用
   -- 注意，如果调用walkto并传递了action方法，
   -- 有可能产生并发问题，建议不要同时使用该方法和walkto中的action
@@ -469,16 +491,18 @@ local define_travel = function()
           end
 
           local zoneCnt = #zoneStack
+          local zoneNames = {}
           local rooms = {}
           local roomCnt = 0
           while #zoneStack > 0 do
             local zonePath = table.remove(zoneStack)
+            table.insert(zoneNames, self.zonesById[zonePath.endid].code)
             for _, room in pairs(self.zonesById[zonePath.endid].rooms) do
               rooms[room.id] = room
               roomCnt = roomCnt + 1
             end
           end
-          self:debug("本次路径计算跨" .. zoneCnt .. "个区域，共" .. roomCnt .. "个房间")
+          self:debug("本次路径计算跨" .. zoneCnt .. "个区域" .. table.concat(zoneNames, ",") .. "，共" .. roomCnt .. "个房间")
           return roomsearch {
             rooms = rooms,
             startid = fromid,
@@ -1130,6 +1154,7 @@ local define_travel = function()
       newState = States.located,
       event = Events.ARRIVED,
       action = function()
+        self.specialMode = nil
         self.walkPlan = nil
         self.prevMove = nil
         self.prevCheck = false
@@ -1834,6 +1859,8 @@ local define_travel = function()
     -- block
     self.blockCmd = nil
     self.blockers = nil
+    -- special mode
+    self.specialMode = nil
   end
 
   -- 禁用所有触发器
@@ -2193,6 +2220,41 @@ local define_travel = function()
     if not walkPlan then
       return self:fire(Events.WALK_PLAN_NOT_EXISTS)
     else
+      -- 添加对特殊模式的支持，会根据需要改变目标房间编号
+      -- specialMode
+      -- first: 同区域同名房间的第一个（天珠任务）
+      -- beforeFirst: 同区域同名房间的第一个的前一个（狙击任务）
+      if self.specialMode == "first" then
+        local targetRoom = self.roomsById[self.targetRoomId]
+        local adjustedPlan = {}
+        for _, move in ipairs(walkPlan) do
+          table.insert(adjustedPlan, move)
+          local endRoom = self.roomsById[move.endid]
+          if endRoom.id ~= targetRoom.id
+            and endRoom.zone == targetRoom.zone
+            and endRoom.name == targetRoom.name then
+            self:debug("发现直达路径第一个同名房间，修改目标房间编号：" .. targetRoom.id .. " => " .. endRoom.id)
+            self.targetRoomId = endRoom.id
+            break
+          end
+        end
+        walkPlan = adjustedPlan
+      elseif self.specialMode == "beforeFirst" then
+        local targetRoom = self.roomsById[self.targetRoomId]
+        local adjustedPlan = {}
+        for _, move in ipairs(walkPlan) do
+          local endRoom = self.roomsById[move.endid]
+          if endRoom.zone == targetRoom.zone
+            and endRoom.name == targetRoom.name then
+            self:debug("发现直达路径同名房间，修改目标房间为前一个房间：" .. targetRoom.id .. " => " .. move.startid)
+            self.targetRoomId = move.startid
+            break
+          else
+            table.insert(adjustedPlan, move)
+          end
+        end
+        walkPlan = adjustedPlan
+      end
       self:debug("本次自动行走共" .. #walkPlan .. "步")
       self:debug("曾有" .. self.relocRetries .. "次定位重试")
       -- this is the only place to store walk plan
