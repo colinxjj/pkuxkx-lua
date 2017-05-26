@@ -389,6 +389,7 @@ local define_murong = function()
         if self.killSeconds % 3 == 0 then
 --          SendNoEcho("perform dugu-jiujian.poqi")
           SendNoEcho("wield sword")
+          SendNoEcho("perform kuangfeng-kuaijian.kuangfeng")
           SendNoEcho("perform huashan-jianfa.jianzhang")
 --          SendNoEcho("perform yunushijiu-jian.sanqingfeng")
           SendNoEcho("perform dugu-jiujian.pobing")

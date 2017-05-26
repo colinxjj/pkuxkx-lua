@@ -87,9 +87,9 @@ local SleepInterval = 60
 -- 每秒打坐内力值
 local DzNumPerSecond = 70
 -- 每次领悟次数
-local LingwuNum = 50  -- 1 - 500
+local LingwuNum = 30  -- 1 - 500
 -- 每次练习次数
-local LianNum = 30  -- 1 - 500
+local LianNum = 20  -- 1 - 500
 -- 是否在升级时转换技能（设置为true时将平均提升技能）
 local LevelupSwitch = false
 -- 睡觉地点
@@ -409,8 +409,8 @@ local define_fullskills = function()
         table.insert(self.skillStack, self.currSkill)
         return self:doSleep()
       end
-      if (jingCost > 0 and status.currJing < jingCost)
-        or (qiCost > 0 and status.currQi < qiCost) then
+      if (jingCost > 0 and status.currJing < jingCost and status.currNeili < 500)
+        or (qiCost > 0 and status.currQi < qiCost and status.currNeili < 500) then
         -- 睡觉前需要将正在联系的技能再次放入栈中
         -- 考虑参数levelupSwitch
         if LevelupSwitch and self.skillLevelup then

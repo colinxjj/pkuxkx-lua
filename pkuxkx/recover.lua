@@ -257,14 +257,14 @@ local define_recover = function()
     local jingliDiff = status.maxJingli * self.jingliThreshold - status.currJingli
     if neiliDiff > 0 then
       local maxDiff = status.maxNeili * 2 - status.currNeili
-      local halfQi = math.floor(self.currQi / 2)
+      local halfQi = math.floor(status.currQi / 2)
       if halfQi < maxDiff then
         SendNoEcho("dazuo " .. halfQi)
       else
         SendNoEcho("dazuo max")
       end
     elseif jingliDiff > 0 then
-      local halfJing = math.floor(self.currJing / 2)
+      local halfJing = math.floor(status.currJing / 2)
       if halfJing < jingliDiff then
         SendNoEcho("tuna " .. halfJing)
       else
@@ -276,25 +276,27 @@ local define_recover = function()
   end
 
   function prototype:start(args)
-    if args.jingUpperBound then
-      self.jingUpperBound = args.jingUpperBound
+    if args then
+      if args.jingUpperBound then
+        self.jingUpperBound = args.jingUpperBound
+      end
+      if args.jingLowerBound then
+        self.jingLowerBound = args.jingLowerBound
+      end
+      if args.qiUpperBound then
+        self.qiUpperBound = args.qiUpperBound
+      end
+      if args.qiLowerBound then
+        self.qiLowerBound = args.qiLowerBound
+      end
+      if args.neiliThreshold then
+        self.neiliThreshold = args.neiliThreshold
+      end
+      if args.jingliThreshold then
+        self.jingliThreshold = args.jingliThreshold
+      end
     end
-    if args.jingLowerBound then
-      self.jingLowerBound = args.jingLowerBound
-    end
-    if args.qiUpperBound then
-      self.qiUpperBound = args.qiUpperBound
-    end
-    if args.qiLowerBound then
-      self.qiLowerBound = args.qiLowerBound
-    end
-    if args.neiliThreshold then
-      self.neiliThreshold = args.neiliThreshold
-    end
-    if args.jingliThreshold then
-      self.jingliThreshold = args.jingliThreshold
-    end
-    return self:fire(Events.HEAL)
+    return self:fire(Events.START)
   end
 
   function prototype:waitUntilRecovered()
@@ -304,8 +306,7 @@ local define_recover = function()
       regexp = helper.settingRegexp("recover", "recovered"),
       response = helper.resumeCoRunnable(currCo)
     }
-    coroutine.yield()
-    helper.removeTriggerGroups("recover_one_shot")
+    return coroutine.yield()
   end
 
   return prototype

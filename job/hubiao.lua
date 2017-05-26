@@ -32,6 +32,7 @@ local FSM = require "pkuxkx.FSM"
 local status = require "pkuxkx.status"
 local recover = require "pkuxkx.recover"
 local combat = require "pkuxkx.combat"
+local captcha = require "pkuxkx.captcha"
 
 local define_hubiao = function()
   local prototype = FSM.inheritedMeta()
@@ -95,6 +96,7 @@ local define_hubiao = function()
     PFM_NOT_IN_COMBAT = "^[ >]*(.*?只能对战斗中的对手使用。|未有对手或者你和对方未处于战斗中，不能使用.*)$",
     HEAL_IN_COMBAT = "^[ >]* 战斗中运功疗伤？找死吗？$",
     BOAT_ARRIVED = "^[> ]*(艄公说“到啦，上岸吧”.*|船夫对你说道：“到了.*|你朝船夫挥了挥手.*|小舟终于划到近岸.*|.*你跨上岸去。.*|一个番僧用沙哑的声音道：“大轮寺到啦，出来吧。”，.*|藤筐离地面越来越近，终于腾的一声着了地，众人都吁了口长气.*)$",
+    BOAT_FORCED_DEPART = "^[ >]*艄公要继续做生意了，所有人被赶下了渡船。$",
   }
 
   local SpecialRenameRooms = {
@@ -536,6 +538,16 @@ local define_hubiao = function()
         self.robberExists = false
       end
     }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.BOAT_FORCED_DEPART,
+      response = function()
+        if self.currStep.category == PathCategory.boat and self.inBoat then
+          self.currStep = table.remove(self.transferPlan)
+          self.inBoat = false
+        end
+      end
+    }
     -- robber
     helper.addTrigger {
       group = "hubiao_robber",
@@ -876,7 +888,7 @@ local define_hubiao = function()
     return self:fire(Events.STEP_SUCCESS)
   end
 
-  function prototype:checkRobberExists()
+  function prototype:doStep()
     while true do
       self.robberExists = true
       SendNoEcho("ask " .. self.playerId .. "'s robber about 去死")
@@ -886,15 +898,11 @@ local define_hubiao = function()
         self:debug("系统超时，重试")
         wait.time(5)
       else
-        return self.robbreExists
+        break
       end
     end
-  end
-
-  function prototype:doStep()
-    local robberExists = self:checkRobberExists()
-    self:debug("劫匪存在：", robberExists)
-    if robberExists then
+    self:debug("劫匪存在：", self.robberExists)
+    if self.robberExists then
       wait.time(3)
       return self:fire(Events.STEP_FAIL)
     else
