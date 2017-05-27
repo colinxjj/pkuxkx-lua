@@ -179,8 +179,7 @@ local define_helper = function()
       _G.world[name] = nil
     end
     local retCode = DeleteTrigger(name)
-    -- print("remove trigger", name, retCode)
-    assert(retCode == eOK or retCode == eTriggerNotFound)
+    -- assert(retCode == eOK or retCode == eTriggerNotFound)
   end
 
   helper.removeAllTriggers = function()

@@ -51,16 +51,23 @@ local define_combat = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
+--    self.pfms = {
+--      {
+--        weapon = "sword",
+--        name = "huashan-jianfa.jianzhang",
+--        energy = 12,
+--      },
+--      {
+--        weapon = "sword",
+--        name = "yunushijiu-jian.sanqingfeng",
+--        energy = 12
+--      }
+--    }
     self.pfms = {
       {
         weapon = "sword",
-        name = "huashan-jianfa.jianzhang",
+        name = "kuangfeng-kuaijian.kuangfeng",
         energy = 12,
-      },
-      {
-        weapon = "sword",
-        name = "yunushijiu-jian.sanqingfeng",
-        energy = 12
       }
     }
     self.pfmId = 1

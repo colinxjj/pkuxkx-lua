@@ -97,6 +97,7 @@ local Deque = require "pkuxkx.deque"
 local boat = require "pkuxkx.boat"
 
 -- inherit global excluded zones
+local ExcludedBlockZones = ExcludedBlockZones
 local ExcludedZones = ExcludedZones
 
 local define_travel = function()
@@ -1322,12 +1323,19 @@ local define_travel = function()
   -- 加载区域列表和房间列表
   function prototype:initZonesAndRooms()
     -- initialize zones
-    local zonesById = dal:getAllZones()
+    local zonesById
+    if ExcludedZones then
+      zonesById = dal:getAllZonesExcludedZones(ExcludedZones)
+    else
+      zonesById = dal:getAllZones()
+    end
+--    local zonesById = dal:getAllZones()
     local zonePaths = dal:getAllZonePaths()
     for i = 1, #zonePaths do
       local zonePath = zonePaths[i]
       local zone = zonesById[zonePath.startid]
-      if zone then
+      local toZone = zonesById[zonePath.endid]
+      if zone and toZone then
         zone:addPath(zonePath)
       end
     end
@@ -1342,8 +1350,8 @@ local define_travel = function()
     end
     -- initialize rooms
     local roomsById
-    if ExcludedZones then
-      roomsById = dal:getAllAvailableRoomsExcludedBlockZones(ExcludedZones)
+    if ExcludedBlockZones then
+      roomsById = dal:getAllAvailableRoomsExcludedBlockZones(ExcludedBlockZones)
     else
       roomsById = dal:getAllAvailableRooms()
     end
@@ -1373,7 +1381,10 @@ local define_travel = function()
     print("地图数据加载完毕，共" .. helper.countElements(self.zonesByCode) .. "个区域，" ..
       helper.countElements(self.roomsByCode) .. "个房间")
     if ExcludedZones then
-      print("屏蔽部分特殊阻碍区域：", table.concat(ExcludedZones, ", "))
+      print("屏蔽区域：", table.concat(ExcludedZones, ", "))
+    end
+    if ExcludedBlockZones then
+      print("屏蔽部分阻碍区域：", table.concat(ExcludedBlockZones, ", "))
     end
   end
 

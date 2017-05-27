@@ -13,12 +13,6 @@ local captcha = require "pkuxkx.captcha"
 local nanjue = require "job.nanjue"
 
 local Skills = {
---  {
---    basic = "sword",
---    special = "kuangfeng-kuaijian",
---    mode = "lian",
---    weapon = "sword"
---  },
   {
     basic = "force",
     special = "zixia-shengong",
@@ -29,6 +23,13 @@ local Skills = {
     special = "dugu-jiujian",
     mode = "both",
     weapon = "sword",
+  },
+  -- 剑宗
+  {
+    basic = "sword",
+    special = "kuangfeng-kuaijian",
+    mode = "lian",
+    weapon = "sword"
   },
   {
     basic = "dodge",
@@ -57,29 +58,32 @@ local Skills = {
     special = "hunyuan-zhang",
     mode = "lingwu",
   },
-  {
-    basic = "parry",
-    special = "yunushijiu-jian",
-    mode = "lian",
-    weapon = "sword",
-  },
-  {
-    basic = "sword",
-    special = "yangwu-jian",
-    mode = "lian",
-    weapon = "sword",
-  },
-  {
-    basic = "parry",
-    special = "poyu-quan",
-    mode = "lian",
-  },
+  -- 气宗
+--  {
+--    basic = "parry",
+--    special = "yunushijiu-jian",
+--    mode = "lian",
+--    weapon = "sword",
+--  },
+--  -- 气宗
 --  {
 --    basic = "sword",
---    special = "xiyi-jian",
+--    special = "yangwu-jian",
 --    mode = "lian",
---    weapon = "sword"
---  }
+--    weapon = "sword",
+--  },
+--  {
+--    basic = "parry",
+--    special = "poyu-quan",
+--    mode = "lian",
+--  },
+  -- 剑宗
+  {
+    basic = "sword",
+    special = "xiyi-jian",
+    mode = "lian",
+    weapon = "sword"
+  }
 
 }
 -- 两次睡觉间间隔秒数

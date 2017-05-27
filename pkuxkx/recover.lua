@@ -24,6 +24,7 @@ local define_recover = function()
     RECOVER = "recover",  -- heal -> recover
     ENOUGH = "enough",  -- recover -> heal
     GOOD = "good",  --> heal -> stop
+    FORBIDDEN = "forbidden",  --> heal, recover -> stop
   }
   local REGEXP = {
     ALIAS_START = "^recover\\s+start\\s*$",
@@ -35,6 +36,7 @@ local define_recover = function()
     NOT_ENOUGH_QI = "^[ >]*(你现在的气太少了，无法产生内息运行全身经脉.*|你现在气血严重不足，无法满足打坐最小要求。|你现在身体状况太差了，无法集中精神！)$",
     JINGLI_MAX = "^[ >]*你现在精力接近圆满状态。$",
     NEILI_MAX = "^[ >]*你现在内力接近圆满状态。$",
+    RECOVER_FORBIDDEN = "^[ >]*中央广场，禁止刷屏！$",
   }
 
   function prototype:FSM()
@@ -119,6 +121,14 @@ local define_recover = function()
         SendNoEcho("set recover recovered") -- used for callback
       end
     }
+    self:addTransition {
+      oldState = States.heal,
+      newState = States.stop,
+      event = Events.FORBIDDEN,
+      action = function()
+        SendNoEcho("set recover recovered")
+      end
+    }
     self:addTransitionToStop(States.stop)
     -- transition from state<recover>
     self:addTransition {
@@ -127,6 +137,14 @@ local define_recover = function()
       event = Events.ENOUGH,
       action = function()
         return self:doHeal()
+      end
+    }
+    self:addTransition {
+      oldState = States.recover,
+      newState = States.stop,
+      event = Events.FORBIDDEN,
+      action = function()
+        SendNoEcho("set recover recovered")
       end
     }
     self:addTransitionToStop(States.recover)
@@ -164,6 +182,13 @@ local define_recover = function()
         SendNoEcho("yun recover")
         wait.time(1)
         return self:doRecover()
+      end
+    }
+    helper.addTrigger {
+      group = "recover_recover",
+      regexp = REGEXP.RECOVER_FORBIDDEN,
+      response = function()
+        return self:fire(Events.FORBIDDEN)
       end
     }
   end
@@ -223,7 +248,7 @@ local define_recover = function()
     end
     if status.effQi < status.maxQi * self.qiLowerBound then
       while status.effQi < status.maxQi * self.qiUpperBound do
-        SendNoEcho("do 3 yun heal")
+        SendNoEcho("do 2 yun heal")
         wait.time(1)
         status:hpbrief()
       end
@@ -268,6 +293,9 @@ local define_recover = function()
       if halfJing < jingliDiff then
         SendNoEcho("tuna " .. halfJing)
       else
+        if jingliDiff < 10 then
+          jingliDiff = 10
+        end
         SendNoEcho("tuna " .. jingliDiff)
       end
     else

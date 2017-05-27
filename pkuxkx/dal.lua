@@ -283,6 +283,28 @@ local define_dal = function()
     }
   end
 
+  function prototype:getAllZonesExcludedZones(excludedZones)
+    assert(#excludedZones > 0, "excluded zones must be more than 1")
+    local ss = {
+      "select * from zones where code not in ("}
+    for i, _ in ipairs(excludedZones) do
+      if i == 1 then
+        table.insert(ss, "?")
+      else
+        table.insert(ss, ",?")
+      end
+    end
+    table.insert(ss, ")")
+    local sql = table.concat(ss, "")
+    return self.db:fetchRowsAs {
+      stmt = sql,
+      constructor = Zone.decorate,
+      key = function(zone) return zone.id end,
+      params = excludedZones,
+      type = "unprepared",
+    }
+  end
+
   -- return array of zone path
   function prototype:getAllZonePaths()
     return self.db:fetchRowsAs {

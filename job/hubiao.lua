@@ -8,15 +8,17 @@
 ----------------------------------------
 
 -- 增加全局屏蔽区域
-ExcludedZones = {
-  "dali", "emei",
-  "gaibang", "jiaxing",
-  "lingjiu", "lingzhou",
-  "miaoling", "mingjiao",
+ExcludedBlockZones = {
+  "dali", "emei", "jiaxing",
+  "lingjiu", "lingzhou", "mingjiao",
   "pingxiwangfu", "riyue",
   "shaolin", "tiantan",
   "wudang", "xihu",
   "xingxiu"
+}
+ExcludedZones = {
+  "gaibang",
+  "miaoling"
 }
 local travel = require "pkuxkx.travel"
 
@@ -32,6 +34,8 @@ local FSM = require "pkuxkx.FSM"
 local status = require "pkuxkx.status"
 local recover = require "pkuxkx.recover"
 local combat = require "pkuxkx.combat"
+-- enable combat by default
+coroutine.wrap(function() combat:start() end)()
 local captcha = require "pkuxkx.captcha"
 
 local define_hubiao = function()
@@ -98,6 +102,7 @@ local define_hubiao = function()
     HEAL_IN_COMBAT = "^[ >]* 战斗中运功疗伤？找死吗？$",
     BOAT_ARRIVED = "^[> ]*(艄公说“到啦，上岸吧”.*|船夫对你说道：“到了.*|你朝船夫挥了挥手.*|小舟终于划到近岸.*|.*你跨上岸去。.*|一个番僧用沙哑的声音道：“大轮寺到啦，出来吧。”，.*|藤筐离地面越来越近，终于腾的一声着了地，众人都吁了口长气.*)$",
     BOAT_FORCED_DEPART = "^[ >]*艄公要继续做生意了，所有人被赶下了渡船。$",
+    BOATING = "^[ >]*(艄公把踏脚板收起来.*|船夫把踏脚板收起来.*|小舟在湖中藕菱之间的水路.*|你跃上小舟，船就划了起来。.*|你拿起船桨用力划了起来。.*|番僧用力一推，将藤筐推离平台，绞盘跟着慢慢放松，藤筐一荡，降了下去。|绳索一紧，藤筐左右摇晃振动了几下，冉冉向上升了起来。)$",
   }
 
   local SpecialRenameRooms = {
@@ -139,9 +144,8 @@ local define_hubiao = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.maxRounds = 10
+    self.maxRounds = 13
     self.rounds = 0
-    self.DEBUG = true
     -- special variable
     self.playerName = "撸啊"
     self.playerId = "luar"
@@ -156,6 +160,10 @@ local define_hubiao = function()
     self.neiliLowerBound = 1
     self.jingliUpperBound = 1.2
     self.jingliLowerBound = 1
+    -- 乱入数
+    self.robberMoves = 0
+
+    self:debugOn()
   end
 
   function prototype:disableAllTriggers()
@@ -387,7 +395,7 @@ local define_hubiao = function()
     self:addTransition {
       oldState = States.submit,
       newState = States.prepare,
-      event = States.CONTINUE,
+      event = Events.CONTINUE,
       action = function()
         self:debug("等待3秒后领取新任务")
         wait.time(3)
@@ -396,6 +404,16 @@ local define_hubiao = function()
     }
     self:addTransitionToStop(States.submit)
     -- transition from state<mixin>
+    self:addTransition {
+      oldState = States.mixin,
+      newState = States.prepare,
+      event = Events.CONTINUE,
+      action = function()
+        self:debug("等待3秒后领取新任务")
+        wait.time(3)
+        return self:doGetJob()
+      end
+    }
     self:addTransitionToStop(States.mixin)
   end
 
@@ -526,7 +544,8 @@ local define_hubiao = function()
       group = "hubiao_transfer",
       regexp = REGEXP.ROBBER_MOVE,
       response = function()
-        self.transferLost = true
+--        self.transferLost = true
+        self.robberMoves = self.robberMoves + 1
       end
     }
     helper.addTrigger {
@@ -555,6 +574,7 @@ local define_hubiao = function()
       regexp = REGEXP.BOAT_FORCED_DEPART,
       response = function()
         if self.currStep.category == PathCategory.boat and self.inBoat then
+          self:debug("被赶下船，去除当前步")
           self.currStep = table.remove(self.transferPlan)
           self.inBoat = false
         end
@@ -713,7 +733,8 @@ local define_hubiao = function()
     travel:waitUntilArrived()
     helper.checkUntilNotBusy()
     SendNoEcho("give cai wu to " .. JobNpcId)
-    return self:fire(Events.STOP)
+--    return self:fire(Events.STOP)
+    return self:fire(Events.CONTINUE)
   end
 
   function prototype:doGetJob()
@@ -787,11 +808,6 @@ local define_hubiao = function()
       self:debug("运镖区域不可达，等待2秒后结束")
       wait.time(2)
       return self:doCancel()
-    elseif #(targets) == 1 then
-      self.targetRoomId = targets[1].id
-      self:debug("目标房间仅有1个，略过预取，直接运输，房间编号：", self.targetRoomId)
-      wait.time(1)
-      return self:fire(Events.PREFETCH_SUCCESS)
     else
       local zone = targets[1].zone
       local searchRooms = {}
@@ -812,6 +828,11 @@ local define_hubiao = function()
         end
         ColourNote("green", "", "特殊房间匹配，重新定位至房间：" .. specialRelocateId)
         table.insert(searchRooms, travel.roomsById[specialRelocateId])
+      elseif #(searchRooms) == 1 then
+        self.targetRoomId = searchRooms[1].id
+        self:debug("目标房间仅有1个，略过预取，直接运输，房间编号：", self.targetRoomId)
+        wait.time(1)
+        return self:fire(Events.PREFETCH_SUCCESS)
       end
       self.searchedRoomIds = {}
       self.searchRooms = searchRooms
@@ -903,7 +924,8 @@ local define_hubiao = function()
     end
     self.transferRoomId = travel.currRoomId
     self.transferPlan = transferPlan
-    self.transferLost = false
+    -- self.transferLost = false
+    self.robberMoves = 0
     self.findDude = false
     self.transferSuccess = false
     helper.removeTriggerGroups("hubiao_transfer_traverse")
@@ -988,6 +1010,7 @@ local define_hubiao = function()
           return self:doCancel()
         end
       elseif self.currStep.category == PathCategory.boat then
+        self:debug("inBoat?", self.inBoat)
         if self.inBoat then
           SendNoEcho("gan che to out")
         else
@@ -1013,12 +1036,17 @@ local define_hubiao = function()
         wait.time(2)
         helper.checkUntilNotBusy()
         return self:fire(Events.TRANSFER_SUCCESS)
-      elseif self.transferLost then
+--      elseif self.transferLost then
+      elseif self.robberMoves > 0 then
         return self:fire(Events.GET_LOST)
       elseif self.stepSuccess then
         -- 此处需要考虑是否在船中
         if self.currStep.category == PathCategory.boat then
-          self.inBoat = not self.inBoat
+          if self.inBoat then
+            self.inBoat = false
+          else
+            self.inBoat = true
+          end
         end
         return self:fire(Events.STEP_SUCCESS)
       else
@@ -1030,9 +1058,9 @@ local define_hubiao = function()
   function prototype:doRelocate()
     wait.time(2)
     helper.checkUntilNotBusy()
-    self:debug("重定位：获取最近房间并匹配")
+    self:debug("重定位：获取最近房间并匹配，当前乱入个数：", self.robberMoves)
     -- 获取最近一格房间
-    local rooms1 = travel:getNearbyRooms(self.transferRoomId, 1)
+    local rooms1 = travel:getNearbyRooms(self.transferRoomId, self.robberMoves)
     if self.DEBUG then
       local roomIds = helper.copyKeys(rooms1)
       print("最近1格房间列表：", table.concat(roomIds, ","))
@@ -1050,7 +1078,8 @@ local define_hubiao = function()
       if currRoomName == room.name
         and currRoomDesc == room.description
         and travel:checkExitsIdentical(currRoomExits, room.exits)
-        and self.transferRoomId ~= room.id then
+        and (self.transferRoomId ~= room.id or self.robberMoves > 1)
+      then
         table.insert(matchedRooms, room)
       end
     end
@@ -1097,7 +1126,7 @@ local define_hubiao = function()
         return self:fire(Events.MIXIN_FOUND)
       else
         self:debug("成功完成一轮任务")
-        return self:fire(Events.STOP)
+        return self:fire(Events.CONTINUE)
       end
     else
       self:debug("任务提交不成功，取消之")
