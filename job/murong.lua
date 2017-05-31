@@ -7,42 +7,12 @@
 -- 2017/4/20 - created
 
 local patterns = {[[
-
-ask pu about job
-你向仆人打听有关『job』的消息。
-仆人说道：「壮士能为慕容世家出力，真是太好了。」
-仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在以下地点附近出现，你去把它找回来吧！
-你的客户端不支持MXP,请直接打开链接查看图片。
-请注意，忽略验证码中的红色文字。
-http://pkuxkx.net/antirobot/robot.php?filename=1492781942600002
-
-慕容世家家贼死了。
-
-你从慕容世家家贼的尸体身上搜出一封信件。
-
-give pu xin
-仆人对着你点了点头。
-仆人说道：「干得好！」
-你给仆人一封信件。
-> 由于你成功的找回慕容复写给江湖豪杰的信件，被奖励：
-一千零九十点实战经验，
-一百四十八点潜能，
-八十点江湖声望作为答谢。
-仆人看着你会心地一笑。
-仆人在你的耳边悄声说道：为了表达对你的谢意，我已经在你的帐户存了一些辛苦费！
-
-你向仆人打听有关『job』的消息。
-仆人说道：「壮士能为慕容世家出力，真是太好了。」
-仆人叹道：家贼难防，有人偷走了少爷的信件，据传曾在『临安府怡红馆』附近出现，你去把它找回来吧！
-
-这里禁止战斗。
-
 ]]}
 
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
-local status = require "pkuxkx.status"
+local combat = require "pkuxkx.combat"
 
 local define_murong = function()
   local prototype = FSM.inheritedMeta()
@@ -79,13 +49,6 @@ local define_murong = function()
     JIAZEI_MISSED = "^[ >]*你想杀谁？$",
     PU_BUSY = "^[ >]*仆人忙着呢，等会吧。$",
   }
-
---  local ExcludedZones = {
---    ["黄河南岸"] = true,
---    ["黄河北岸"] = true,
---    ["长江"] = true,
---    ["长江北岸"] = true
---  }
 
   local JobRoomId = 479
 
@@ -372,30 +335,30 @@ local define_murong = function()
   end
 
   function prototype:initTimers()
-    helper.removeTimerGroups("murong_kill")
-    helper.addTimer {
-      group = "murong_kill",
-      interval = 2,
-      response = function()
-        if not self.killSeconds then
-          self.killSeconds = 0
-        else
-          self.killSeconds = self.killSeconds + 2
-        end
-        if self.killSeconds % 8 == 0 then
-          SendNoEcho("yun recover")
-        end
-        self:debug("战斗时间", self.killSeconds)
-        if self.killSeconds % 3 == 0 then
---          SendNoEcho("perform dugu-jiujian.poqi")
-          SendNoEcho("wield sword")
-          SendNoEcho("perform kuangfeng-kuaijian.kuangfeng")
-          SendNoEcho("perform huashan-jianfa.jianzhang")
---          SendNoEcho("perform yunushijiu-jian.sanqingfeng")
-          SendNoEcho("perform dugu-jiujian.pobing")
-        end
-      end
-    }
+--    helper.removeTimerGroups("murong_kill")
+--    helper.addTimer {
+--      group = "murong_kill",
+--      interval = 2,
+--      response = function()
+--        if not self.killSeconds then
+--          self.killSeconds = 0
+--        else
+--          self.killSeconds = self.killSeconds + 2
+--        end
+--        if self.killSeconds % 8 == 0 then
+--          SendNoEcho("yun recover")
+--        end
+--        self:debug("战斗时间", self.killSeconds)
+--        if self.killSeconds % 3 == 0 then
+----          SendNoEcho("perform dugu-jiujian.poqi")
+--          SendNoEcho("wield sword")
+--          SendNoEcho("perform kuangfeng-kuaijian.kuangfeng")
+--          SendNoEcho("perform huashan-jianfa.jianzhang")
+----          SendNoEcho("perform yunushijiu-jian.sanqingfeng")
+--          SendNoEcho("perform dugu-jiujian.pobing")
+--        end
+--      end
+--    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -519,13 +482,15 @@ local define_murong = function()
     self.killSeconds = nil
     self.jiazeiKilled = false
     helper.enableTriggerGroups("murong_kill")
-    helper.enableTimerGroups("murong_kill")
+--    helper.enableTimerGroups("murong_kill")
+    combat:start()
 
     while not self.jiazeiKilled do
       wait.time(3)
       self:debug("检查家贼是否已被杀死")
     end
 
+    combat:stop()
     self:debug("家贼已被杀死，成功返回")
     return self:fire(Events.JIAZEI_KILLED)
   end

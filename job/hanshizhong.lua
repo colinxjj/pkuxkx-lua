@@ -6,6 +6,10 @@
 -- Change:
 -- 2017/5/12 - created
 
+local patterns = {[[
+
+]]}
+
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 
@@ -55,7 +59,7 @@ local define_hanshizhong = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("hanshizhong_ask_")
+    helper.removeTriggerGroups("hanshizhong_ask_start", "hanshizhong_ask_done")
   end
 
   function prototype:initAliases()

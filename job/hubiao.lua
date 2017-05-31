@@ -96,13 +96,15 @@ local define_hubiao = function()
     ROBBER_NOT_EXISTS = "^[ >]*这里没有这个人。$",
     WEAPON_REMOVED = "^[ >]*(.*卸除了你的兵器.*|该兵器现在还无法装备。)$",
     WEAPON_WIELDED = "^[ >]*(你已经装备著了。|你从陈旧的剑鞘中拔出一把玄铁剑握在手中。)$",
-    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【.*?】。$",
+    WEAPON_ID = "^\\( *(\\d+)\\)(.*?)\\([a-zA-Z0-9_ ]*\\) *可塑性:.*伤害力:.*$",
+    WEAPON_DURABILITY = "^ *耐久度:(\\d+)/(\\d+)",
+    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰|陨铁)【.*?】。$",
     GRADUATED = "^[ >]*你已经在新手镖局获得足够经验了，快到大城市去闯荡一番吧。$",
     PFM_NOT_IN_COMBAT = "^[ >]*(.*?只能对战斗中的对手使用。|未有对手或者你和对方未处于战斗中，不能使用.*)$",
     HEAL_IN_COMBAT = "^[ >]* 战斗中运功疗伤？找死吗？$",
     BOAT_ARRIVED = "^[> ]*(艄公说“到啦，上岸吧”.*|船夫对你说道：“到了.*|你朝船夫挥了挥手.*|小舟终于划到近岸.*|.*你跨上岸去。.*|一个番僧用沙哑的声音道：“大轮寺到啦，出来吧。”，.*|藤筐离地面越来越近，终于腾的一声着了地，众人都吁了口长气.*)$",
     BOAT_FORCED_DEPART = "^[ >]*艄公要继续做生意了，所有人被赶下了渡船。$",
-    BOATING = "^[ >]*(艄公把踏脚板收起来.*|船夫把踏脚板收起来.*|小舟在湖中藕菱之间的水路.*|你跃上小舟，船就划了起来。.*|你拿起船桨用力划了起来。.*|番僧用力一推，将藤筐推离平台，绞盘跟着慢慢放松，藤筐一荡，降了下去。|绳索一紧，藤筐左右摇晃振动了几下，冉冉向上升了起来。)$",
+    BOAT_OFFSHORE = "^[ >]*(艄公把踏脚板收起来.*|船夫把踏脚板收起来.*|小舟在湖中藕菱之间的水路.*|你跃上小舟，船就划了起来。.*|你拿起船桨用力划了起来。.*|番僧用力一推，将藤筐推离平台，绞盘跟着慢慢放松，藤筐一荡，降了下去。|绳索一紧，藤筐左右摇晃振动了几下，冉冉向上升了起来。)$",
   }
 
   local SpecialRenameRooms = {
@@ -116,10 +118,18 @@ local define_hubiao = function()
   }
 
   local SpecialRelocateRooms = {
-    -- 嘉兴区域可能分配到明州的金鸡亭
-    ["金鸡亭"] = 785,
-    -- 嘉兴区域可能分配到苏州的南门
-    ["南门"] = 494,
+    ["嘉兴"] = {
+      -- 明州金鸡亭
+      ["金鸡亭"] = 785,
+      -- 苏州南门
+      ["南门"] = 494,
+    },
+    ["建康府"] = {
+      ["长江渡口"] = 864
+    },
+    ["岳阳"] = {
+      ["长江岸边"] = 1095
+    }
   }
 
   -- 福州福威镖局
@@ -130,6 +140,7 @@ local define_hubiao = function()
   local JobNpcId = "zuo"
   local PrefetchDepth = 5
   local DoubleSearchDepth = 3
+  local WeaponFixRoomId = 2167
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -144,7 +155,7 @@ local define_hubiao = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.maxRounds = 13
+    self.maxRounds = 10
     self.rounds = 0
     -- special variable
     self.playerName = "撸啊"
@@ -162,7 +173,15 @@ local define_hubiao = function()
     self.jingliLowerBound = 1
     -- 乱入数
     self.robberMoves = 0
-
+    -- 乘船状态
+    self.boatStatus = "yelling"
+    -- 武器
+    self.weaponName = "百合 追日之剑"
+    self.weaponId = nil
+    self.needWield = true
+    self.wieldCmd = "wield sword"
+    self.weaponDurability = 500
+    -- 开启调试
     self:debugOn()
   end
 
@@ -193,11 +212,16 @@ local define_hubiao = function()
     self:addState {
       state = States.prepare,
       enter = function()
-        helper.enableTriggerGroups("hubiao_info_start", "hubiao_accept_start")
+        helper.enableTriggerGroups(
+          "hubiao_info_start", "hubiao_accept_start",
+          "hubiao_weapon_id_start", "hubiao_weapon_dura_start")
       end,
       exit = function()
-        helper.disableTriggerGroups("hubiao_info_start", "hubiao_info_done",
-          "hubiao_accept_start", "hubiao_accept_done")
+        helper.disableTriggerGroups(
+          "hubiao_info_start", "hubiao_info_done",
+          "hubiao_accept_start", "hubiao_accept_done",
+          "hubiao_weapon_id_start", "hubiao_weapon_id_done",
+          "hubiao_weapon_dura_start", "hubiao_weapon_dura_done")
       end
     }
     self:addState {
@@ -315,10 +339,25 @@ local define_hubiao = function()
       action = function()
         -- 设置下一步的路径为当前路径
         if #(self.transferPlan) > 0 then
-          if self.currStep and self.currStep == PathCategory.boat and self.inBoat then
-            -- 额外等待5秒
-            wait.time(5)
-            return self:doStep()
+          -- 乘船处理
+          if self.currStep and self.currStep.category == PathCategory.boat then
+            -- 乘船前
+            if self.boatStatus == "yelling" then
+              self:debug("登船成功，等待5秒后尝试离船")
+              self.boatStatus = "boating"
+              wait.time(5)
+              return self:doStep()
+            -- 乘船中
+            elseif self.boatStatus == "boating" then
+              self:debug("刚登上船，不行动，需要等待船夫开船")
+              wait.time(2)
+              return self:doStep()
+            elseif self.boatStatus == "leaving" then
+              self:debug("离船成功")
+              self.boatStatus = "yelling"
+              self.currStep = table.remove(self.transferPlan)
+              return self:doStep()
+            end
           else
             self.currStep = table.remove(self.transferPlan)
             return self:doStep()
@@ -472,6 +511,50 @@ local define_hubiao = function()
         self.searchRoomName = wildcards[3]
       end
     }
+    -- weapon
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "weapon_id_start",
+      done = "weapon_id_done",
+    }
+    helper.addTrigger {
+      group = "hubiao_weapon_id_done",
+      regexp = REGEXP.WEAPON_ID,
+      response = function(name, line, wildcards)
+        self:debug("WEAPON_ID triggered")
+        print(wildcards[1])
+        print(wildcards[2])
+        local weaponId = tonumber(wildcards[1])
+        local weaponName = wildcards[2]
+        if string.find(weaponName, self.weaponName) then
+          self.weaponId = "sword " .. weaponId
+          self.wieldCmd = "wield " .. self.weaponId
+          if string.find(weaponName, "(装)") then
+            self.needWield = false
+          else
+            self.needWield = true
+          end
+        end
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "weapon_dura_start",
+      done = "weapon_dura_done",
+    }
+    helper.addTrigger {
+      group = "hubiao_weapon_dura_done",
+      regexp = REGEXP.WEAPON_DURABILITY,
+      response = function(name, line, wildcards)
+        self.weaponDurability = tonumber(wildcards[1])
+      end
+    }
+
+    helper.addTriggerSettingsPair {
+      group = "hubiao",
+      start = "weapon_dura_start",
+      done = "weapon_dura_done"
+    }
     -- step
     helper.addTriggerSettingsPair {
       group = "hubiao",
@@ -516,6 +599,8 @@ local define_hubiao = function()
           SendNoEcho("drop shi tan")
         elseif item == "玄冰" then
           SendNoEcho("drop xuan bing")
+        elseif item == "陨铁" then
+          SendNoEcho("drop yun tie")
         end
       end
     }
@@ -573,10 +658,21 @@ local define_hubiao = function()
       group = "hubiao_transfer",
       regexp = REGEXP.BOAT_FORCED_DEPART,
       response = function()
-        if self.currStep.category == PathCategory.boat and self.inBoat then
-          self:debug("被赶下船，去除当前步")
+        if self.currStep.category == PathCategory.boat and self.boatStatus == "boating" then
+          self:debug("乘船中，被赶下船，去除当前步并重置乘船状态")
+          self.boatStatus = "yelling"
           self.currStep = table.remove(self.transferPlan)
-          self.inBoat = false
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.BOAT_OFFSHORE,
+      response = function()
+        self:debug("BOAT_OFFSHORE triggered")
+        if self.boatStatus == "boating" then
+          self:debug("船离岸，尝试离开船")
+          self.boatStatus = "leaving"
         end
       end
     }
@@ -738,6 +834,33 @@ local define_hubiao = function()
   end
 
   function prototype:doGetJob()
+    -- 检查武器
+    self.weaponId = nil
+    self.wieldCmd = nil
+    self.needWield = false
+    SendNoEcho("set hubiao weapon_id_start")
+    SendNoEcho("i sword")
+    SendNoEcho("set hubiao weapon_id_done")
+    helper.checkUntilNotBusy()
+    if not self.weaponId then
+      error("武器检查失败")
+    end
+    if self.needWield then
+      SendNoEcho("unwield all")
+      SendNoEcho(self.wieldCmd)
+    end
+
+    SendNoEcho("set hubiao weapon_dura_start")
+    SendNoEcho("look " .. self.weaponId)
+    SendNoEcho("set hubiao weapon_dura_done")
+    helper.checkUntilNotBusy()
+    if self.weaponDurability <= 100 then
+      travel:walkto(WeaponFixRoomId)
+      travel:waitUntilArrived()
+      wait.time(1)
+      SendNoEcho("fix " .. self.weaponId)
+      wait.time(1)
+    end
     travel:walkto(StartRoomId)
     travel:waitUntilArrived()
     self:debug(
@@ -820,7 +943,13 @@ local define_hubiao = function()
       if #(searchRooms) == 0 then
         ColourNote("yellow", "", "伙计所在地点不可达", zone, self.searchRoomName, "无法执行预取，等待2秒后结束")
         self:debug("尝试特殊定位房间")
-        local specialRelocateId = SpecialRelocateRooms[self.searchRoomName]
+        local zoneName = travel.zonesByCode[zone].name
+        local relocZone = SpecialRelocateRooms[zoneName]
+        local specialRelocateId
+        if relocZone then
+          specialRelocateId = relocZone[self.searchRoomName]
+        end
+        -- local specialRelocateId = SpecialRelocateRooms[self.searchRoomName]
         if not specialRelocateId then
           ColourNote("red", "", "无法执行预取，取消该任务")
           wait.time(2)
@@ -976,6 +1105,11 @@ local define_hubiao = function()
         SendNoEcho("yun powerup")
       end
 
+      -- 先判断是否迷路
+      if self.robberMoves > 0 then
+        return self:fire(Events.GET_LOST)
+      end
+
       SendNoEcho("set hubiao step_start")
       if self.currStep.category == PathCategory.normal then
         local direction, isExpanded = helper.expandDirection(self.currStep.path)
@@ -1010,13 +1144,15 @@ local define_hubiao = function()
           return self:doCancel()
         end
       elseif self.currStep.category == PathCategory.boat then
-        self:debug("inBoat?", self.inBoat)
-        if self.inBoat then
-          SendNoEcho("gan che to out")
-        else
+        self:debug("boatStatus?", self.boatStatus)
+        if self.boatStatus == "yelling" then
           -- 叫船
           SendNoEcho(self.currStep.path)
           SendNoEcho("gan che to enter")
+        elseif self.boatStatus == "boating" then
+          SendNoEcho("gan che to out")
+        else
+          error("Unexpected boat status")
         end
       elseif self.currStep.category == PathCategory.pause then
         ColourNote("red", "", "护镖不支持pause路径")
@@ -1036,18 +1172,7 @@ local define_hubiao = function()
         wait.time(2)
         helper.checkUntilNotBusy()
         return self:fire(Events.TRANSFER_SUCCESS)
---      elseif self.transferLost then
-      elseif self.robberMoves > 0 then
-        return self:fire(Events.GET_LOST)
       elseif self.stepSuccess then
-        -- 此处需要考虑是否在船中
-        if self.currStep.category == PathCategory.boat then
-          if self.inBoat then
-            self.inBoat = false
-          else
-            self.inBoat = true
-          end
-        end
         return self:fire(Events.STEP_SUCCESS)
       else
         return self:fire(Events.STEP_FAIL)

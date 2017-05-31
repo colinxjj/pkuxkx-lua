@@ -446,10 +446,6 @@ local define_jobs = function()
       def = JobDefinition.nanjue,
       impl = nanjue
     }
---    self.definedJobs.hubiao = Job:decorate {
---      def = JobDefinition.hubiao,
---      impl = hubiao
---    }
     self.definedJobs.murong = Job:decorate {
       def = JobDefinition.murong,
       impl = murong

@@ -172,6 +172,11 @@ local define_module = function()
     end
     if status.currJing < status.maxJing / 2 and self.mode == "tuna" then
       SendNoEcho("yun regenerate")
+      if status.currNeili < status.maxNeili * 0.2 then
+        SendNoEcho("yun recover")
+        SendNoEcho("dazuo 2000")
+        return
+      end
     end
     if status.currQi < status.maxQi / 2 and self.mode == "dazuo" then
       SendNoEcho("yun recover")

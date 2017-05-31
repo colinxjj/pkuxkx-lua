@@ -14,6 +14,7 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local captcha = require "pkuxkx.captcha"
+local combat = require "pkuxkx.combat"
 
 -- 去除掉干扰字符
 local ExcludeCharacters = {}
@@ -476,7 +477,7 @@ local define_touxue = function()
     SendNoEcho("follow " .. self.npcId)
     SendNoEcho("unwield all")
     SendNoEcho("bei none")
-    SendNoEcho("yun qi")
+    SendNoEcho("yun recover")
     SendNoEcho("set skip_combat 0")
     local fightStartTime = os.time()
     -- 添加触发
@@ -521,6 +522,7 @@ local define_touxue = function()
         self.cannotTouxue = true
       end
     }
+    combat:stop()
     SendNoEcho("fight " .. self.npcId)
     wait.time(1)
     -- 打开触发
