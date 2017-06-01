@@ -152,6 +152,8 @@ local define_travel = function()
     ALIAS_WALKTO_CODE = "^walkto\\s+([a-z][a-z0-9]+)\\s*$",
     ALIAS_WALKTO_LIST = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
     ALIAS_WALKTO_MODE = "^walkto\\s+mode\\s+(quick|normal|slow)$",
+    ALIAS_WALKTO_FIRST = "^walkf\\s+(.*)$",
+    ALIAS_WALKTO_BEFORE_FIRST = "^walkbf\\s+(.*)$",
     ALIAS_TRAVERSE = "^traverse\\s+(\\d+)\\s*([^ ]*)$",
     ALIAS_TRAVERSE_ZONE = "^traverse\\s+([a-z][a-z0-9]+)\\s*([^ ]*)$",
     ALIAS_LOC_HERE = "^loc\\s+here\\s*$",
@@ -1836,6 +1838,27 @@ local define_travel = function()
         }
       end
     }
+    -- walkto第一个房间
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_WALKTO_FIRST,
+      response = function(name, line, wildcards)
+        local location = wildcards[1]
+        return self:walktoFirst {
+          fullname = location
+        }
+      end
+    }
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_WALKTO_BEFORE_FIRST,
+      response = function(name, line, wildcards)
+        local location = wildcards[1]
+        return self:walktoBeforeFirst {
+          fullname = location
+        }
+      end
+    }
   end
 
   -- 重置所有属性至初始值
@@ -2244,9 +2267,10 @@ local define_travel = function()
           if endRoom.id ~= targetRoom.id
             and endRoom.zone == targetRoom.zone
             and endRoom.name == targetRoom.name then
-            self:debug("发现直达路径第一个同名房间，修改目标房间编号：" .. targetRoom.id .. " => " .. endRoom.id)
+            self:debug("发现直达路径上同名房间，修改目标房间编号：" .. targetRoom.id .. " => " .. endRoom.id)
             self.targetRoomId = endRoom.id
-            break
+            adjustedPlan = {}
+            table.insert(adjustedPlan, move)
           end
         end
         walkPlan = adjustedPlan
@@ -2259,7 +2283,7 @@ local define_travel = function()
             and endRoom.name == targetRoom.name then
             self:debug("发现直达路径同名房间，修改目标房间为前一个房间：" .. targetRoom.id .. " => " .. move.startid)
             self.targetRoomId = move.startid
-            break
+            adjustedPlan = {}
           else
             table.insert(adjustedPlan, move)
           end

@@ -151,6 +151,7 @@ local define_nanjue = function()
     ALIAS_START = "^nanjue\\s+start\\s*$",
     ALIAS_STOP = "^nanjue\\s+stop\\s*$",
     ALIAS_DEBUG = "^nanjue\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_AVT = "^nanjue\\s+avt\\s*$",
     -- 任务标识 任务名称 任务状态 发布时间 截止时间 任务地点 资质要求 认领玩家
     JOB_INFO = "^\\s*([0-9_]+?)\\s+(.*?)「(.*?)」\\s+(.*?)\\s+(\\d+:\\d+:\\d+)\\s+(\\d+:\\d+:\\d+)\\s+(.*?)\\s+(.*?)\\s+(\\d+)$",
     RECORD_SUCCESS = "^[ >]*最近长安城内出现不少盗窃事件，有人报告.*$",
@@ -422,6 +423,14 @@ local define_nanjue = function()
 
   function prototype:available()
     return os.time() > self.availableTime
+  end
+
+  function prototype:showAvailableTime()
+    if self.availableTime and self.availableTime > 0 then
+      print("男爵任务可用时间：", os.date("%Y-%m-%d %H:%M:%S", self.availableTime))
+    else
+      print("男爵任务未执行过")
+    end
   end
 
   function prototype:resetOnStop()
@@ -923,6 +932,13 @@ local define_nanjue = function()
         end
       end
     }
+    helper.addAlias {
+      group = "nanjue",
+      regexp = REGEXP.ALIAS_AVT,
+      response = function()
+        return self:showAvailableTime()
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -1239,6 +1255,26 @@ local define_nanjue = function()
     helper.assureNotBusy()
     return self:fire(Events.CONTINUE)
   end
+
+  -- 回调函数提供其他模块简单执行男爵的功能
+  function prototype:doIfAvailable(callback)
+    self:debug("尝试男爵任务")
+    if self:available() then
+      self:debug("男爵任务可用")
+      self:doStart()
+      wait.time(10)
+      while self.currState ~= "stop" do
+        self:debug("男爵任务仍在进行中")
+        wait.time(10)
+      end
+    else
+      self:debug("男爵任务不可用")
+    end
+    if callback then
+      return callback()
+    end
+  end
+
 
   return prototype
 end

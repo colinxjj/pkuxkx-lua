@@ -25,12 +25,12 @@ local Skills = {
     weapon = "sword",
   },
   -- 剑宗
-  {
-    basic = "sword",
-    special = "kuangfeng-kuaijian",
-    mode = "lian",
-    weapon = "sword"
-  },
+--  {
+--    basic = "sword",
+--    special = "kuangfeng-kuaijian",
+--    mode = "lian",
+--    weapon = "sword"
+--  },
   {
     basic = "dodge",
     special = "huashan-shenfa",
@@ -59,31 +59,31 @@ local Skills = {
     mode = "lingwu",
   },
   -- 气宗
---  {
---    basic = "parry",
---    special = "yunushijiu-jian",
---    mode = "lian",
---    weapon = "sword",
---  },
---  -- 气宗
---  {
---    basic = "sword",
---    special = "yangwu-jian",
---    mode = "lian",
---    weapon = "sword",
---  },
---  {
---    basic = "parry",
---    special = "poyu-quan",
---    mode = "lian",
---  },
-  -- 剑宗
+  {
+    basic = "parry",
+    special = "yunushijiu-jian",
+    mode = "lian",
+    weapon = "sword",
+  },
+  -- 气宗
   {
     basic = "sword",
-    special = "xiyi-jian",
+    special = "yangwu-jian",
     mode = "lian",
-    weapon = "sword"
-  }
+    weapon = "sword",
+  },
+  {
+    basic = "parry",
+    special = "poyu-quan",
+    mode = "lian",
+  },
+  -- 剑宗
+--  {
+--    basic = "sword",
+--    special = "xiyi-jian",
+--    mode = "lian",
+--    weapon = "sword"
+--  }
 
 }
 -- 两次睡觉间间隔秒数
@@ -112,6 +112,7 @@ local define_fullskills = function()
     ALIAS_STOP = "^fullskills\\s+stop\\s*$",
     ALIAS_DEBUG = "^fullskills\\s+debug\\s+(on|off)\\s*$",
     ALIAS_GAP = "^fullskills\\s+gap\\s+(\\d+)\\s*$",
+    ALIAS_NANJUE = "^fullskills\\s+nanjue\\s+(on|off)\\s*$",
     SLEPT = "^[ >]*你往床上一躺，开始睡觉。$",
     WAKE_UP = "^[ >]*你一觉醒来，精神抖擞地活动了几下手脚。$",
     CANNOT_SLEEP = "^[ >]*你刚在三分钟内睡过一觉, 多睡对身体有害无益.*$",
@@ -136,6 +137,7 @@ local define_fullskills = function()
     self.skillStack = {}
     self:populateSkillStack()
     self.limitGap = ReservedLimitGap
+    self.includeNanjue = true
   end
 
   function prototype:populateSkillStack()
@@ -237,6 +239,18 @@ local define_fullskills = function()
         self.limitGap = gap
       end
     }
+    helper.addAlias {
+      group = "fullskills",
+      regexp = REGEXP.ALIAS_NANJUE,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self.includeNanjue = true
+        else
+          self.includeNanjue = false
+        end
+      end
+    }
   end
 
   function prototype:start()
@@ -263,8 +277,19 @@ local define_fullskills = function()
   end
 
   function prototype:doStart()
-    local startTime = os.time()
-    local diff = startTime - self.startTime
+    if self.includeNanjue then
+      return nanjue:doIfAvailable(function()
+        travel:walkto(SkillRoomId)
+        travel:waitUntilArrived()
+        wait.time(1)
+        return self:doInternalStart()
+      end)
+    end
+    return self:doInternalStart()
+  end
+
+  function prototype:doInternalStart()
+    local diff = os.time() - self.startTime
     if diff > SleepInterval then
       self:debug("睡觉间隔已达到" .. diff, "开始fullskills")
       return self:doFull()

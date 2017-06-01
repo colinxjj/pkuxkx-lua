@@ -45,7 +45,6 @@ local define_module = function()
     self.mode = "dazuo"
     self.startTime = 0
     self.includeNanjue = true
-    self.lastNanjueTime = 0
   end
 
   function prototype:debug(...)
@@ -158,17 +157,21 @@ local define_module = function()
   end
 
   function prototype:doDztn()
+    if self.includeNanjue then
+      return nanjue:doIfAvailable(function()
+        travel:walkto(DztnRoomId)
+        travel:waitUntilArrived()
+        wait.time(1)
+        return self:doInternalDztn()
+      end)
+    end
+    return self:doInternalDztn()
+  end
+
+  function prototype:doInternalDztn()
     status:hpbrief()
     if status.food < 150 or status.drink < 150 then
       return self:doEat()
-    end
-    if self.DEBUG then
-      local currTime = os.time()
-      local timeDiff = currTime - self.lastNanjueTime
-      self:debug("距上次男爵任务时间：", timeDiff)
-    end
-    if self.includeNanjue and os.time() - 60 * 15 > self.lastNanjueTime then
-      return self:doNanjue()
     end
     if status.currJing < status.maxJing / 2 and self.mode == "tuna" then
       SendNoEcho("yun regenerate")
@@ -201,28 +204,6 @@ local define_module = function()
     wait.time(1)
     travel:walkto(DztnRoomId)
     travel:waitUntilArrived()
-    helper.enableTriggerGroups("dztn")
-    return self:doDztn()
-  end
-
-  function prototype:doNanjue()
-    local nanjueStartTime = os.time()
-    helper.disableTriggerGroups("dztn")
-    nanjue:doStart()
-    wait.time(10)
-    while nanjue.currState ~= "stop" do
-      self:debug("男爵任务仍在进行中")
-      wait.time(10)
-    end
-    local currTime = os.time()
-    if currTime - nanjueStartTime < 60 then
-      self:debug("男爵任务结束过快，需要fullme，自动禁止")
-      self.includeNanjue = false
-    end
-    self.lastNanjueTime = currTime
-    travel:walkto(DztnRoomId)
-    travel:waitUntilArrived()
-    wait.time(1)
     helper.enableTriggerGroups("dztn")
     return self:doDztn()
   end

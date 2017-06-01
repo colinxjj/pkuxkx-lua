@@ -15,6 +15,8 @@ local define_helper = function()
     NOT_BUSY = "^[ >]*你现在不忙。$",
     CHECKED_NOT_BUSY = "^[ >]*你不忙$",
     SETTING = "^[ >]*设定环境变量：__SETTING_NAME__ = \"__SETTING_VALUE__\"$",
+    ALIAS_TP_SET = "^tp\\s+(.+)$",
+    ALIAS_TP = "^tp$",
   }
 
   helper.settingRegexp = function(name, value)
@@ -664,6 +666,28 @@ local define_helper = function()
     end
   }
   helper.enableTimerGroups("heartbeat")
+  -- 添加别名
+  helper.addAlias {
+    group = "helper",
+    regexp = REGEXP.ALIAS_TP_SET,
+    response = function(name, line, wildcards)
+      local cmd = wildcards[1]
+      print("设置逃跑方向：", cmd)
+      SetVariable("tp_direction", cmd)
+    end
+  }
+  helper.addAlias {
+    group = "helper",
+    regexp = REGEXP.ALIAS_TP,
+    response = function(name, line, wildcards)
+      SendNoEcho("special chainless")
+      SendNoEcho("halt")
+      local direction = GetVariable("tp_direction")
+      if direction then
+        SendNoEcho(direction)
+      end
+    end
+  }
 
   return helper
 end

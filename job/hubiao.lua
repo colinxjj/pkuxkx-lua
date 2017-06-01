@@ -349,7 +349,7 @@ local define_hubiao = function()
               return self:doStep()
             -- 乘船中
             elseif self.boatStatus == "boating" then
-              self:debug("刚登上船，不行动，需要等待船夫开船")
+              self:debug("在boating情况下不应当行走成功，程序存在漏洞")
               wait.time(2)
               return self:doStep()
             elseif self.boatStatus == "leaving" then
@@ -1150,6 +1150,8 @@ local define_hubiao = function()
           SendNoEcho(self.currStep.path)
           SendNoEcho("gan che to enter")
         elseif self.boatStatus == "boating" then
+          self:debug("尚未开船，等待")
+        elseif self.boatStatus == "leaving" then
           SendNoEcho("gan che to out")
         else
           error("Unexpected boat status")
@@ -1209,16 +1211,36 @@ local define_hubiao = function()
       end
     end
     if #(matchedRooms) > 1 then
-      ColourNote("yellow", "", "存在多个房间匹配迷路房间，放弃该任务")
-      return self:doCancel()
+      -- 添加对区域信息的匹配，增加匹配的可能
+      local zoneCode = travel.roomsById[self.transferRoomId].zone
+      self:debug("发现多个房间匹配，尝试增加区域匹配", zoneCode)
+      local matchedRoomsWithZone = {}
+      for _, room in ipairs(matchedRooms) do
+        if room.zone == zoneCode then
+          table.insert(matchedRoomsWithZone, room)
+        end
+      end
+      if #matchedRoomsWithZone == 0 then
+        ColourNote("red", "", "不存在同区域房间匹配，放弃任务")
+        return self:doCancel()
+      elseif #matchedRoomsWithZone > 1 then
+        ColourNote("red", "", "存在同区域多个房间匹配，放弃任务")
+        return self:doCancel()
+      else
+        ColourNote("yellow", "", "匹配到同区域唯一房间，重新计算")
+        travel.currRoomId = matchedRoomsWithZone[1].id
+        travel:refreshRoomInfo()
+        self.transferRoomId = travel.currRoomId
+        return self:fire(Events.RELOCATED)
+      end
     elseif #(matchedRooms) == 1 then
-      self:debug("已匹配唯一房间，重新计算运输计划")
+      ColourNote("green", "", "已匹配唯一房间，重新计算运输计划")
       travel.currRoomId = matchedRooms[1].id
       travel:refreshRoomInfo()
       self.transferRoomId = travel.currRoomId
       return self:fire(Events.RELOCATED)
     else
-      ColourNote("yellow", "", "无房间可匹配，放弃该任务")
+      ColourNote("red", "", "无房间可匹配，放弃该任务")
       return self:doCancel()
     end
   end

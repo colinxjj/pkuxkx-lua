@@ -9,6 +9,7 @@
 local helper = require "pkuxkx.helper"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
+local nanjue = require "job.nanjue"
 
 local define_xiulian = function()
   local prototype = {}
@@ -25,6 +26,7 @@ local define_xiulian = function()
     ALIAS_ROOM = "xlforce\\s+room\\s+(\\d+)\\s*$",
     ALIAS_FORCE = "xlforce\\s+force\\s+(.*?)\\s*$",
     ALIAS_DZ = "xlforce\\s+dz\\s*$",
+    ALIAS_NANJUE = "xlforce\\s+nanjue\\s+(on|off)\\s*$",
   }
 
   function prototype:new()
@@ -39,7 +41,8 @@ local define_xiulian = function()
     self:initAliases()
 
     self.forceId = "zixia-shengong"
-    self.roomId = 2921
+    self.roomId = 2918
+    self.includeNanjue = true
   end
 
   function prototype:initTriggers()
@@ -135,9 +138,35 @@ local define_xiulian = function()
         return self:doDz()
       end
     }
+    helper.addAlias {
+      group = "xiulian",
+      regexp = REGEXP.ALIAS_NANJUE,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self.includeNanjue = true
+        else
+          self.includeNanjue = false
+        end
+      end
+    }
   end
 
   function prototype:doXiulian()
+    if self.includeNanjue then
+      if nanjue:available() then
+        return nanjue:doIfAvailable(function()
+          travel:walkto(self.roomId)
+          travel:waitUntilArrived()
+          wait.time(1)
+          return self:doInternalXiulian()
+        end)
+      end
+    end
+    return self:doInternalXiulian()
+  end
+
+  function prototype:doInternalXiulian()
     status:hpbrief()
     if status.food < 150 then
       SendNoEcho("do 2 eat ganliang")
