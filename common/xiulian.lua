@@ -9,7 +9,9 @@
 local helper = require "pkuxkx.helper"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
+local captcha = require "pkuxkx.captcha"
 local nanjue = require "job.nanjue"
+
 
 local define_xiulian = function()
   local prototype = {}
