@@ -23,6 +23,7 @@ ExcludedZones = {
 local travel = require "pkuxkx.travel"
 
 local patterns = {[[
+一片浓雾中，什么也看不清。
 
 ]]}
 
