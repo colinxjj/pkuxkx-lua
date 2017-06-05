@@ -1204,7 +1204,7 @@ local define_hubiao = function()
     local matchedRooms = {}
     for _, room in pairs(rooms1) do
       if currRoomName == room.name
-        and currRoomDesc == room.description
+        and (currRoomDesc == room.description or currRoomDesc == "一片浓雾中，什么也看不清。")  -- 当大雾时，不对描述进行匹配
         and travel:checkExitsIdentical(currRoomExits, room.exits)
         and (self.transferRoomId ~= room.id or self.robberMoves > 1)
       then

@@ -36,7 +36,7 @@ local define_recover = function()
     NOT_ENOUGH_QI = "^[ >]*(你现在的气太少了，无法产生内息运行全身经脉.*|你现在气血严重不足，无法满足打坐最小要求。|你现在身体状况太差了，无法集中精神！)$",
     JINGLI_MAX = "^[ >]*你现在精力接近圆满状态。$",
     NEILI_MAX = "^[ >]*你现在内力接近圆满状态。$",
-    RECOVER_FORBIDDEN = "^[ >]*(中央广场，禁止刷屏|对不起，武庙你只能老实呆着).*$",
+    RECOVER_FORBIDDEN = "^[ >]*(中央广场，禁止刷屏|对不起，武庙你只能老实呆着|对不起，比武场中请不要练功).*$",
   }
 
   function prototype:FSM()
