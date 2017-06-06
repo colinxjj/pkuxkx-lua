@@ -6,7 +6,6 @@
 -- To change this template use File | Settings | File Templates.
 --
 
-
 local patterns = {[[
 975
 
@@ -41,10 +40,10 @@ duizhao
 
 ]]}
 
-
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
+local combat = require "pkuxkx.combat"
 
 local define_cisha = function()
   local prototype = FSM.inheritedMeta()
@@ -52,19 +51,31 @@ local define_cisha = function()
   local States = {
     stop = "stop",
     ask = "ask",
+    wait = "wait",
     search = "search",
-    fight = "fight",
+    kill = "kill",
     submit = "submit"
   }
   local Events = {
     STOP = "stop",
-    START = "start"
+    START = "start",
+    WAIT = "wait",
+    ZONE_CONFIRMED = "zone_confirmed",
+    KILL = "kill",
+    KILLED = "killed",
   }
   local REGEXP = {
     ALIAS_START = "^cisha\\s+start\\s*$",
     ALIAS_STOP = "^cisha\\s+stop\\s*$",
     ALIAS_DEBUG = "^cisha\\s+debug\\s+(on|off)\\s*$",
+    JOB_WAIT_LOCATION = "^[ >]*孟之经说道：「这里人多眼杂，你先到(.*?)等候，我自会通知你。」$",
+    HINT = "^[ >]*孟之经\\(meng zhijing\\)告诉你：(.*)对照\\(duizhao\\)这页，你就知道你要刺杀的人在哪了。$",
+    DUIZHAO_MAP = "^(\\d+) *(.+)$",
+    FOUND = "^[ >]*你定睛一看，(.*?)正是你要找的汉奸卖国贼！$",
+    TITLE_NAME = "^[ >]*大元.*?(?:招讨|安抚)副使 *(.*?)\\((.*?)\\)$",
+    FINISHED = "^[ >]*恭喜！你完成了都统制府行刺任务！$",
   }
+  local JobRoomId = 975
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -93,16 +104,200 @@ local define_cisha = function()
       end,
       exit = function() end
     }
+    self:addState {
+      state = States.ask,
+      enter = function()
+        helper.enableTriggerGroups("cisha_ask_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("cisha_ask_start", "cisha_ask_done")
+      end
+    }
+    self:addState {
+      state = States.wait,
+      enter = function()
+        helper.enableTriggerGroups("cisha_wait", "cisha_duizhao_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("cisha_wait", "cisha_duizhao_start", "cisha_duizhao_end")
+      end
+    }
+    self:addState {
+      state = States.search,
+      enter = function()
+        helper.enableTriggerGroups("cisha_search")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("cisha_search")
+      end
+    }
+    self:addState {
+      state = States.kill,
+      enter = function()
+        helper.enableTriggerGroups("cisha_kill")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("cisha_kill")
+      end
+    }
+    self:addState {
+      state = States.submit,
+      enter = function() end,
+      exit = function() end
+    }
   end
 
   function prototype:initTransitions()
     -- transition from state<stop>
-    self:addTransitionToStop(States.STOP)
-
+    self:addTransition {
+      oldState = States.stop,
+      newState = States.ask,
+      event = Events.START,
+      action = function()
+        return self:doGetJob()
+      end
+    }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<ask>
+    self:addTransition {
+      oldState = States.ask,
+      newState = States.wait,
+      event = Events.WAIT,
+      action = function()
+        assert(self.waitRoomId, "wait room id cannot be nil")
+        return self:doWait()
+      end
+    }
+    self:addTransitionToStop(States.ask)
+    -- transition from state<wait>
+    self:addTransition {
+      oldState = States.wait,
+      newState = States.search,
+      event = Events.ZONE_CONFIRMED,
+      action = function()
+        assert(self.searchZone, "search zone cannot be nil")
+        return self:doSearch()
+      end
+    }
+    self:addTransitionToStop(States.wait)
+    -- transition from state<search>
+    self:addTransition {
+      oldState = States.search,
+      newState = States.kill,
+      event = Events.KILL,
+      action = function()
+        return self:doKill()
+      end
+    }
+    self:addTransitionToStop(States.search)
+    -- transition from state<kill>
+    self:addTransition {
+      oldState = States.kill,
+      newState = States.submit,
+      event = Events.KILLED,
+      action = function()
+        return self:doSubmit()
+      end
+    }
+    self:addTransitionToStop(States.kill)
+    -- transition from state<submit>
+    self:addTransitionToStop(States.submit)
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("cisha_ask_start", "cisha_ask_done")
+    helper.addTriggerSettingsPair {
+      group = "cisha",
+      start = "ask_start",
+      done = "ask_done"
+    }
+    helper.addTrigger {
+      group = "cisha_ask_done",
+      regexp = REGEXP.JOB_WAIT_LOCATION,
+      response = function(name, line, wildcards)
+        local rooms = travel:getMatchedRooms {
+          name = wildcards[1],
+          zone = "建康府"
+        }
+        if rooms and #rooms > 0 then
+          self.waitRoomId = rooms[1].id
+        end
+      end
+    }
+    local addWordHint = function(name, line, wildcards)
+      if not self.hint then
+        self.hint = {}
+      end
+      table.insert(self.hint, {
+        row = helper.ch2number(wildcards[1]),
+        column = helper.ch2number(wildcards[2])
+      })
+    end
+    helper.addTrigger {
+      group = "cisha_wait",
+      regexp = REGEXP.HINT,
+      response = function(name, line, wildcards)
+        self:debug("HINT triggered")
+        local rawHint = wildcards[1]
+        for _, c in ipairs({"一", "二", "三", "四", "五"}) do
+          local s, e, rowChr, columnChr = string.find(rawHint, "第" .. c .. "个字在：第(.-)行，第(.-)列。")
+          if rowChr and columnChr then
+            if not self.hint then
+              self.hint = {}
+            end
+            table.insert(self.hint, {
+              row = helper.ch2number(rowChr),
+              column = helper.ch2number(columnChr)
+            })
+          end
+        end
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "cisha",
+      start = "duizhao_start",
+      done = "duizhao_done"
+    }
+    helper.addTrigger {
+      group = "cisha_duizhao_done",
+      regexp = REGEXP.DUIZHAO_MAP,
+      response = function(name, line, wildcards)
+        local rowId = tonumber(wildcards[1])
+        local text = wildcards[2]
+        if not self.duizhaoMap then
+          self.duizhaoMap = {}
+        end
+        self.duizhaoMap[rowId] = text
+      end
+    }
+    helper.addTrigger {
+      group = "cisha_search",
+      regexp = REGEXP.FOUND,
+      response = function(name, line, wildcards)
+        self:debug("FOUND triggered")
+        self.npcName = wildcards[1]
+      end
+    }
+    helper.addTrigger {
+      group = "cisha_search",
+      regexp = REGEXP.TITLE_NAME,
+      response = function(name, line, wildcards)
+        self:debug("TITLE_NAME triggered")
+        if self.npcName then
+          if self.npcName == wildcards[1] then
+            self.npcId = string.lower(wildcards[2])
+            self:debug("贼人ID为：", self.npcId)
+          end
+        end
+      end
+    }
+    helper.addTrigger {
+      group = "cisha_kill",
+      regexp = REGEXP.FINISHED,
+      response = function()
+        self.finished = true
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -144,6 +339,165 @@ local define_cisha = function()
         print("停止 - 当前状态", self.currState)
       end
     }
+  end
+
+  function prototype:doGetJob()
+    if self.currState ~= States.ask then
+      return
+    end
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    self:debug("等待1秒后询问任务")
+    wait.time(1)
+    self.waitRoomId = nil
+    self.workTooFast = false
+    self.prevNotFinish = false
+    SendNoEcho("set cisha ask_start")
+    SendNoEcho("ask meng about job")
+    SendNoEcho("set cisha ask_done")
+    helper.checkUntilNotBusy()
+    if self.prevNotFinish then
+      ColourNote("yellow", "", "上次任务未完成，取消后再进行询问")
+      wait.time(1)
+      SendNoEcho("ask meng about finish")
+      SendNoEcho("ask meng about fail")
+      wait.time(1)
+      return self:doGetJob()
+    elseif self.workTooFast then
+      wait.time(5)
+      return self:doGetJob()
+    elseif not self.waitRoomId then
+      ColourNote("无法获取到等待房间，任务失败")
+      return self:doCancel()
+    else
+      return self:fire(Events.WAIT)
+    end
+  end
+
+  function prototype:doWait()
+    travel:walkto(self.waitRoomId)
+    travel:waitUntilArrived()
+    SendNoEcho("yun recover")
+    SendNoEcho("dazuo max")
+    self.hint = nil
+    local waitTime = 0
+    while not self.hint do
+      self:debug("等待密语提示", waitTime)
+      wait.time(5)
+    end
+    if self.DEBUG then
+      print("已获取提示信息：")
+      for i, h in ipairs(self.hint) do
+        print("第" .. i .. "字：", "r" .. h.row, "c" .. h.column)
+      end
+    end
+    wait.time(1)
+    self.duizhaoMap = nil
+    SendNoEcho("halt")
+    SendNoEcho("set cisha duizhao_start")
+    SendNoEcho("duizhao")
+    SendNoEcho("set cisha duizhao_done")
+    helper.checkUntilNotBusy()
+    local zoneWords = {}
+    for i, h in ipairs(self.hint) do
+      local text = self.hint[h.row]
+      local word = string.sub(text, h.column * 2 - 1, h.column * 2)
+      table.insert(zoneWords, word)
+    end
+    local searchZoneName = table.concat(zoneWords, "")
+    self:debug("搜索区域名称为：", searchZoneName)
+    self.searchZone = travel.zonesByName[searchZoneName]
+    if not self.searchZone then
+      ColourNote("red", "", "指定搜索区域不可达，任务失败")
+      return self:doCancel()
+    else
+      return self:fire(Events.ZONE_CONFIRMED)
+    end
+  end
+
+  function prototype:doSearch()
+    self.npcName = nil
+    self.npcId = nil
+
+    -- 行走到中心节点然后遍历
+    local centerCode = self.searchZone.centercode
+    local centerId = travel.roomsByCode[centerCode]
+    self:debug("前进至区域中心节点后遍历：", centerId)
+    travel:walkto(centerId)
+    travel:waitUntilArrived()
+    self:debug("到达中心节点")
+
+    self.npcFound = false
+    if self.npcName then
+      self:debug("行进途中已经遇到过贼人，修改遍历条件", self.npcName, self.npcId)
+      helper.addOneShotTrigger {
+        group = "cisha_one_shot",
+        regexp = "^.*安抚副使 " .. self.npcName .. "\\(.*\\)$",
+        response = function()
+          self.npcFound = true
+        end
+      }
+    else
+      self:debug("尚未遇到贼人，遍历寻找")
+      helper.addOneShotTrigger {
+        group = "cisha_one_shot",
+        regexp = REGEXP.FOUND,
+        response = function()
+          self.npcFound = true
+        end
+      }
+    end
+    local onStep = function()
+      return self.npcFound
+    end
+    travel:traverseZone(self.searchZone.code, onStep)
+    travel:waitUntilArrived()
+
+    if self.npcFound then
+      self:debug("发现贼人，杀之")
+      return self:fire(Events.KILL)
+    else
+      self:debug("未发现贼人，任务失败")
+      return self:doCancel()
+    end
+  end
+
+  function prototype:doKill()
+    self.finished = false
+    combat:start()
+    SendNoEcho("follow " .. self.npcId)
+    SendNoEcho("yun powerup")
+    SendNoEcho("killall " .. self.npcId)
+    local waitTime = 0
+    while not self.finished do
+      self:debug("等待完成", waitTime)
+      SendNoEcho("killall " .. self.npcId)
+      wait.time(5)
+    end
+    SendNoEcho("follow none")
+    SendNoEcho("halt")
+    combat:stop()
+    return self:fire(Events.KILLED)
+  end
+
+  function prototype:doSubmit()
+    travel:stop()
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    self:debug("等到1秒后提交")
+    wait.time(1)
+    SendNoEcho("ask meng about finish")
+    helper.checkUntilNotBusy()
+    return self:fire(Events.STOP)
+  end
+
+  function prototype:doCancel()
+--    travel:walkto(JobRoomId)
+--    travel:waitUntilArrived()
+--    wait.time(1)
+--    SendNoEcho("ask meng about fail")
+--
+    ColourNote("red", "", "手动进行取消")
   end
 
   return prototype
