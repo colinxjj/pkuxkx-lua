@@ -24,13 +24,6 @@ local Skills = {
     mode = "both",
     weapon = "sword",
   },
-  -- 剑宗
---  {
---    basic = "sword",
---    special = "kuangfeng-kuaijian",
---    mode = "lian",
---    weapon = "sword"
---  },
   {
     basic = "dodge",
     special = "huashan-shenfa",
@@ -48,6 +41,13 @@ local Skills = {
     mode = "lian",
     weapon = "sword"
   },
+  -- 剑宗
+  {
+    basic = "sword",
+    special = "kuangfeng-kuaijian",
+    mode = "lian",
+    weapon = "sword"
+  },
   {
     basic = "parry",
     special = "hunyuan-zhang",
@@ -58,32 +58,37 @@ local Skills = {
     special = "hunyuan-zhang",
     mode = "lingwu",
   },
-  -- 气宗
-  {
-    basic = "parry",
-    special = "yunushijiu-jian",
-    mode = "lian",
-    weapon = "sword",
-  },
-  -- 气宗
+--  -- 气宗
+--  {
+--    basic = "parry",
+--    special = "yunushijiu-jian",
+--    mode = "lian",
+--    weapon = "sword",
+--  },
+--  -- 气宗
+--  {
+--    basic = "sword",
+--    special = "yangwu-jian",
+--    mode = "lian",
+--    weapon = "sword",
+--  },
+  -- 剑宗
   {
     basic = "sword",
-    special = "yangwu-jian",
+    special = "xiyi-jian",
     mode = "lian",
-    weapon = "sword",
+    weapon = "sword"
   },
   {
     basic = "parry",
     special = "poyu-quan",
     mode = "lian",
   },
-  -- 剑宗
---  {
---    basic = "sword",
---    special = "xiyi-jian",
---    mode = "lian",
---    weapon = "sword"
---  }
+  {
+    basic = "cuff",
+    special = "poyu-quan",
+    mode = "lingwu",
+  },
 
 }
 -- 两次睡觉间间隔秒数
@@ -91,7 +96,7 @@ local SleepInterval = 60
 -- 每秒打坐内力值
 local DzNumPerSecond = 70
 -- 每次领悟次数
-local LingwuNum = 30  -- 1 - 500
+local LingwuNum = 100  -- 1 - 500
 -- 每次练习次数
 local LianNum = 20  -- 1 - 500
 -- 是否在升级时转换技能（设置为true时将平均提升技能）
@@ -137,6 +142,18 @@ local define_fullskills = function()
     self.skillStack = {}
     self:populateSkillStack()
     self.limitGap = ReservedLimitGap
+    -- calculate lingwu count and number
+    local cnt = LingwuNum / 50
+    if cnt < 1 then
+      self.lingwuCnt = 1
+      self.lingwuNum = LingwuNum
+    elseif cnt == math.floor(cnt) then
+      self.lingwuCnt = math.floor(cnt)
+      self.lingwuNum = 50
+    else
+      self.lingwuCnt = math.ceil(cnt)
+      self.lingwuNum = math.floor(LingwuNum / self.lingwuCnt)
+    end
     self.includeNanjue = true
   end
 
@@ -198,6 +215,14 @@ local define_fullskills = function()
       regexp = REGEXP.CANNOT_LIAN,
       response = function()
         self.canLian = false
+      end
+    }
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.CANNOT_DAZUO,
+      response = function()
+        wait.time(5)
+        return self:doPrepare()
       end
     }
   end
@@ -312,10 +337,11 @@ local define_fullskills = function()
     if neiliDiff <= 10 then
       return self:doFull()
     elseif neiliDiff > dzNumPerMin then
-      if status.currQi + status.maxQi * 0.1 < dzNumPerMin then
+      if status.maxQi * 0.8 < dzNumPerMin then
         SendNoEcho("yun recover")
         SendNoEcho("dazuo max")
       else
+        SendNoEcho("yun recover")
         SendNoEcho("dazuo " .. dzNumPerMin)
       end
     else
@@ -348,7 +374,7 @@ local define_fullskills = function()
         self:debug("技能", self.currSkill.basic, "达到技能限制")
         return self:doFull()
       end
-      workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
+      workCmd = "do " .. self.lingwuCnt .. " lingwu " .. self.currSkill.basic .. " " .. self.lingwuNum
       testCmd = "lingwu " .. self.currSkill.basic .. " 1"
       recoverCmd = "yun regenerate"
     elseif self.currSkill.mode == "lian" then
@@ -384,7 +410,7 @@ local define_fullskills = function()
         -- 重置标记位
         self.canImprove = true
         -- 尝试领悟
-        workCmd = "lingwu " .. self.currSkill.basic .. " " .. LingwuNum
+        workCmd = "do " .. self.lingwuCnt .. " lingwu " .. self.currSkill.basic .. " " .. self.lingwuNum
         testCmd = "lingwu " .. self.currSkill.basic .. " 1"
         recoverCmd = "yun regenerate"
         -- 检查是否可提高
