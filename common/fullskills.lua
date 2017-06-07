@@ -20,8 +20,14 @@ local Skills = {
   },
   {
     basic = "sword",
-    special = "dugu-jiujian",
+    special = "huashan-jianfa",
     mode = "both",
+    weapon = "sword"
+  },
+  {
+    basic = "sword",
+    special = "dugu-jiujian",
+    mode = "lian",
     weapon = "sword",
   },
   {
@@ -34,12 +40,6 @@ local Skills = {
     special = "dugu-jiujian",
     mode = "lingwu",
     weapon = "sword",
-  },
-  {
-    basic = "parry",
-    special = "huashan-jianfa",
-    mode = "lian",
-    weapon = "sword"
   },
   -- 剑宗
   {
@@ -94,7 +94,7 @@ local Skills = {
 -- 两次睡觉间间隔秒数
 local SleepInterval = 60
 -- 每秒打坐内力值
-local DzNumPerSecond = 70
+local DzNumPerSecond = 76
 -- 每次领悟次数
 local LingwuNum = 100  -- 1 - 500
 -- 每次练习次数
@@ -126,6 +126,7 @@ local define_fullskills = function()
     CANNOT_IMPROVE = "^[ >]*(你的基本功夫比你的高级功夫还高|你的.*?的级别还没有.*?的级别高，不能通过练习来提高|你需要提高基本功，不然练得再多也没有用).*$",
     CANNOT_DAZUO = "^[ >]*你现在的气太少了，无法产生内息运行全身经脉。$",
     CANNOT_LIAN = "^[ >]*你的内力不够.*$",
+    DG9J_JING = "^[ >]*你目前精神状态并不足以领悟独孤九剑。$",
   }
 
   function prototype:new()
@@ -223,6 +224,13 @@ local define_fullskills = function()
       response = function()
         wait.time(5)
         return self:doPrepare()
+      end
+    }
+    helper.addTrigger {
+      group = "fullskills",
+      regexp = REGEXP.DG9J_JING,
+      response = function()
+        SendNoEcho("yun regenerate")
       end
     }
   end

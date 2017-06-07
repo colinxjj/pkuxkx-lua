@@ -9,6 +9,9 @@
 local patterns = {[[
 975
 
+你向孟之经打听有关『job』的消息。
+孟之经说道：「我给你的你上一个任务还没完成呢。」
+
 孟之经说道：「这里人多眼杂，你先到江南小道等候，我自会通知你。」
 
 > 孟之经托付都府内常随送给了你一页密码。
@@ -33,6 +36,9 @@ duizhao
     大元 建康府南城路安抚副使 彭晓峦(Peng xiaoluan)
 
 大元 建康府南城路招讨副使 顾杰(Gu jie)
+
+你向董波冲打听有关『fight』的消息。
+董波冲说道：「你怕了吗？」
 
 上官年往东落荒而逃了。
 
@@ -69,11 +75,15 @@ local define_cisha = function()
     ALIAS_STOP = "^cisha\\s+stop\\s*$",
     ALIAS_DEBUG = "^cisha\\s+debug\\s+(on|off)\\s*$",
     JOB_WAIT_LOCATION = "^[ >]*孟之经说道：「这里人多眼杂，你先到(.*?)等候，我自会通知你。」$",
+    WORK_TOO_FAST = "^[ >]*孟之经说道：「你上次大发神威之后，汉奸们都大多不敢出头了，过段时间再来吧.*」$",
+    PREV_NOT_FINISH = "^[ >]*孟之经说道：「我给你的你上一个任务还没完成呢。」$",
     HINT = "^[ >]*孟之经\\(meng zhijing\\)告诉你：(.*)对照\\(duizhao\\)这页，你就知道你要刺杀的人在哪了。$",
     DUIZHAO_MAP = "^(\\d+) *(.+)$",
     FOUND = "^[ >]*你定睛一看，(.*?)正是你要找的汉奸卖国贼！$",
-    TITLE_NAME = "^[ >]*大元.*?(?:招讨|安抚)副使 *(.*?)\\((.*?)\\)$",
+    -- TITLE_NAME = "^[ >]*大元.*?(?:招讨|安抚|宣抚)副使 *(.*?)\\((.*?)\\)$",
+    TITLE_NAME = "^[ >]*大元.*?副使 *(.*?)\\((.*?)\\)$",
     FINISHED = "^[ >]*恭喜！你完成了都统制府行刺任务！$",
+    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰|陨铁)【.*?】。$",
   }
   local JobRoomId = 975
 
@@ -90,6 +100,8 @@ local define_cisha = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
+
+    self.DEBUG = true
   end
 
   function prototype:disableAllTriggers()
@@ -142,8 +154,12 @@ local define_cisha = function()
     }
     self:addState {
       state = States.submit,
-      enter = function() end,
-      exit = function() end
+      enter = function()
+        helper.enableTriggerGroups("cisha_submit")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("cisha_submit")
+      end
     }
   end
 
@@ -224,15 +240,22 @@ local define_cisha = function()
         end
       end
     }
-    local addWordHint = function(name, line, wildcards)
-      if not self.hint then
-        self.hint = {}
+    helper.addTrigger {
+      group = "cisha_ask_done",
+      regexp = REGEXP.WORK_TOO_FAST,
+      response = function()
+        self:debug("WORK_TOO_FAST triggered")
+        self.workTooFast = true
       end
-      table.insert(self.hint, {
-        row = helper.ch2number(wildcards[1]),
-        column = helper.ch2number(wildcards[2])
-      })
-    end
+    }
+    helper.addTrigger {
+      group = "cisha_ask_done",
+      regexp = REGEXP.PREV_NOT_FINISH,
+      response = function()
+        self:debug("PREV_NOT_FINISH triggered")
+        self.prevNotFinish = true
+      end
+    }
     helper.addTrigger {
       group = "cisha_wait",
       regexp = REGEXP.HINT,
@@ -295,13 +318,28 @@ local define_cisha = function()
       group = "cisha_kill",
       regexp = REGEXP.FINISHED,
       response = function()
+        self:debug("FINISHED triggered")
         self.finished = true
+      end
+    }
+    helper.addTrigger {
+      group = "cisha_submit",
+      regexp = REGEXP.GARBAGE,
+      response = function(name, line, wildcards)
+        local item = wildcards[1]
+        if item == "石炭" then
+          SendNoEcho("drop shi tan")
+        elseif item == "玄冰" then
+          SendNoEcho("drop xuan bing")
+        elseif item == "陨铁" then
+          SendNoEcho("drop yun tie")
+        end
       end
     }
   end
 
   function prototype:initAliases()
-    helper.removeAliasGroup("cisha")
+    helper.removeAliasGroups("cisha")
     helper.addAlias {
       group = "cisha",
       regexp = REGEXP.ALIAS_START,
@@ -384,6 +422,7 @@ local define_cisha = function()
     while not self.hint do
       self:debug("等待密语提示", waitTime)
       wait.time(5)
+      waitTime = waitTime + 5
     end
     if self.DEBUG then
       print("已获取提示信息：")
@@ -400,13 +439,13 @@ local define_cisha = function()
     helper.checkUntilNotBusy()
     local zoneWords = {}
     for i, h in ipairs(self.hint) do
-      local text = self.hint[h.row]
+      local text = self.duizhaoMap[h.row]
       local word = string.sub(text, h.column * 2 - 1, h.column * 2)
       table.insert(zoneWords, word)
     end
     local searchZoneName = table.concat(zoneWords, "")
     self:debug("搜索区域名称为：", searchZoneName)
-    self.searchZone = travel.zonesByName[searchZoneName]
+    self.searchZone = travel:getMatchedZone(searchZoneName)
     if not self.searchZone then
       ColourNote("red", "", "指定搜索区域不可达，任务失败")
       return self:doCancel()
@@ -421,9 +460,9 @@ local define_cisha = function()
 
     -- 行走到中心节点然后遍历
     local centerCode = self.searchZone.centercode
-    local centerId = travel.roomsByCode[centerCode]
-    self:debug("前进至区域中心节点后遍历：", centerId)
-    travel:walkto(centerId)
+    local centerRoom = travel.roomsByCode[centerCode]
+    self:debug("前进至区域中心节点后遍历：", centerRoom.id)
+    travel:walkto(centerRoom.id)
     travel:waitUntilArrived()
     self:debug("到达中心节点")
 
