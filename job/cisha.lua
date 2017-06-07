@@ -84,6 +84,7 @@ local define_cisha = function()
     TITLE_NAME = "^[ >]*大元.*?副使 *(.*?)\\((.*?)\\)$",
     FINISHED = "^[ >]*恭喜！你完成了都统制府行刺任务！$",
     GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰|陨铁)【.*?】。$",
+    MINGJIAO_WEAPON = "^ *□手持.*?圣火令\\(.*?\\)$",
   }
   local JobRoomId = 975
 
@@ -101,17 +102,29 @@ local define_cisha = function()
     self:initAliases()
     self:setState(States.stop)
 
+    self.precondition = {
+      jing = 1,
+      qi = 1,
+      neili = 1.4,
+      jingli = 1
+    }
+
     self.DEBUG = true
   end
 
   function prototype:disableAllTriggers()
-
+    helper.disableTimerGroups(
+      "cisha_ask_start", "cisha_ask_done", "cisha_wait",
+      "cisha_duizhao_start", "cisha_duizhao_done", "cisha_search",
+      "cisha_kill", "cisha_look_start", "cisha_look_done",
+      "cisha_submit")
   end
 
   function prototype:initStates()
     self:addState {
       state = States.stop,
       enter = function()
+        helper.removeTriggerGroups("cisha_one_shot")
         self:disableAllTriggers()
       end,
       exit = function() end
@@ -131,7 +144,7 @@ local define_cisha = function()
         helper.enableTriggerGroups("cisha_wait", "cisha_duizhao_start")
       end,
       exit = function()
-        helper.disableTriggerGroups("cisha_wait", "cisha_duizhao_start", "cisha_duizhao_end")
+        helper.disableTriggerGroups("cisha_wait", "cisha_duizhao_start", "cisha_duizhao_done")
       end
     }
     self:addState {
@@ -146,10 +159,10 @@ local define_cisha = function()
     self:addState {
       state = States.kill,
       enter = function()
-        helper.enableTriggerGroups("cisha_kill")
+        helper.enableTriggerGroups("cisha_kill", "cisha_look_start")
       end,
       exit = function()
-        helper.disableTriggerGroups("cisha_kill")
+        helper.disableTriggerGroups("cisha_kill", "cisha_look_start", "cisha_look_done")
       end
     }
     self:addState {
@@ -221,7 +234,11 @@ local define_cisha = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("cisha_ask_start", "cisha_ask_done")
+    helper.removeTriggerGroups(
+      "cisha_ask_start", "cisha_ask_done", "cisha_wait",
+      "cisha_duizhao_start", "cisha_duizhao_done", "cisha_search",
+      "cisha_kill", "cisha_look_start", "cisha_look_done",
+      "cisha_submit")
     helper.addTriggerSettingsPair {
       group = "cisha",
       start = "ask_start",
@@ -334,6 +351,19 @@ local define_cisha = function()
         elseif item == "陨铁" then
           SendNoEcho("drop yun tie")
         end
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "cisha",
+      start = "look_start",
+      done = "look_done"
+    }
+    helper.addTrigger {
+      group = "cisha_look_done",
+      regexp = REGEXP.MINGJIAO_WEAPON,
+      response = function()
+        self:debug("MINGJIAO_WEAPON triggered")
+        self.npcMingjiao = true
       end
     }
   end
@@ -471,7 +501,7 @@ local define_cisha = function()
       self:debug("行进途中已经遇到过贼人，修改遍历条件", self.npcName, self.npcId)
       helper.addOneShotTrigger {
         group = "cisha_one_shot",
-        regexp = "^.*安抚副使 " .. self.npcName .. "\\(.*\\)$",
+        regexp = "^ *大元.*?副使 *" .. self.npcName .. "\\(.*\\)$",
         response = function()
           self.npcFound = true
         end
@@ -503,7 +533,19 @@ local define_cisha = function()
 
   function prototype:doKill()
     self.finished = false
-    combat:start()
+    self.npcMingjiao = false
+    self:debug("检查敌手是否是明教")
+    SendNoEcho("set cisha look_start")
+    SendNoEcho("look " .. self.npcId)
+    SendNoEcho("set cisha look_done")
+    helper.checkUntilNotBusy()
+    if self.npcMingjiao then
+      self:debug("敌人是明教，使用三仙剑攻击")
+      combat:start("jianzong-mingjiao")
+    else
+      self:debug("敌人不是明教，使用通常攻击")
+      combat:start()
+    end
     SendNoEcho("follow " .. self.npcId)
     SendNoEcho("yun powerup")
     SendNoEcho("killall " .. self.npcId)

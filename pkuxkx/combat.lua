@@ -38,6 +38,53 @@ local define_combat = function()
     ENERGY = "^[ >]*你在攻击中不断积蓄攻势。\\(气势：(\\d+)%\\)$",
   }
 
+  local DefaultPFM = "jianzong"
+
+  local PFM = {
+    -- 剑宗，默认无脑狂风
+    jianzong = {
+      {
+        weapon = "sword",
+        name = "kuangfeng-kuaijian.kuangfeng",
+        energy = 12,
+      }
+    },
+    -- 气宗，默认轮流剑掌，三青峰
+    qizong = {
+      {
+        weapon = "sword",
+        name = "huashan-jianfa.jianzhang",
+        energy = 12,
+      },
+      {
+        weapon = "sword",
+        name = "yunushijiu-jian.sanqingfeng",
+        energy = 12
+      }
+    },
+    -- 剑宗对明教，默认连环
+    ["jianzong-mingjiao"] = {
+      {
+        weapon = "sword",
+        name = "kuangfeng-kuaijian.lianhuan",
+        energy = 12,
+      }
+    },
+    -- 气宗对明教，默认三青峰
+    ["qizong-mingjiao"] = {
+      {
+        weapon = "sword",
+        name = "dugu-jiujian.poqi",
+        energy = 4
+      },
+      {
+        name = "hunyuan-zhang.wuji",
+        jiali = "max",
+        energy = 12
+      }
+    }
+  }
+
   function prototype:FSM()
     local obj = FSM:new()
     setmetatable(obj, self or prototype)
@@ -51,25 +98,7 @@ local define_combat = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
---    self.pfms = {
---      {
---        weapon = "sword",
---        name = "huashan-jianfa.jianzhang",
---        energy = 12,
---      },
---      {
---        weapon = "sword",
---        name = "yunushijiu-jian.sanqingfeng",
---        energy = 12
---      }
---    }
-    self.pfms = {
-      {
-        weapon = "sword",
-        name = "kuangfeng-kuaijian.kuangfeng",
-        energy = 12,
-      }
-    }
+    self.pfms = PFM[DefaultPFM]
     self.pfmId = 1
     self.testCombatPfm = "dugu-jiujian.pobing"
   end
@@ -171,22 +200,48 @@ local define_combat = function()
     local currPfm = self.pfms[self.pfmId]
     if self.energy >= currPfm.energy then
       self:debug("满足气势需求，施放", currPfm.name)
+      if currPfm.jiali then
+        SendNoEcho("jiali " .. currPfm.jiali)
+      end
       if currPfm.weapon then
         SendNoEcho("wield " .. currPfm.weapon)
+        SendNoEcho("perform " .. currPfm.name)
       else
         SendNoEcho("remove shield")
+        SendNoEcho("perform " .. currPfm.name)
+        SendNoEcho("wear shield")
       end
-      SendNoEcho("perform " .. currPfm.name)
+      if currPfm.jiali then
+        SendNoEcho("jiali 0")
+      end
       -- 目前暂不判断是否成功
       self.pfmId = self.pfmId + 1
     end
   end
 
-  function prototype:start()
+  function prototype:start(type)
+    if not type then
+      self.pfms = PFM[DefaultPFM]
+    elseif not PFM[type] then
+      ColourNote("yellow", "", type .. " PFM设定不存在")
+      self.pfms = PFM[DefaultPFM]
+    else
+      self.pfms = PFM[type]
+    end
+    self.pfmId = 1
     return self:fire(Events.START)
   end
 
-  function prototype:stop()
+  function prototype:stop(type)
+    if not type then
+      self.pfms = PFM[DefaultPFM]
+    elseif not PFM[type] then
+      ColourNote("yellow", "", type .. " PFM设定不存在")
+      self.pfms = PFM[DefaultPFM]
+    else
+      self.pfms = PFM[type]
+    end
+    self.pfmId = 1
     return self:fire(Events.STOP)
   end
 

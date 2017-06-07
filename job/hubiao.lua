@@ -9,6 +9,7 @@
 
 -- 增加全局屏蔽区域
 ExcludedBlockZones = {
+  "gaibang", "miaoling",
   "dali", "emei", "jiaxing",
   "lingjiu", "lingzhou", "mingjiao",
   "pingxiwangfu", "riyue",
@@ -391,6 +392,8 @@ local define_hubiao = function()
       newState = States.lost,
       event = Events.GET_LOST,
       action = function()
+        -- 重置状态
+        self.boatStatus = "yelling"
         return self:doRelocate()
       end
     }
