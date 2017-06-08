@@ -122,8 +122,8 @@ values
   ('tiantan', 'ÃÏÃ≥', 'tiantanxitianmen'),
   ('shenlongdao', '…Ò¡˙µ∫', 'shenlongdaofengding'),
   ('shashoubang', '…± ÷∞Ô', 'shashoubangguangchang'),
-  ('gaibang', 'ÿ§∞Ô', 'gaibangshudongneibu'),
-  ('miaoling', '√Á¡Î', 'miaolingbianyuan')
+  ('gaibang', 'ÿ§∞Ô', 'gaibangshudongneibu')
+  -- ('miaoling', '√Á¡Î', 'miaolingbianyuan')
 ;
 
 create table if not exists zone_connectivity (
@@ -341,7 +341,3 @@ or (startcode = 'changjiangbei' and endcode = 'changjiangnan')
 or (startcode = 'huanghebei' and endcode = 'huanghenan')
 or (startcode = 'huanghenan' and endcode = 'huanghebei')
 ;
-
---.separator ':'
---.import char2pinyin.csv chr2pinyin
---.import pinyin2char.csv pinyin2chr

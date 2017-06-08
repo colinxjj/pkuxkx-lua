@@ -84,3 +84,130 @@ ask xiao about finish
 你获得了四份火铜【劣质】。ll
 
 ]]}
+
+
+local helper = require "pkuxkx.helper"
+local FSM = require "pkuxkx.FSM"
+local travel = require "pkuxkx.travel"
+local captcha = require "pkuxkx.captcha"
+
+local XiaofengMode = {
+  KILL = 1,  -- 杀
+  CAPTURE = 2,  -- 擒
+  PERSUADE = 3,  -- 劝
+  WIN = 4,  -- 胜
+}
+
+local define_xiaofeng = function()
+  local prototype = FSM.inheritedMeta()
+
+  local States = {
+    stop = "stop"
+  }
+  local Events = {
+    STOP = "stop",
+    START = "start"
+  }
+  local REGEXP = {
+    ALIAS_START = "^xiaofeng\\s+start\\s*$",
+    ALIAS_STOP = "^xiaofeng\\s+stop\\s*$",
+    ALIAS_DEBUG = "^xiaofeng\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_CAPTURE = "^xiaofeng\\s+capture\\s+(.*)\\s*$",
+    ALIAS_PERSUADE = "^xiaofeng\\s+persuade\\s+(.*)\\s*$",
+    ALIAS_KILL = "^xiaofeng\\s+kill\\s+(.*)\\s*$",
+    ALIAS_WIN = "^xiaofeng\\s+win\\s+(.*)\\s*$",
+    JOB_CAPTURE = "^ *此人于中原武林颇为有用，你去将他擒回这里交给我。打晕其之后若他再醒来.*$",
+    JOB_PERSUADE = "^ *此人加入西夏一品堂不久，尚可教化，你去劝劝.*$",
+    JOB_KILL = "^ *kill shashou$",
+    JOB_WIN = "^ *win shashou$",
+    JOB_CAPTCHA = "^请注意，忽略验证码中的红色文字。$",
+    WORK_TOO_FAST = "^work too fast$",
+    PREV_NOT_FINISH = "^prev not finish$",
+  }
+
+  function prototype:FSM()
+    local obj = FSM:new()
+    setmetatable(obj, self or prototype)
+    obj:postConstruct()
+    return obj
+  end
+
+  function prototype:postConstruct()
+    self:initStates()
+    self:initTransitions()
+    self:initTriggers()
+    self:initAliases()
+    self:setState(States.stop)
+
+    self.mode = nil
+
+  end
+
+  function prototype:disableAllTriggers()
+
+  end
+
+  function prototype:initStates()
+    self:addState {
+      state = States.stop,
+      enter = function()
+        self:disableAllTriggers()
+      end,
+      exit = function() end
+    }
+  end
+
+  function prototype:initTransitions()
+    -- transition from state<stop>
+    self:addTransitionToStop(States.stop)
+
+  end
+
+  function prototype:initTriggers()
+
+  end
+
+  function prototype:initAliases()
+    helper.removeAliasGroups("xiaofeng")
+    helper.addAlias {
+      group = "xiaofeng",
+      regexp = REGEXP.ALIAS_START,
+      response = function()
+        return self:fire(Events.START)
+      end
+    }
+    helper.addAlias {
+      group = "xiaofeng",
+      regexp = REGEXP.ALIAS_STOP,
+      response = function()
+        return self:fire(Events.STOP)
+      end
+    }
+    helper.addAlias {
+      group = "xiaofeng",
+      regexp = REGEXP.ALIAS_DEBUG,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self:debugOn()
+        else
+          self:debugOff()
+        end
+      end
+    }
+  end
+
+  function prototype:addTransitionToStop(fromState)
+    self:addTransition {
+      oldState = fromState,
+      newState = States.stop,
+      event = Events.STOP,
+      action = function()
+        print("停止 - 当前状态", self.currState)
+      end
+    }
+  end
+
+  return prototype
+end
+return define_xiaofeng():FSM()

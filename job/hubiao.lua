@@ -151,7 +151,7 @@ local define_hubiao = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.maxRounds = 10
+    self.maxRounds = 8
     self.rounds = 0
     -- special variable
     self.playerName = "撸啊"
@@ -1070,6 +1070,8 @@ local define_hubiao = function()
     self.powerupPresent = false
     self.qiPresent = false
     SendNoEcho("wield sword")
+    -- 将当前步重置为空
+    self.currStep = nil
     return self:fire(Events.STEP_SUCCESS)
   end
 
@@ -1232,9 +1234,9 @@ local define_hubiao = function()
         return self:fire(Events.RELOCATED)
       end
     elseif #(matchedRooms) == 1 then
-      ColourNote("green", "", "已匹配唯一房间，重新计算运输计划")
       travel.currRoomId = matchedRooms[1].id
       travel:refreshRoomInfo()
+      ColourNote("green", "", "已匹配唯一房间，重新计算运输计划 " .. travel.currRoomId)
       self.transferRoomId = travel.currRoomId
       return self:fire(Events.RELOCATED)
     else

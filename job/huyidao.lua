@@ -232,7 +232,10 @@ local define_huyidao = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("huyidao_ask_start", "huyidao_ask_done")
+    helper.removeTriggerGroups(
+      "huyidao_ask_start", "huyidao_ask_done",
+      "huyidao_map_start", "huyidao_map_done",
+      "huyidao_give_start", "huyidao_give_done")
     helper.addTriggerSettingsPair {
       group = "huyidao",
       start = "ask_start",
