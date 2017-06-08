@@ -25,12 +25,36 @@ ask hu about job
 你在攻击中不断积蓄攻势。(气势：12%)
 魏八大说道：“你有种去临安府找我兄弟东门益(ladubk)，他会给我报仇的！”
 
+
+
+-- 模式三
+
+ask sui cong about 藏宝图
+你向胡二打听有关『藏宝图』的消息。
+我发现附近的小树林里面藏着一伙盗宝人，从他们身上可能会获得线索。我这就带你过去。
+林间小道 -
+
+    一条长满荒草的小道，前面似乎通向了一片小树林！
+    「仲夏」: 一轮火红的夕阳正徘徊在西方的地平线上。
+
+    这里唯一的出口是 east。
+
+杨树林 -
+
+    稀稀落落得长着南方常见的杨树和小灌木，茂盛的茅草大概有一个人多高，
+四周似乎危机起伏，需要小心了。
+    「仲夏」: 一轮火红的夕阳正徘徊在西方的地平线上。
+
+    这里明显的出口是 northeast 和 west。
+get map from corpse
+你从贝杰的尸体身上搜出一片宝藏地图残片。
 ]]}
 
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local combat = require "pkuxkx.combat"
+local captcha = require "pkuxkx.captcha"
 
 local define_huyidao = function()
   local prototype = FSM.inheritedMeta()
@@ -60,6 +84,7 @@ local define_huyidao = function()
     JOB_INFO = "^[ >]*胡一刀说道：『我收到消息，听说(.*?)有盗宝人(.*?)\\((.*?)\\)找到了闯王宝藏的地图,你可否帮忙找回来！』$",
     MAP_COUNT = "^\\( *(\\d+)\\) *宝藏地图残片\\(Map piece\\d+\\)$",
     GIVEN = "^[ >]*你给胡一刀一.*$",
+    CAPTCHA = "^获得关于盗宝人的消息。$",
   }
 
   local JobRoomId = 38
@@ -223,6 +248,14 @@ local define_huyidao = function()
         self.npcId = string.lower(wildcards[3])
       end
     }
+    helper.addTrigger {
+      group = "huyidao_ask_done",
+      regexp = REGEXP.CAPTCHA,
+      response = function()
+        self:debug("CAPTCHA triggered")
+        self.needCaptcha = true
+      end
+    }
     helper.addTriggerSettingsPair {
       group = "huyidao",
       start = "map_start",
@@ -230,7 +263,7 @@ local define_huyidao = function()
     }
     helper.addTrigger {
       group = "huyidao_map_done",
-      REGEXP.MAP_COUNT,
+      regexp = REGEXP.MAP_COUNT,
       response = function(name, line, wildcards)
         self:debug("MAP_CNT triggered")
         local cnt = tonumber(wildcards[1])
@@ -442,7 +475,7 @@ local define_huyidao = function()
     SendNoEcho("perform dugu-jiujian.poqi")
     -- 限定60秒解决战斗
     local waitTime = 0
-    while self.npcKilled and waitTime < 60 do
+    while not self.npcKilled and waitTime < 60 do
       self:debug("战斗时长：", waitTime)
       wait.time(5)
       waitTime = waitTime + 5

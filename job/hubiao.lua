@@ -9,13 +9,7 @@
 
 -- 增加全局屏蔽区域
 ExcludedBlockZones = {
-  "gaibang", "miaoling",
-  "dali", "emei", "jiaxing",
-  "lingjiu", "lingzhou", "mingjiao",
-  "pingxiwangfu", "riyue",
-  "shaolin", "tiantan",
-  "wudang", "xihu",
-  "xingxiu"
+  "gaibang", "miaoling", "jiaxing"
 }
 ExcludedZones = {
   "gaibang",

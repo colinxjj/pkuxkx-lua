@@ -50,6 +50,7 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local combat = require "pkuxkx.combat"
+local captcha = require "pkuxkx.captcha"
 
 local define_cisha = function()
   local prototype = FSM.inheritedMeta()
