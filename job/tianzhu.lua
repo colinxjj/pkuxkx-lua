@@ -123,7 +123,7 @@ local define_tianzhu = function()
 
   function prototype:initTransitions()
     -- transition from state<stop>
-    self:addTransitionToStop(States.STOP)
+    self:addTransitionToStop(States.stop)
     self:addTransition {
       oldState = States.stop,
       newState = States.ask,
@@ -218,7 +218,7 @@ local define_tianzhu = function()
   end
 
   function prototype:initAliases()
-    helper.removeAliasGroup("tianzhu")
+    helper.removeAliasGroups("tianzhu")
     helper.addAlias {
       group = "tianzhu",
       regexp = REGEXP.ALIAS_START,

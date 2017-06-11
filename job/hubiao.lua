@@ -9,7 +9,7 @@
 
 -- 增加全局屏蔽区域
 ExcludedBlockZones = {
-  "gaibang", "miaoling", "jiaxing"
+  "gaibang", "miaoling", "jiaxing", "yangzhou"
 }
 ExcludedZones = {
   "gaibang",
@@ -656,7 +656,9 @@ local define_hubiao = function()
       group = "hubiao_transfer",
       regexp = REGEXP.BOAT_FORCED_DEPART,
       response = function()
-        if self.currStep.category == PathCategory.boat and self.boatStatus == "boating" then
+        self:debug("BOAT_FORCED_DEPART triggered")
+        if self.currStep.category == PathCategory.boat
+          and (self.boatStatus == "boating" or self.boatStatus == "leaving") then
           self:debug("乘船中，被赶下船，去除当前步并重置乘船状态")
           self.boatStatus = "yelling"
           self.currStep = table.remove(self.transferPlan)

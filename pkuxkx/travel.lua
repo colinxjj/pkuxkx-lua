@@ -457,21 +457,24 @@ local define_travel = function()
           end
           self:debug("出发地与目的地处于同一区域，共" .. roomCnt .. "个房间")
         end
-        local result = roomsearch {
+        local plan = roomsearch {
           rooms = startZone.rooms,
           startid = fromid,
           targetid = toid
         }
-        if result then
-          return result
+        self:printPlan(plan, "直达")
+        if plan then
+          return plan
         end
         -- 修改，当同一区域但无法到达时，使用备用全图搜索！
         ColourNote("yellow", "", "注意，当前区域无法从房间" .. fromid .. "到达房间" .. toid .. "，尝试全局搜索")
-        return roomsearch {
+        local fallbackPlan = roomsearch {
           rooms = self.roomsById,
           startid = fromid,
           targetid = toid
         }
+        self:printPlan(fallbackPlan, "直达")
+        return fallbackPlan
       else
         -- zone search for shortest path
         local zoneStack = zonesearch {
@@ -481,7 +484,7 @@ local define_travel = function()
         }
         if not zoneStack then
           self:debug("计算区域路径失败，区域 " .. startZone.name .. " 至区域 " .. endZone.name .. " 不可达")
-          return false
+          return nil
         else
           table.insert(zoneStack, ZonePath:decorate {startid=startZone.id, endid=startZone.id, weight=0})
           -- only for debug
@@ -506,11 +509,13 @@ local define_travel = function()
             end
           end
           self:debug("本次路径计算跨" .. zoneCnt .. "个区域" .. table.concat(zoneNames, ",") .. "，共" .. roomCnt .. "个房间")
-          return roomsearch {
+          local plan = roomsearch {
             rooms = rooms,
             startid = fromid,
             targetid = toid
           }
+          self:printPlan(plan, "直达")
+          return plan
         end
       end
     end
@@ -2229,16 +2234,20 @@ local define_travel = function()
       -- 遍历计划需要考虑起始节点，所以在栈顶添加startid -> startid的虚拟path
       table.insert(plan, dal:getPseudoPath(plan[#plan].startid))
     end
-    if not plan or #(plan) == 0 then
-      print("遍历路径为空")
-    else
+    self:printPlan(plan, "遍历")
+    return plan
+  end
+
+  function prototype:printPlan(plan, type)
+    if plan then
       local ls = {}
       for i = #(plan), 1, -1 do
         table.insert(ls, plan[i].path)
       end
-      print("遍历路径为：", table.concat(ls, ";"))
+      print(type, table.concat(ls, ";"))
+    else
+      print(type, "无路径")
     end
-    return plan
   end
 
   -- 准备行走计划（直达，或遍历）

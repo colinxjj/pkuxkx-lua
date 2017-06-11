@@ -35,10 +35,9 @@ local define_combat = function()
     ALIAS_START = "^combat\\s+start\\s*$",
     ALIAS_STOP = "^combat\\s+stop\\s*$",
     ALIAS_DEBUG = "^combat\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_MODE = "^combat\\s+mode\\s+(.*?)$",
     ENERGY = "^[ >]*你在攻击中不断积蓄攻势。\\(气势：(\\d+)%\\)$",
   }
-
-  local DefaultPFM = "jianzong"
 
   local PFM = {
     -- 剑宗，默认无脑狂风
@@ -98,7 +97,8 @@ local define_combat = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-    self.pfms = PFM[DefaultPFM]
+    self.defaultPFM = "qizong"
+    self.pfms = PFM[self.defaultPFM]
     self.pfmId = 1
     self.testCombatPfm = "dugu-jiujian.pobing"
   end
@@ -180,6 +180,20 @@ local define_combat = function()
         end
       end
     }
+    helper.addAlias {
+      group = "combat",
+      regexp = REGEXP.ALIAS_MODE,
+      response = function(name, line, wildcards)
+        local mode = wildcards[1]
+        if not PFM[mode] then
+          ColourNote("yellow", "", "不存在给定战斗模式：" .. mode)
+        else
+          self.defaultPFM = mode
+          self.pfms = PFM[mode]
+          self.pfmId = 1
+        end
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -221,10 +235,10 @@ local define_combat = function()
 
   function prototype:start(type)
     if not type then
-      self.pfms = PFM[DefaultPFM]
+      self.pfms = PFM[self.defaultPFM]
     elseif not PFM[type] then
       ColourNote("yellow", "", type .. " PFM设定不存在")
-      self.pfms = PFM[DefaultPFM]
+      self.pfms = PFM[self.defaultPFM]
     else
       self.pfms = PFM[type]
     end
@@ -234,10 +248,10 @@ local define_combat = function()
 
   function prototype:stop(type)
     if not type then
-      self.pfms = PFM[DefaultPFM]
+      self.pfms = PFM[self.defaultPFM]
     elseif not PFM[type] then
       ColourNote("yellow", "", type .. " PFM设定不存在")
-      self.pfms = PFM[DefaultPFM]
+      self.pfms = PFM[self.defaultPFM]
     else
       self.pfms = PFM[type]
     end

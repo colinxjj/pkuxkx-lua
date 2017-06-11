@@ -93,6 +93,8 @@ local define_touxue = function()
     JOB_NEED_CAPTCHA = "^[ >]*慕容复给了你一张纸，上书：$",
     WORK_TOO_FAST = "^[ >]*慕容复说道：「暂时我没有什么事了。」$",
     CANNOT_TOUXUE = "^[ >]*你恐怕没有偷学机会了。$",
+    UNWIELD_SWORD = "^[ >]*你将.*?随手一扔，只见.*?突然变得光芒万道，仿佛化做无数的星光四散飘走了！$",
+    WIELD_SWORD = "^[ >]*.*?突然自动跃入你手中，只见一道白光直透.*?，威力猛然大增！$",
   }
 
   local JobRoomId = 479
@@ -109,6 +111,7 @@ local define_touxue = function()
     self:initTransitions()
     self:initTriggers()
     self:initAliases()
+    self:initTimers()
     self:setState(States.stop)
     self.precisionPercent = PrecisionThreshold
     self.recallPercent = RecallThreshold
@@ -168,7 +171,7 @@ local define_touxue = function()
         helper.enableTriggerGroups("touxue_submit_start")
       end,
       exit = function()
-        helper.disableTimerGroups("touxue_submit_start", "touxue_submit_done")
+        helper.disableTriggerGroups("touxue_submit_start", "touxue_submit_done")
       end
     }
   end
@@ -216,6 +219,7 @@ local define_touxue = function()
       newState = States.submit,
       event = Events.LEARNED,
       action = function()
+        helper.disableTimerGroups("touxue_fight")
         return self:doSubmit()
       end
     }
@@ -353,6 +357,19 @@ local define_touxue = function()
         return self:doPrepare()
       end
     }
+  end
+
+  function prototype:initTimers()
+    helper.removeTimerGroups("touxue_fight")
+--    helper.addTimer {
+--      group = "touxue_fight",
+--      interval = 1,
+--      response = function()
+--        -- always busy myself
+--        SendNoEcho("wield sword")
+--        SendNoEcho("unwield all")
+--      end
+--    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -527,8 +544,10 @@ local define_touxue = function()
     wait.time(1)
     -- 打开触发
     helper.enableTriggerGroups("touxue_fight")
+    helper.enableTimerGroups("touxue_fight")
     while true do
       wait.time(4)
+      -- always busy myself
       if #(self.motionsLearned) == motionCnt then
         ColourNote("green", "", "招数已学满")
         return self:fire(Events.LEARNED)

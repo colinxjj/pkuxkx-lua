@@ -12,6 +12,7 @@ local define_helper = function()
   local helper = {}
 
   local REGEXP = {
+    DYING = "^[ >]*\\( 你已经陷入半昏迷状态，随时都可能摔倒晕去。 \\).8$",
     NOT_BUSY = "^[ >]*你现在不忙。$",
     CHECKED_NOT_BUSY = "^[ >]*你不忙$",
     SETTING = "^[ >]*设定环境变量：__SETTING_NAME__ = \"__SETTING_VALUE__\"$",
@@ -657,6 +658,14 @@ local define_helper = function()
   helper.removeAllTriggers()
   helper.removeAllAliases()
   helper.removeAllTimers()
+  helper.addTrigger {
+    group = "dying",
+    regexp = REGEXP.DYING,
+    response = function()
+      Execute("tp")
+    end
+  }
+  helper.enableTriggerGroups("dying")
   -- 添加定时器防止掉线
   helper.addTimer {
     group = "heartbeat",
