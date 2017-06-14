@@ -549,8 +549,7 @@ local define_touxue = function()
             self:debug("此招已学习", name)
             break
           else
-            local result = self:hp
-            (motion, line)
+            local result = self:evaluateMotion(motion, line)
             if result.success then
               if result.precision >= self.precisionPercent and result.recall >= self.recallPercent then
                 self:debug(motion.simplified, "准确：", result.precision, "召回：", result.recall)
