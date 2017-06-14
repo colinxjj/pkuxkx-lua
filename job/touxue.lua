@@ -96,7 +96,7 @@ local define_touxue = function()
     UNWIELD_SWORD = "^[ >]*你将.*?随手一扔，只见.*?突然变得光芒万道，仿佛化做无数的星光四散飘走了！$",
     WIELD_SWORD = "^[ >]*.*?突然自动跃入你手中，只见一道白光直透.*?，威力猛然大增！$",
     TICK = helper.settingRegexp("touxue", "tick"),
-    MOTION_LEARNED = "^[ >]*motion learned$",
+    MOTION_LEARNED = "^[ >]*你从.*?身上偷学到了一招！$",
   }
 
   local JobRoomId = 479
