@@ -68,6 +68,7 @@ local define_hubiao = function()
     ALIAS_STOP = "^hubiao\\s+stop\\s*$",
     ALIAS_DEBUG = "^hubiao\\s+debug\\s+(on|off)\\s*$",
     ALIAS_MIXIN = "^hubiao\\s+mixin\\s+(.*?)\\s*$",
+    ALIAS_HBST = "^hbst$",
     JOB_INFO = "^(\\d+)\\s+(.*?)\\s+(\\d+)秒\\s+(.*?)\\s+(.*)$",
     ACCEPT_INFO = "^.*把这批红货送到(.*?)那里，他已经派了个伙计名叫(.*?)到(.*?)附近接你，把镖车送到他那里就行了。$",
     ACCEPT_FAIL = "^[ >]*认领任务失败，请选择其他任务。$",
@@ -98,9 +99,9 @@ local define_hubiao = function()
     GRADUATED = "^[ >]*你已经在新手镖局获得足够经验了，快到大城市去闯荡一番吧。$",
     PFM_NOT_IN_COMBAT = "^[ >]*(.*?只能对战斗中的对手使用。|未有对手或者你和对方未处于战斗中，不能使用.*)$",
     HEAL_IN_COMBAT = "^[ >]* 战斗中运功疗伤？找死吗？$",
-    BOAT_ARRIVED = "^[> ]*(艄公说“到啦，上岸吧”.*|船夫对你说道：“到了.*|你朝船夫挥了挥手.*|小舟终于划到近岸.*|.*你跨上岸去。.*|一个番僧用沙哑的声音道：“大轮寺到啦，出来吧。”，.*|藤筐离地面越来越近，终于腾的一声着了地，众人都吁了口长气.*)$",
+    BOAT_ARRIVED = "^[> ]*(艄公说“到啦，上岸吧”|船夫对你说道：“到了|你朝船夫挥了挥手|小舟终于划到近岸|.*你跨上岸去|一个番僧用沙哑的声音道：“大轮寺到啦，出来吧。”，|藤筐离地面越来越近，终于腾的一声着了地，众人都吁了口长气).*$",
     BOAT_FORCED_DEPART = "^[ >]*艄公要继续做生意了，所有人被赶下了渡船。$",
-    BOAT_OFFSHORE = "^[ >]*(艄公把踏脚板收起来.*|船夫把踏脚板收起来.*|小舟在湖中藕菱之间的水路.*|你跃上小舟，船就划了起来。.*|你拿起船桨用力划了起来。.*|番僧用力一推，将藤筐推离平台，绞盘跟着慢慢放松，藤筐一荡，降了下去。|绳索一紧，藤筐左右摇晃振动了几下，冉冉向上升了起来。)$",
+    BOAT_OFFSHORE = "^[ >]*(艄公把踏脚板收起来|船夫把踏脚板收起来|小舟在湖中藕菱之间的水路|你跃上小舟，船就划了起来|你拿起船桨用力划了起来|番僧用力一推，将藤筐推离平台，绞盘跟着慢慢放松，藤筐一荡，降了下去|绳索一紧，藤筐左右摇晃振动了几下，冉冉向上升了起来).*$",
   }
 
   local SpecialRenameRooms = {
@@ -129,10 +130,10 @@ local define_hubiao = function()
   }
 
   -- 福州福威镖局
---  local StartRoomId = 26
+--  local JobRoomId = 26
 --  local JobNpcId = "lin"
   -- 苏州镖局
-  local StartRoomId = 456
+  local JobRoomId = 456
   local JobNpcId = "zuo"
   local PrefetchDepth = 5
   local DoubleSearchDepth = 3
@@ -319,7 +320,7 @@ local define_hubiao = function()
       event = Events.PREFETCH_SUCCESS,
       action = function()
         -- back to start
-        travel:walkto(StartRoomId)
+        travel:walkto(JobRoomId)
         travel:waitUntilArrived()
         self:debug("等待2秒后进行运送")
         wait.time(2)
@@ -806,6 +807,22 @@ local define_hubiao = function()
         end
       end
     }
+    helper.addAlias {
+      group = "hubiao",
+      regexp = REGEXP.ALIAS_HBST,
+      response = function()
+        self:fire(Events.STOP)
+        wait.time(1)
+        travel:walkto(JobRoomId)
+        travel:waitUntilArrived()
+        wait.time(1)
+        SendNoEcho("ask " .. JobNpcId .. " about fail")
+        SendNoEcho("ask " .. JobNpcId .. " about 重置任务")
+        self.rounds = 0
+        wait.time(1)
+        return self:fire(Events.START)
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -825,7 +842,7 @@ local define_hubiao = function()
 
   function prototype:doSubmitCaiwu()
     travel:stop()
-    travel:walkto(StartRoomId)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     helper.checkUntilNotBusy()
     SendNoEcho("give cai wu to " .. JobNpcId)
@@ -861,7 +878,7 @@ local define_hubiao = function()
       SendNoEcho("fix " .. self.weaponId)
       wait.time(1)
     end
-    travel:walkto(StartRoomId)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     self:debug(
       "恢复设置 精" .. self.jingLowerBound .. "/" .. self.jingUpperBound ..
@@ -1025,7 +1042,7 @@ local define_hubiao = function()
     ColourNote("red", "", "调试模式不进行任务取消，请手动完成后再重新加载")
 --    helper.assureNotBusy()
 --    travel:stop()
---    travel:walkto(StartRoomId)
+--    travel:walkto(JobRoomId)
 --    travel:waitUntilArrived()
 --    helper.assureNotBusy()
 --    SendNoEcho("ask " .. JobNpcId .. " about fail")
@@ -1249,7 +1266,7 @@ local define_hubiao = function()
 
   function prototype:doSubmit()
     travel:stop()
-    travel:walkto(StartRoomId)
+    travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     self.submitSuccess = false
     SendNoEcho("set hubiao submit_start")

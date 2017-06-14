@@ -129,7 +129,7 @@ local define_recover = function()
         SendNoEcho("set recover recovered")
       end
     }
-    self:addTransitionToStop(States.stop)
+    self:addTransitionToStop(States.heal)
     -- transition from state<recover>
     self:addTransition {
       oldState = States.recover,
