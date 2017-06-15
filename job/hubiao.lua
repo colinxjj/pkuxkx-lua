@@ -180,6 +180,7 @@ local define_hubiao = function()
     self.weaponDurability = 500
     -- 开启调试
     self:debugOn()
+    -- 开启日志
   end
 
   function prototype:disableAllTriggers()

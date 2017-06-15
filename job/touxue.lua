@@ -409,15 +409,7 @@ local define_touxue = function()
   end
 
   function prototype:initTimers()
-    helper.removeTimerGroups("touxue_fight")
-    helper.addTimer {
-      group = "touxue_fight",
-      interval = 1,
-      response = function()
-        -- always busy myself
-        SendNoEcho("set touxue tick")
-      end
-    }
+
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -610,7 +602,6 @@ local define_touxue = function()
 
   function prototype:doSubmit()
     SendNoEcho("set skip_combat 1")
-    helper.removeTriggerGroups("touxue_fight")
     helper.checkUntilNotBusy()
     travel:walkto(JobRoomId)
     travel:waitUntilArrived()
