@@ -97,6 +97,7 @@ local define_touxue = function()
     WIELD_SWORD = "^[ >]*.*?突然自动跃入你手中，只见一道白光直透.*?，威力猛然大增！$",
     TICK = helper.settingRegexp("touxue", "tick"),
     MOTION_LEARNED = "^[ >]*你从.*?身上偷学到了一招！$",
+    WON = "^[ >]*你战胜了(.*?)!$",
   }
 
   local JobRoomId = 479
@@ -225,6 +226,8 @@ local define_touxue = function()
         SendNoEcho("halt")
         SendNoEcho("follow none")
         SendNoEcho("bei strike cuff")
+        SendNoEcho("jifa sword dugu-jiujian")
+        SendNoEcho("unwield all")
         return self:doSubmit()
       end
     }
@@ -299,8 +302,8 @@ local define_touxue = function()
           SendNoEcho("touxue " .. self.npcId)
         else
           -- busy myself
+          SendNoEcho("wield jitui")
           SendNoEcho("unwield all")
-          SendNoEcho("wield sword")
         end
       end
     }
@@ -321,6 +324,14 @@ local define_touxue = function()
       regexp = REGEXP.CANNOT_TOUXUE,
       response = function()
         self:debug("CANNOT_TOUXUE triggered")
+        self.cannotTouxue = true
+      end
+    }
+    helper.addTrigger {
+      group = "touxue_fight",
+      regexp = REGEXP.WON,
+      response = function()
+        self:debug("WON triggered")
         self.cannotTouxue = true
       end
     }
@@ -530,6 +541,7 @@ local define_touxue = function()
     -- 接触装备和武功
     SendNoEcho("follow " .. self.npcId)
     SendNoEcho("unwield all")
+    SendNoEcho("jifa sword none")
     SendNoEcho("bei none")
     SendNoEcho("yun recover")
     SendNoEcho("set skip_combat 0")
@@ -566,6 +578,7 @@ local define_touxue = function()
         end
       end
     }
+    helper.enableTriggerGroups("touxue_fight_npc")
     combat:stop()
     SendNoEcho("fight " .. self.npcId)
     while true do
