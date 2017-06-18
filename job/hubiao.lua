@@ -62,6 +62,7 @@ local define_hubiao = function()
     TRANSFER_SUCCESS = "transfer_success",  -- 运输成功 transfer -> submit
     MIXIN_FOUND = "mixin_found",  -- 发现密信 submit -> mixin
     CONTINUE = "continue",  -- submit -> prepare
+    CANCEL = "cancel",  -- any cancellable states -> submit -> prepare
   }
   local REGEXP = {
     ALIAS_START = "^hubiao\\s+start\\s*$",
@@ -328,6 +329,14 @@ local define_hubiao = function()
         return self:doPrepareTransfer()
       end
     }
+    self:addTransition {
+      oldState = States.prefetch,
+      newState = States.submit,
+      event = Events.CANCEL,
+      action = function()
+        return self:doCancel()
+      end
+    }
     self:addTransitionToStop(States.prefetch)
     -- transition from state<transfer>
     self:addTransition {
@@ -369,7 +378,7 @@ local define_hubiao = function()
             return self:doSubmit()
           else
             ColourNote("red", "", "没有找到伙计，任务失败！")
-            return self:doCancel()
+            return self:fire(Events.CANCEL)
           end
         end
       end
@@ -411,6 +420,14 @@ local define_hubiao = function()
         return self:doSubmit()
       end
     }
+    self:addTransition {
+      oldState = States.transfer,
+      newState = States.submit,
+      event = Events.CANCEL,
+      action = function()
+        return self:doCancel()
+      end
+    }
     self:addTransitionToStop(States.transfer)
     -- transition from state<lost>
     self:addTransition {
@@ -419,6 +436,15 @@ local define_hubiao = function()
       event = Events.RELOCATED,
       action = function()
         return self:doPrepareTransfer()
+      end
+    }
+    self:addTransition {
+      oldState = States.lost,
+      newState = States.submit,
+      event = Events.CANCEL,
+      action = function()
+        travel:stop()
+        return self:doCancel()
       end
     }
     self:addTransitionToStop(States.lost)
@@ -948,7 +974,7 @@ local define_hubiao = function()
     if #(targets) == 0 then
       self:debug("运镖区域不可达，等待2秒后结束")
       wait.time(2)
-      return self:doCancel()
+      return self:fire(Events.CANCEL)
     else
       local zone = targets[1].zone
       local searchRooms = {}
@@ -971,7 +997,7 @@ local define_hubiao = function()
         if not specialRelocateId then
           ColourNote("red", "", "无法执行预取，取消该任务")
           wait.time(2)
-          return self:doCancel()
+          return self:fire(Events.CANCEL)
         end
         ColourNote("green", "", "特殊房间匹配，重新定位至房间：" .. specialRelocateId)
         table.insert(searchRooms, travel.roomsById[specialRelocateId])
@@ -1030,7 +1056,7 @@ local define_hubiao = function()
     else
       self:debug("没有更多的搜索房间，预取失败，放弃该任务")
       wait.time(2)
-      return self:doCancel()
+      return self:fire(Events.CANCEL)
     end
   end
 
@@ -1040,26 +1066,24 @@ local define_hubiao = function()
 
   function prototype:doCancel()
     -- for debug purpose
-    ColourNote("red", "", "调试模式不进行任务取消，请手动完成后再重新加载")
---    helper.assureNotBusy()
---    travel:stop()
---    travel:walkto(JobRoomId)
---    travel:waitUntilArrived()
---    helper.assureNotBusy()
---    SendNoEcho("ask " .. JobNpcId .. " about fail")
---    return self:fire(Events.STOP)
+--    ColourNote("red", "", "调试模式不进行任务取消，请手动完成后再重新加载")
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    helper.assureNotBusy()
+    SendNoEcho("ask " .. JobNpcId .. " about fail")
+    return self:fire(Events.CONTINUE)
   end
 
   function prototype:doPrepareTransfer()
     local walkPlan = travel:generateWalkPlan(travel.currRoomId, self.targetRoomId)
     if not walkPlan then
       ColourNote("red", "", "计算直达路径失败，放弃该任务")
-      return self:doCancel()
+      return self:fire(Events.CANCEL)
     end
     local traversePlan = travel:generateNearbyTraversePlan(self.targetRoomId, DoubleSearchDepth, true)
     if not traversePlan then
       ColourNote("red", "", "计算搜索路径失败，放弃该任务")
-      return self:doCancel()
+      return self:fire(Events.CANCEL)
     end
     -- 合并两个行走计划栈，注意顺序
     local transferPlan = {}
@@ -1137,7 +1161,8 @@ local define_hubiao = function()
           SendNoEcho("gan che to " .. direction)
         else
           ColourNote("red", "", "护镖不支持特殊路径" .. self.currStep.path)
-          return self:doCancel()
+          --return self:doCancel()
+          error("地图错误，存在不可行路径")
         end
       elseif self.currStep.category == PathCategory.multiple then
         -- self:sendPath(move.path)
@@ -1149,11 +1174,11 @@ local define_hubiao = function()
             SendNoEcho("gan che to " .. direction)
           else
             ColourNote("yellow", "", "护镖不支持多命令路径" .. self.currStep.path)
-            return self:doCancel()
+            error("地图错误，存在不可行路径")
           end
         else
           ColourNote("yellow", "", "护镖不支持多命令路径" .. self.currStep.path)
-          return self:doCancel()
+          error("地图错误，存在不可行路径")
         end
       elseif self.currStep.category == PathCategory.busy then
         local direction, isExpanded = helper.expandDirection(self.currStep.path)
@@ -1161,7 +1186,7 @@ local define_hubiao = function()
           SendNoEcho("gan che to " .. direction)
         else
           ColourNote("red", "", "护镖不支持特殊路径" .. self.currStep.path)
-          return self:doCancel()
+          error("地图错误，存在不可行路径")
         end
       elseif self.currStep.category == PathCategory.boat then
         self:debug("boatStatus?", self.boatStatus)
@@ -1178,10 +1203,10 @@ local define_hubiao = function()
         end
       elseif self.currStep.category == PathCategory.pause then
         ColourNote("red", "", "护镖不支持pause路径")
-        return self:doCancel()
+        error("地图错误，存在不可行路径")
       elseif self.currStep.category == PathCategory.block then
         ColourNote("red", "", "护镖不支持block路径")
-        return self:doCancel()
+        error("地图错误，存在不可行路径")
       else
         error("current version does not support this path category:" .. self.currStep.category, 2)
       end
@@ -1223,9 +1248,10 @@ local define_hubiao = function()
     local matchedRooms = {}
     for _, room in pairs(rooms1) do
       if currRoomName == room.name
-        and (currRoomDesc == room.description or currRoomDesc == "一片浓雾中，什么也看不清。")  -- 当大雾时，不对描述进行匹配
-        and travel:checkExitsIdentical(currRoomExits, room.exits)
-        and (self.transferRoomId ~= room.id or self.robberMoves > 1)
+        and (
+          (currRoomDesc == room.description and travel:checkExitsIdentical(currRoomExits, room.exits))
+          or string.find(currRoomDesc, "一片浓雾中，什么也看不清。")  -- 大雾时，不对出口和描述做判断
+        ) and (self.transferRoomId ~= room.id or self.robberMoves > 1)
       then
         table.insert(matchedRooms, room)
       end
@@ -1242,10 +1268,10 @@ local define_hubiao = function()
       end
       if #matchedRoomsWithZone == 0 then
         ColourNote("red", "", "不存在同区域房间匹配，放弃任务")
-        return self:doCancel()
+        return self:fire(Events.CANCEL)
       elseif #matchedRoomsWithZone > 1 then
         ColourNote("red", "", "存在同区域多个房间匹配，放弃任务")
-        return self:doCancel()
+        return self:fire(Events.CANCEL)
       else
         ColourNote("yellow", "", "匹配到同区域唯一房间，重新计算")
         travel.currRoomId = matchedRoomsWithZone[1].id
@@ -1261,7 +1287,7 @@ local define_hubiao = function()
       return self:fire(Events.RELOCATED)
     else
       ColourNote("red", "", "无房间可匹配，放弃该任务")
-      return self:doCancel()
+      return self:fire(Events.CANCEL)
     end
   end
 
