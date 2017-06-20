@@ -302,8 +302,9 @@ local define_touxue = function()
           SendNoEcho("touxue " .. self.npcId)
         else
           -- busy myself
-          SendNoEcho("wield jitui")
+--          SendNoEcho("wield jitui")
           SendNoEcho("unwield all")
+          SendNoEcho("wield jitui")
         end
       end
     }
