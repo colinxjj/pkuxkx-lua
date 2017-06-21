@@ -150,6 +150,7 @@ local define_tianzhu = function()
         return self:doGo()
       end
     }
+    self:addTransitionToStop(States.ask)
     -- transition from state<fight>
     self:addTransition {
       oldState = States.fight,
@@ -159,6 +160,7 @@ local define_tianzhu = function()
         return self:doSubmit()
       end
     }
+    self:addTransitionToStop(States.fight)
   end
 
   function prototype:initTriggers()
@@ -312,6 +314,8 @@ local define_tianzhu = function()
     travel:waitUntilArrived()
     wait.time(1)
     SendNoEcho("give dashi tian zhu")
+    helper.checkUntilNotBusy()
+    return self:fire(Events.STOP)
   end
 
   return prototype
