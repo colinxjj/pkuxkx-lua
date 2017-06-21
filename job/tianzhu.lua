@@ -281,7 +281,7 @@ local define_tianzhu = function()
     self.needCaptcha = false
     SendNoEcho("set tianzhu ask_start")
     SendNoEcho("ask dashi about job")
-    SendNoEcho("ask tianzhu ask_done")
+    SendNoEcho("set tianzhu ask_done")
     helper.checkUntilNotBusy()
     if self.targetLocation then
       return self:fire(Events.GO)
@@ -299,7 +299,9 @@ local define_tianzhu = function()
   end
 
   function prototype:doGo()
-    travel:walktoFirst(self.targetLocation)
+    travel:walktoFirst {
+      fullname = self.targetLocation
+    }
     travel:waitUntilArrived()
     print("到达目的地")
   end

@@ -165,10 +165,10 @@ local define_hubiao = function()
     self.jingLowerBound = 0.9
     self.qiUpperBound = 1
     self.qiLowerBound = 0.9
-    self.neiliUpperBound = 1.8
-    self.neiliLowerBound = 1
-    self.jingliUpperBound = 1.2
-    self.jingliLowerBound = 1
+    self.neiliUpperBound = 0.95
+    self.neiliLowerBound = 0.5
+    self.jingliUpperBound = 0.9
+    self.jingliLowerBound = 0.8
     -- ÂÒÈëÊý
     self.robberMoves = 0
     -- ³Ë´¬×´Ì¬

@@ -16,6 +16,7 @@ local nanjue = require "job.nanjue"
 -- local hubiao = require "job.hubiao"
 local murong = require "job.murong"
 local touxue = require "job.touxue"
+local tianzhu = require "job.tianzhu"
 
 -- ∞Ôª·»ŒŒÒ
 local banghui = require "common.banghui"
