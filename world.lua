@@ -198,6 +198,8 @@ function Note() end
 
 function EnableTimerGroup() end
 
+function EnableTriggerGroup() end
+
 utils = {}
 
 function utils.split(str, delim)

@@ -314,6 +314,7 @@ local define_tianzhu = function()
     travel:waitUntilArrived()
     wait.time(1)
     SendNoEcho("give dashi tian zhu")
+    wait.time(1)
     helper.checkUntilNotBusy()
     return self:fire(Events.STOP)
   end

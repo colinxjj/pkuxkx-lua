@@ -33,8 +33,6 @@ local define_dal = function()
     GET_ROOMS_LIKE_CODE = "select * from rooms where code like ?",
     GET_ROOMS_BY_ZONE = "select * from rooms where zone = ?",
     GET_PATHS_BY_STARTID = "select * from paths where startid = ?",
-    --    GET_PINYIN_BY_CHR = "select * from pinyin2chr where pinyin = ?",
-    --    GET_CHR_BY_PINYIN = "select * from chr2pinyin where chr = ?",
     -- current version ignores code, zone, mapinfo columns
     UPD_ROOM = [[update rooms
     set name = :name, description = :description, exits = :exits
