@@ -72,6 +72,7 @@ local define_captcha = function()
     self.picThread = nil
     self.url = nil
     self.pngStr = nil
+    self.baseUrl = "http://pkuxkx.net"
 
     world[self.scriptName] = function()
       self:refreshWindow()
@@ -192,7 +193,19 @@ local define_captcha = function()
 
   function prototype:doGetHTML(url)
     http.TIMEOUT = 2
-    return http.request(url)
+    local result
+    if string.find(url, self.baseUrl) then
+      result = http.request(url)
+      if not result then
+        -- 官网可能遭到攻击了，使用备用网址
+        self.baseUrl = "http://pkuxkx.com"
+        local fallbackUrl = string.gsub(url, "pkuxkx.net", "pkuxkx.com")
+        result = http.request(fallbackUrl)
+      end
+    else
+      result = http.request(url)
+    end
+    return result
   end
 
   function prototype:doGetJpgUrl(htmlText)
@@ -200,7 +213,7 @@ local define_captcha = function()
     if string.len(htmlText) >= 25 then
       local jpgUrl = string.match(htmlText, "/b2evo_captcha_tmp.-jpg")
       if not jpgUrl then return nil end
-      return "http://pkuxkx.net/antirobot" .. jpgUrl
+      return self.baseUrl .. "/antirobot" .. jpgUrl
     else
       return nil
     end

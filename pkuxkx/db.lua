@@ -9,55 +9,25 @@
 --------------------------------------------------------------
 -- db.lua
 -- handle db operations
+-- important update, we use utf8 character set to store
+-- all strings in sqlite3 db
+-- that means the characters directly received from
+-- MUSHClient must be converted from GBK to UTF8 before
+-- sending to DB
+--
+-- to encapsulate the effort of converting forth and back
+-- we do this in all DB operations and make sure the interface
+-- of this method only require GBK encoded string, all conversions
+-- are made automatically in the public methods
 --------------------------------------------------------------
+local iconv = require "luaiconv"
+local utf8encoder = iconv.new("utf-8", "gbk")
+local utf8decoder = iconv.new("gbk", "utf-8")
+
 local define_db = function()
 
   local prototype = {}
   prototype.__index = prototype
-
-  -- Deprecated, use file db
-  local getDataFromFile = function(filename, sql)
-    local db = sqlite3.open(filename, 0)
-    local results = {}
-    local stmt = db:prepare(sql)
-    while true do
-      local result = stmt:step()
-      if result == sqlite3.DONE then
-        break
-      end
-      assert(result == sqlite3.ROW, "Row not found")
-      local row = stmt:get_named_values()
-      table.insert(results, row)
-    end
-    stmt:finalize()
-    db:close()
-
-    return results
-  end
-
-  -- Deprecated, use file db
-  local doLoad = function(db, sql, rows, bindRow)
-    local stmt = db:prepare(sql)
-    for idx, row in ipairs(rows) do
-      bindRow(stmt, row)
-      local result = stmt:step()
-      if result ~= sqlite3.DONE then error(db:errmsg()) end
-      stmt:reset()
-    end
-    stmt:finalize()
-  end
-
-  -- Deprecated, use file db
-  local loadDataInMem = function(filename, db)
-    local rooms = getDataFromFile(filename, "select * from rooms")
-    local roomsSql = "insert into rooms (id, code, name, description, exits, zone) values (?,?,?,?,?,?)"
-    local bindRoom = function(stmt, row) stmt:bind_values(row.id, row.code, row.name, row.description, row.exits, row.zone) end
-    doLoad(db, roomsSql, rooms, bindRoom)
-    local paths = getDataFromFile(filename, "select * from paths")
-    local pathsSql = "insert into paths (startid, endid, path, endcode, weight) values (?,?,?,?,?)"
-    local bindPath = function(stmt, row) stmt:bind_values(row.startid, row.endid, row.path, row.endcode, row.weight) end
-    doLoad(db, pathsSql, paths, bindPath)
-  end
 
   function prototype.open(filename)
     assert(filename, "filename cannot be empty")
@@ -90,6 +60,15 @@ local define_db = function()
     end
   end
 
+  local decodeRow = function(row)
+    for k, v in pairs(row) do
+      if type(v) == "string" then
+        row[k] = utf8decoder:iconv(v)
+      end
+    end
+    return row
+  end
+
   function prototype:fetchRowAs(args)
     assert(args.stmt, "stmt cannot be nil")
     local stmt = assert(self.stmts[args.stmt], "stmt is not prepared")
@@ -99,8 +78,16 @@ local define_db = function()
     stmt:reset()
     if params then
       if type(params) == "table" then
+        for i, v in ipairs(params) do
+          if type(v) == "string" then
+            params[i] = utf8encoder:iconv(v)
+          end
+        end
         assert(stmt:bind_values(unpack(params)) == sqlite3.OK, "failed to bind values")
       else
+        if type(params) == "string" then
+          params = utf8encoder:iconv(params)
+        end
         assert(stmt:bind_values(params) == sqlite3.OK, "failed to bind values")
       end
     end
@@ -108,7 +95,7 @@ local define_db = function()
     if stmt:step() ~= sqlite3.ROW then
       return nil
     end
-    return constructor(nil, stmt:get_named_values())
+    return constructor(nil, decodeRow(stmt:get_named_values()))
   end
 
   function prototype:fetchRowsAs(args)
@@ -131,8 +118,16 @@ local define_db = function()
 
     if params then
       if type(params) == "table" then
+        for i, v in ipairs(params) do
+          if type(v) == "string" then
+            params[i] = utf8encoder:iconv(v)
+          end
+        end
         assert(stmt:bind_values(unpack(params)) == sqlite3.OK, "failed to bind values")
       else
+        if type(params) == "string" then
+          params = utf8encoder:iconv(params)
+        end
         assert(stmt:bind_values(params) == sqlite3.OK, "failed to bind values")
       end
     end
@@ -143,7 +138,7 @@ local define_db = function()
         break
       end
       assert(result == sqlite3.ROW, "Row not found")
-      local row = stmt:get_named_values()
+      local row = decodeRow(stmt:get_named_values())
       local obj = constructor(nil, row)
       if key then
         results[key(obj)] = obj
@@ -164,6 +159,11 @@ local define_db = function()
     assert(type(args.params) == "table", "params in update must be name table")
     --always reset the statement
     stmt:reset()
+    for k, v in pairs(params) do
+      if type(v) == "string" then
+        params[k] = utf8encoder:iconv(v)
+      end
+    end
     assert(stmt:bind_names(params) == sqlite3.OK, "failed to bind params with nametable")
     assert(stmt:step() == sqlite3.DONE)
   end

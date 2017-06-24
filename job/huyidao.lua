@@ -81,6 +81,7 @@ local define_huyidao = function()
     ALIAS_DEBUG = "^huyidao\\s+debug\\s+(on|off)\\s*$",
     ALIAS_SEARCH = "^huyidao\\s+search\\s+(.*?)\\s+(.*?)\\s*$",
     ALIAS_XUNBAO = "^huyidao\\s+xunbao\\s+(.*?)\\s*$",
+    ALIAS_MANUAL = "^^huyidao\\s+manual\\s+(on|off)\s*$",
     JOB_INFO = "^[ >]*胡一刀说道：『我收到消息，听说(.*?)有盗宝人(.*?)\\((.*?)\\)找到了闯王宝藏的地图,你可否帮忙找回来！』$",
     MAP_COUNT = "^\\( *(\\d+)\\) *宝藏地图残片\\(Map piece\\d+\\)$",
     GIVEN = "^[ >]*你给胡一刀一.*$",
@@ -325,6 +326,30 @@ local define_huyidao = function()
         self.searchZoneName = wildcards[2]
       end
     }
+    helper.addAlias {
+      group = "huyidao",
+      regexp = REGEXP.ALIAS_XUNBAO,
+      response = function(name, line, wildcards)
+        travel:walktoFirst {
+          fullname = wildcards[1]
+        }
+        travel:waitUntilArrived()
+        wait.time(1)
+        SendNoEcho("xunbao")
+      end
+    }
+    helper.addAlias {
+      group = "huyidao",
+      regexp = REGEXP.ALIAS_MANUAL,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self.manual = true
+        else
+          self.manual = false
+        end
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -562,7 +587,16 @@ local define_huyidao = function()
 
   -- 仅在询问失败时执行
   function prototype:doCancel()
-    ColourNote("red", "", "请手动取消任务")
+    if self.manual then
+      ColourNote("red", "", "请手动取消任务")
+    else
+      travel:walkto(JobRoomId)
+      wait.time(1)
+      SendNoEcho("ask hu about fail")
+      wait.time(1)
+      helper.checkUntilNotBusy()
+      return self:fire(Events.STOP)
+    end
   end
 
   return prototype

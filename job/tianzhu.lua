@@ -25,7 +25,7 @@ give dashi tian zhu
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
-local status = require "pkuxkx.status"
+local captcha = require "pkuxkx.captcha"
 
 local define_tianzhu = function()
   local prototype = FSM.inheritedMeta()
@@ -51,7 +51,7 @@ local define_tianzhu = function()
     ALIAS_SEARCH = "^tianzhu\\s+search\\s+(.+)$",
     ALIAS_BACK = "^tianzhu\\s+back\\s*$",
     JOB_INFO = "^[ >]*莲花生大士\\(lianhuasheng dashi\\)告诉你：我推测天珠可能即将在(.*?)出世，你不妨去看一看。$",
-    CAPTCHA = "^captcha info$",
+    CAPTCHA = "^[ >]*请注意，忽略验证码中的红色文字。$",
     REWARDED = "^[ >]*莲花生大士给了你一枚天珠，并嘱咐到.*$",
     OBTAINED = "^[ >]*历经艰辛之后，你获取了出世的天珠，可以把它交给莲花生大士复命了。$",
     ZHENQI = "^[ >]*莲花生大士说道：「建康府的南贤与我有旧，你可以去他那里请教真气运行的规则。」$",
@@ -150,6 +150,7 @@ local define_tianzhu = function()
         return self:doGo()
       end
     }
+    self:addTransitionToStop(States.ask)
     -- transition from state<fight>
     self:addTransition {
       oldState = States.fight,
@@ -159,6 +160,7 @@ local define_tianzhu = function()
         return self:doSubmit()
       end
     }
+    self:addTransitionToStop(States.fight)
   end
 
   function prototype:initTriggers()
@@ -281,7 +283,7 @@ local define_tianzhu = function()
     self.needCaptcha = false
     SendNoEcho("set tianzhu ask_start")
     SendNoEcho("ask dashi about job")
-    SendNoEcho("ask tianzhu ask_done")
+    SendNoEcho("set tianzhu ask_done")
     helper.checkUntilNotBusy()
     if self.targetLocation then
       return self:fire(Events.GO)
@@ -299,7 +301,9 @@ local define_tianzhu = function()
   end
 
   function prototype:doGo()
-    travel:walktoFirst(self.targetLocation)
+    travel:walktoFirst {
+      fullname = self.targetLocation
+    }
     travel:waitUntilArrived()
     print("到达目的地")
   end
@@ -310,6 +314,9 @@ local define_tianzhu = function()
     travel:waitUntilArrived()
     wait.time(1)
     SendNoEcho("give dashi tian zhu")
+    wait.time(1)
+    helper.checkUntilNotBusy()
+    return self:fire(Events.STOP)
   end
 
   return prototype
