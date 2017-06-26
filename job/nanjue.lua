@@ -584,7 +584,9 @@ local define_nanjue = function()
   function prototype:initTriggers()
     helper.removeTriggerGroups(
       "nanjue_info_start", "nanjue_info_done",
+      "nanjue_record_start", "nanjue_record_done",
       "nanjue_look_start", "nanjue_look_done",
+      "nanjue_ask_start", "nanjue_ask_done",
       "nanjue_testify_start", "nanjue_testify_done",
       "nanjue_submit_start", "nanjue_submit_done"
     )

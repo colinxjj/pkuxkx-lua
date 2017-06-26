@@ -8,8 +8,8 @@
 
 local helper = require "pkuxkx.helper"
 local http = require "socket.http"
---assert(package.loadlib("luagd.dll", "luaopen_gd"))()
-local gd = require "gd"
+assert(package.loadlib("luagd.dll", "luaopen_gd"))()
+-- local gd = require "gd"
 require "movewindow"
 
 local define_captcha = function()
@@ -79,7 +79,7 @@ local define_captcha = function()
     end
 
     -- initialize
-    local im = gd.createFromJpeg(self.pngDir .. "\\" .. "empty.jpg")
+    local im = gd.createTrueColor(20, 20)
     self.pngStr = im:pngStr()
     self:drawWindow()
 

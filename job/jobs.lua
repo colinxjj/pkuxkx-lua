@@ -13,10 +13,10 @@ local status = require "pkuxkx.status"
 -- 导入所有任务实现
 local songxin = require "job.songxin"
 local nanjue = require "job.nanjue"
--- local hubiao = require "job.hubiao"
 local murong = require "job.murong"
 local touxue = require "job.touxue"
 local tianzhu = require "job.tianzhu"
+local cisha = require "job.cisha"
 
 -- 帮会任务
 local banghui = require "common.banghui"
@@ -454,6 +454,14 @@ local define_jobs = function()
     self.definedJobs.touxue = Job:decorate {
       def = JobDefinition.touxue,
       impl = touxue
+    }
+    self.definedJobs.tianzhu = Job:decorate {
+      def = JobDefinition.tianzhu,
+      impl = tianzhu
+    }
+    self.definedJobs.cisha = Job:decorate {
+      def = JobDefinition.cisha,
+      impl = cisha
     }
   end
 

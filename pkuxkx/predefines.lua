@@ -56,10 +56,13 @@ local predefines = function()
 
   -- define useful constants here
   trigger_info_flag = {}
+  trigger_info_flag.script_name = 4
   trigger_info_flag.group = 26
   alias_info_flag = {}
+  alias_info_flag.script_name = 3
   alias_info_flag.group = 16
   timer_info_flag = {}
+  timer_info_flag.script_name = 5
   timer_info_flag.group = 19
 
   -- error code

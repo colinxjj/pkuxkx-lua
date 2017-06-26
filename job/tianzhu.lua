@@ -72,6 +72,12 @@ local define_tianzhu = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
+    self.precondition = {
+      jing = 1,
+      qi = 1,
+      neili = 1.8,
+      jingli = 1
+    }
   end
 
   function prototype:resetOnStop()
@@ -89,6 +95,7 @@ local define_tianzhu = function()
       enter = function()
         self:disableAllTriggers()
         self:resetOnStop()
+        SendNoEcho("set jobs job_done")
       end,
       exit = function() end
     }
@@ -164,7 +171,10 @@ local define_tianzhu = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("tianzhu_ask_start", "tianzhu_ask_done", "tianzhu_submit")
+    helper.removeTriggerGroups(
+      "tianzhu_ask_start", "tianzhu_ask_done",
+      "tianzhu_fight",
+      "tianzhu_submit")
     helper.addTriggerSettingsPair {
       group = "tianzhu",
       start = "ask_start",
@@ -317,6 +327,10 @@ local define_tianzhu = function()
     wait.time(1)
     helper.checkUntilNotBusy()
     return self:fire(Events.STOP)
+  end
+
+  function prototype:doStart()
+    return self:fire(Events.START)
   end
 
   return prototype

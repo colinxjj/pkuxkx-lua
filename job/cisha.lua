@@ -115,9 +115,12 @@ local define_cisha = function()
 
   function prototype:disableAllTriggers()
     helper.disableTimerGroups(
-      "cisha_ask_start", "cisha_ask_done", "cisha_wait",
-      "cisha_duizhao_start", "cisha_duizhao_done", "cisha_search",
-      "cisha_kill", "cisha_look_start", "cisha_look_done",
+      "cisha_ask_start", "cisha_ask_done",
+      "cisha_wait",
+      "cisha_duizhao_start", "cisha_duizhao_done",
+      "cisha_search",
+      "cisha_kill",
+      "cisha_look_start", "cisha_look_done",
       "cisha_submit")
   end
 
@@ -549,10 +552,12 @@ local define_cisha = function()
     end
     SendNoEcho("follow " .. self.npcId)
     SendNoEcho("yun powerup")
+    SendNoEcho("ask " .. self.npcId .. " about fight")
     SendNoEcho("killall " .. self.npcId)
     local waitTime = 0
     while not self.finished do
       self:debug("等待完成", waitTime)
+      SendNoEcho("ask " .. self.npcId .. " about fight")
       SendNoEcho("killall " .. self.npcId)
       wait.time(5)
     end
@@ -574,12 +579,17 @@ local define_cisha = function()
   end
 
   function prototype:doCancel()
---    travel:walkto(JobRoomId)
---    travel:waitUntilArrived()
---    wait.time(1)
---    SendNoEcho("ask meng about fail")
---
-    ColourNote("red", "", "手动进行取消")
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    wait.time(1)
+    SendNoEcho("ask meng about fail")
+    wait.time(1)
+    return self:fire(Events.STOP)
+--    ColourNote("red", "", "手动进行取消")
+  end
+
+  function prototype:doStart()
+    return self:fire(Events.START)
   end
 
   return prototype

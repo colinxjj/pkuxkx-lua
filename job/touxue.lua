@@ -170,12 +170,8 @@ local define_touxue = function()
     }
     self:addState {
       state = States.submit,
-      enter = function()
-        helper.enableTriggerGroups("touxue_submit_start")
-      end,
-      exit = function()
-        helper.disableTriggerGroups("touxue_submit_start", "touxue_submit_done")
-      end
+      enter = function() end,
+      exit = function() end
     }
   end
 
@@ -235,7 +231,7 @@ local define_touxue = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("touxue_ask_start", "touxue_ask_done")
+    helper.removeTriggerGroups("touxue_ask_start", "touxue_ask_done", "touxue_fight")
     helper.addTriggerSettingsPair {
       group = "touxue",
       start = "ask_start",

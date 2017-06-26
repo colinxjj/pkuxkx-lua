@@ -56,6 +56,7 @@ local define_db = function()
     assert(args, "args in prepare cannot be nil")
     for name, sql in pairs(args) do
       if self.stmts[name] then error("SQL " .. name .. " is already prepared", 2) end
+      -- print("prepare stmt ", name, sql)
       self.stmts[name] = self.db:prepare(sql)
     end
   end
@@ -105,7 +106,7 @@ local define_db = function()
     if sqlType == "unprepared" then
       stmt = self.db:prepare(args.stmt)
     else
-      stmt = assert(self.stmts[args.stmt], "stmt is not prepared")
+      stmt = assert(self.stmts[args.stmt], "stmt is not prepared:" .. args.stmt)
       -- always reset the statement
       stmt:reset()
     end

@@ -189,6 +189,7 @@ local define_helper = function()
     local triggerList = GetTriggerList()
     if triggerList then
       for _, trigger in ipairs(triggerList) do
+
         helper.removeTrigger(trigger)
       end
     end
@@ -204,7 +205,10 @@ local define_helper = function()
       for i, trigger in ipairs(triggerList) do
         local group = GetTriggerInfo(trigger, trigger_info_flag.group)
         if groups[group] then
-          helper.removeTrigger(trigger)
+          local scriptName = GetTriggerInfo(trigger, trigger_info_flag.script_name)
+          if scriptName and string.find(scriptName, "auto_added_trigger_") then
+            helper.removeTrigger(trigger)
+          end
         end
       end
     end
@@ -250,7 +254,10 @@ local define_helper = function()
     local aliasList = GetAliasList()
     if aliasList then
       for i, alias in ipairs(aliasList) do
-        helper.removeAlias(alias)
+        local scriptName = GetAliasInfo(alias, alias_info_flag.script_name)
+        if scriptName and string.find(scriptName, "auto_added_alias_") then
+          helper.removeAlias(alias)
+        end
       end
     end
   end
@@ -354,7 +361,10 @@ local define_helper = function()
     local timerList = GetTimerList()
     if timerList then
       for i, timer in ipairs(timerList) do
-        helper.removeTimer(timer)
+        local scriptName = GetTimerInfo(timer, timer_info_flag.script_name)
+        if scriptName and string.find(scriptName, "auto_added_timer_") then
+          helper.removeTimer(timer)
+        end
       end
     end
   end
@@ -658,6 +668,7 @@ local define_helper = function()
   helper.removeAllTriggers()
   helper.removeAllAliases()
   helper.removeAllTimers()
+  helper.removeTriggerGroups("dying")
   helper.addTrigger {
     group = "dying",
     regexp = REGEXP.DYING,
@@ -667,6 +678,7 @@ local define_helper = function()
   }
   helper.enableTriggerGroups("dying")
   -- 添加定时器防止掉线
+  helper.removeTimerGroups("heartbeat")
   helper.addTimer {
     group = "heartbeat",
     interval = 30,
@@ -676,6 +688,7 @@ local define_helper = function()
   }
   helper.enableTimerGroups("heartbeat")
   -- 添加别名
+  helper.removeAliasGroups("helper")
   helper.addAlias {
     group = "helper",
     regexp = REGEXP.ALIAS_TP_SET,

@@ -43,7 +43,7 @@ create table if not exists pinyin2chr (
 );
 create table if not exists chr2pinyin (
   chr text primary key,
-  unicode integer,
+  chrcode integer,
   pinyin text
 );
 create index if not exists idx_chr2pinyin on chr2pinyin (unicode);

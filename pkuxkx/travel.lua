@@ -1397,14 +1397,17 @@ local define_travel = function()
 
   -- 初始化触发器
   function prototype:initTriggers()
-
     helper.removeTriggerGroups(
       "travel_look_start",
       "travel_look_name",
       "travel_look_desc",
       "travel_look_season",
       "travel_look_exits",
-      "travel_walk"
+      "travel_walk",
+      "travel_block_start",
+      "travel_block_done",
+      "travel_walk_busy_start",
+      "travel_walk_busy_done"
     )
 
     -- 初始触发

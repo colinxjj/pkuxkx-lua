@@ -220,8 +220,11 @@ local define_murong = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("murong_ask_start", "murong_ask_done",
-      "murong_search", "murong_kill")
+    helper.removeTriggerGroups(
+      "murong_ask_start", "murong_ask_done",
+      "murong_search",
+      "murong_kill",
+      "murong_submit_start", "murong_submit_done")
     helper.addTriggerSettingsPair {
       group = "murong",
       start = "ask_start",
@@ -335,30 +338,7 @@ local define_murong = function()
   end
 
   function prototype:initTimers()
---    helper.removeTimerGroups("murong_kill")
---    helper.addTimer {
---      group = "murong_kill",
---      interval = 2,
---      response = function()
---        if not self.killSeconds then
---          self.killSeconds = 0
---        else
---          self.killSeconds = self.killSeconds + 2
---        end
---        if self.killSeconds % 8 == 0 then
---          SendNoEcho("yun recover")
---        end
---        self:debug("Õ½¶·Ê±¼ä", self.killSeconds)
---        if self.killSeconds % 3 == 0 then
-----          SendNoEcho("perform dugu-jiujian.poqi")
---          SendNoEcho("wield sword")
---          SendNoEcho("perform kuangfeng-kuaijian.kuangfeng")
---          SendNoEcho("perform huashan-jianfa.jianzhang")
-----          SendNoEcho("perform yunushijiu-jian.sanqingfeng")
---          SendNoEcho("perform dugu-jiujian.pobing")
---        end
---      end
---    }
+
   end
 
   function prototype:addTransitionToStop(fromState)

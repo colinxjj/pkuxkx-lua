@@ -33,11 +33,15 @@ local define_hanshizhong = function()
   local prototype = FSM.inheritedMeta()
 
   local States = {
-    stop = "stop"
+    stop = "stop",
+    ask = "ask",
+    search = "search",
+    submit = "submit",
   }
   local Events = {
     STOP = "stop",
-    START = "start"
+    START = "start",
+    SEARCH = "search",
   }
   local REGEXP = {}
 
