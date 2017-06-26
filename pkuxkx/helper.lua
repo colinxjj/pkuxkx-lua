@@ -107,7 +107,7 @@ local define_helper = function()
     local regexp = assert(type(args.regexp) == "string" and args.regexp, "regexp in trigger must be string")
     local group = assert(args.group, "group in trigger cannot be empty")
     local response = assert(type(args.response) == "function" and args.response, "response must be function")
-    local name = args.name or (group .. "_" .. GetUniqueID())
+    local name = args.name or ("auto_added_trigger_" .. group .. "_" .. GetUniqueID())
     local sequence = args.sequence or 10
     local stopEvaluation = args.stopEvaluation or false
 
