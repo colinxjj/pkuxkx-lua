@@ -189,8 +189,10 @@ local define_helper = function()
     local triggerList = GetTriggerList()
     if triggerList then
       for _, trigger in ipairs(triggerList) do
-
-        helper.removeTrigger(trigger)
+        local scriptName = GetTriggerInfo(trigger, trigger_info_flag.script_name)
+        if scriptName and string.find(scriptName, "auto_added_trigger_") then
+          helper.removeTrigger(trigger)
+        end
       end
     end
   end
@@ -205,10 +207,7 @@ local define_helper = function()
       for i, trigger in ipairs(triggerList) do
         local group = GetTriggerInfo(trigger, trigger_info_flag.group)
         if groups[group] then
-          local scriptName = GetTriggerInfo(trigger, trigger_info_flag.script_name)
-          if scriptName and string.find(scriptName, "auto_added_trigger_") then
-            helper.removeTrigger(trigger)
-          end
+          helper.removeTrigger(trigger)
         end
       end
     end

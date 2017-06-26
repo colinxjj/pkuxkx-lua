@@ -103,6 +103,7 @@ local define_hubiao = function()
     BOAT_ARRIVED = "^[> ]*(艄公说“到啦，上岸吧”|船夫对你说道：“到了|你朝船夫挥了挥手|小舟终于划到近岸|.*你跨上岸去|一个番僧用沙哑的声音道：“大轮寺到啦，出来吧。”，|藤筐离地面越来越近，终于腾的一声着了地，众人都吁了口长气).*$",
     BOAT_FORCED_DEPART = "^[ >]*艄公要继续做生意了，所有人被赶下了渡船。$",
     BOAT_OFFSHORE = "^[ >]*(艄公把踏脚板收起来|船夫把踏脚板收起来|小舟在湖中藕菱之间的水路|你跃上小舟，船就划了起来|你拿起船桨用力划了起来|番僧用力一推，将藤筐推离平台，绞盘跟着慢慢放松，藤筐一荡，降了下去|绳索一紧，藤筐左右摇晃振动了几下，冉冉向上升了起来).*$",
+    WAKEUP = "^[ >]*慢慢地你终于又有了知觉....$",
   }
 
   local SpecialRenameRooms = {
@@ -139,6 +140,7 @@ local define_hubiao = function()
   local PrefetchDepth = 5
   local DoubleSearchDepth = 3
   local WeaponFixRoomId = 2167
+  local DiningRoomId = 3797
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -489,7 +491,11 @@ local define_hubiao = function()
       "hubiao_step_start", "hubiao_step_done",
       "hubiao_submit_start", "hubiao_submit_done",
       "hubiao_mixin_start", "hubiao_mixin_done",
+      "hubiao_weapon_id_start", "hubiao_weapon_id_done",
+      "hubiao_weapon_dura_start", "hubiao_weapon_dura_done",
       "hubiao_transfer",
+      "hubiao_transfer_traverse",
+      "hubiao_prefetch_traverse",
       "hubiao_robber",
       "hubiao_force"
     )
@@ -657,6 +663,13 @@ local define_hubiao = function()
       response = function()
 --        self.transferLost = true
         self.robberMoves = self.robberMoves + 1
+      end
+    }
+    helper.addTrigger {
+      group = "hubiao_transfer",
+      regexp = REGEXP.WAKEUP,
+      response = function()
+        return self:fire(Events.CANCEL)
       end
     }
     helper.addTrigger {
@@ -878,6 +891,23 @@ local define_hubiao = function()
   end
 
   function prototype:doGetJob()
+    -- 检查食物饮水
+    status:hpbrief()
+    if status.food < 150 or status.drink < 150 then
+      travel:walkto(DiningRoomId)
+      travel:waitUntilArrived()
+      wait.time(1)
+      SendNoEcho("do 2 eat")
+      SendNoEcho("do 2 drink")
+      wait.time(1)
+      helper.checkUntilNotBusy()
+      travel:walkto(JobRoomId)
+      travel:waitUntilArrived()
+      wait.time(1)
+    else
+      self:debug("食物饮水检查完毕")
+    end
+
     -- 检查武器
     self.weaponId = nil
     self.wieldCmd = nil
@@ -1161,7 +1191,6 @@ local define_hubiao = function()
           SendNoEcho("gan che to " .. direction)
         else
           ColourNote("red", "", "护镖不支持特殊路径" .. self.currStep.path)
-          --return self:doCancel()
           error("地图错误，存在不可行路径")
         end
       elseif self.currStep.category == PathCategory.multiple then

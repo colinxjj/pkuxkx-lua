@@ -57,32 +57,34 @@ local define_captcha = function()
   end
 
   function prototype:postConstruct()
-    self:initTriggers()
-    self:initAliases()
-    self.DEBUG = true
-    -- create folder first
-    self.pngs = {}
-    self.pngDir = "png-captcha"
-    os.execute("md " .. self.pngDir)
-    self.windowWidth = 300
-    self.windowHeight = 150
-    self.windowName = "mini_captcha"
-    self.imageName = "captcha"
-    self.scriptName = "captcha_hotspot_callback"
-    self.picThread = nil
-    self.url = nil
-    self.pngStr = nil
-    self.baseUrl = "http://pkuxkx.net"
+    -- only when gd is in namespace
+    if gd then
+      self:initTriggers()
+      self:initAliases()
+      self.DEBUG = true
+      -- create folder first
+      self.pngs = {}
+      self.pngDir = "png-captcha"
+      os.execute("md " .. self.pngDir)
+      self.windowWidth = 300
+      self.windowHeight = 150
+      self.windowName = "mini_captcha"
+      self.imageName = "captcha"
+      self.scriptName = "captcha_hotspot_callback"
+      self.picThread = nil
+      self.url = nil
+      self.pngStr = nil
+      self.baseUrl = "http://pkuxkx.net"
 
-    world[self.scriptName] = function()
-      self:refreshWindow()
+      world[self.scriptName] = function()
+        self:refreshWindow()
+      end
+
+      -- initialize
+      local im = gd.createTrueColor(20, 20)
+      self.pngStr = im:pngStr()
+      self:drawWindow()
     end
-
-    -- initialize
-    local im = gd.createTrueColor(20, 20)
-    self.pngStr = im:pngStr()
-    self:drawWindow()
-
   end
 
   function prototype:debug(...)
