@@ -13,7 +13,7 @@ local patterns = {[[
 local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
-local captcha = require "pkuxkx.captcha"
+-- local captcha = require "pkuxkx.captcha"
 local combat = require "pkuxkx.combat"
 
 -- 去除掉干扰字符
@@ -87,6 +87,7 @@ local define_touxue = function()
     ALIAS_PRECISION = "^touxue\\s+precision\\s+(\\d+)\\s*$",
     ALIAS_RECALL = "^touxue\\s+recall\\s+(\\d+)\\s*$",
     ALIAS_SEARCH = "^touxue\\s+search\\s+(.+?)\\s+(.+?)\\s*$",
+    ALIAS_FIGHT = "^touxue\\s+fight\\s+(.+?)\\s*$",
     JOB_SKILL = "^[ >]*慕容复说道：「.*，我近来习武遇到障碍，听说有人擅长(.*)。」$",
     JOB_NPC_ZONE = "^[ >]*慕容复在你的耳边悄声说道：其人名曰(.*?)，正在(.*?)一带活动。$",
     JOB_MOTION = "^[ >]*慕容复在你的耳边悄声说道：(.*)$",
@@ -97,7 +98,7 @@ local define_touxue = function()
     WIELD_SWORD = "^[ >]*.*?突然自动跃入你手中，只见一道白光直透.*?，威力猛然大增！$",
     TICK = helper.settingRegexp("touxue", "tick"),
     MOTION_LEARNED = "^[ >]*你从.*?身上偷学到了一招！$",
-    WON = "^[ >]*你战胜了(.*?)!$",
+    -- WON = "^[ >]*你战胜了(.*?)!$",
   }
 
   local JobRoomId = 479
@@ -324,14 +325,14 @@ local define_touxue = function()
         self.cannotTouxue = true
       end
     }
-    helper.addTrigger {
-      group = "touxue_fight",
-      regexp = REGEXP.WON,
-      response = function()
-        self:debug("WON triggered")
-        self.cannotTouxue = true
-      end
-    }
+--    helper.addTrigger {
+--      group = "touxue_fight",
+--      regexp = REGEXP.WON,
+--      response = function()
+--        self:debug("WON triggered")
+--        self.cannotTouxue = true
+--      end
+--    }
   end
 
   function prototype:initAliases()
@@ -401,6 +402,18 @@ local define_touxue = function()
         self.zoneName = wildcards[2]
         if self.DEBUG then self:show() end
         return self:doPrepare()
+      end
+    }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_FIGHT,
+      response = function(name, line, wildcards)
+        if self.currState ~= "search" then
+          self:debug("将当前状态修改：" .. self.currState .. " -> " .. States.fight)
+          self.currState = States.fight
+        end
+        self.npcId = wildcards[1]
+        return self:fire(Events.TARGET_FOUND)
       end
     }
   end
@@ -569,7 +582,7 @@ local define_touxue = function()
     }
     helper.enableTriggerGroups("touxue_fight_npc")
     combat:stop()
-    SendNoEcho("fight " .. self.npcId)
+    SendNoEcho("kill " .. self.npcId)
     while true do
       wait.time(1)
       -- always busy myself
