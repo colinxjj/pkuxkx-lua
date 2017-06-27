@@ -23,6 +23,24 @@ http://pkuxkx.net/antirobot/robot.php?filename=1496618202176383
 
 你离开了这一片奸细出没的区域。
 
+你瞬间感到了危险临近，奸细就在附近！
+
+> 树丛
+不知不觉，你竟跟到了一处不知名的所在。
+
+异族奸细可能在东南面略高的地方。
+溪间
+
+>
+su
+异族奸细可能在南面略高的地方。
+看起来辛生永想杀死你！
+看起来司马生亮想杀死你！
+看起来邓剑想杀死你！
+树桩
+    异族奸细 辛生永(Xin shengyong)
+    异族奸细 司马生亮(Sima shengliang)
+    异族奸细 邓剑(Deng jian)
 
 ]]}
 
@@ -44,6 +62,8 @@ local define_hanshizhong = function()
     SEARCH = "search",
   }
   local REGEXP = {}
+
+  local JobRoomId = 642
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -83,7 +103,7 @@ local define_hanshizhong = function()
   end
 
   function prototype:initAliases()
-
+    helper.removeAliasGroups("hanshizhong")
   end
 
   function prototype:addTransitionToStop(fromState)

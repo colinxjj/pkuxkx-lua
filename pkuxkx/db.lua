@@ -157,6 +157,7 @@ local define_db = function()
     assert(args.stmt, "stmt cannot be nil")
     local stmt = assert(self.stmts[args.stmt], "stmt is not prepared")
     local params = assert(args.params, "params in update cannot be nil")
+    local ignoreError = args.ignoreError
     assert(type(args.params) == "table", "params in update must be name table")
     --always reset the statement
     stmt:reset()
@@ -166,7 +167,10 @@ local define_db = function()
       end
     end
     assert(stmt:bind_names(params) == sqlite3.OK, "failed to bind params with nametable")
-    assert(stmt:step() == sqlite3.DONE)
+    local result = stmt:step()
+    if not ignoreError then
+      assert(result == sqlite3.DONE)
+    end
   end
 
   return prototype

@@ -113,6 +113,59 @@ local define_fsm = function()
     ALIAS_DEBUG = "^fsmalias\\s+debug\\s+(on|off)\\s*$",
   }
 
+  local TaskItems = {
+    {
+      itemId = "",
+      itemName = "王重阳的先天罡气谱",
+      npcId = "wang chongyang",
+      npcName = "王重阳",
+    },
+    {
+      itemId = "",
+      itemName = "张三丰的太极剑",
+      npcId = "zhang sanfeng",
+      npcName = "张三丰",
+    },
+    {
+      itemId = "",
+      itemName = "段誉的香罗帕",
+      npcId = "duan yu",
+      npcName = "段誉"
+    },
+    {
+      itemId = "",
+      itemName = "李莫愁的毒经",
+      npcId = "li mochou",
+      npcName = "李莫愁"
+    },
+    {
+      itemId = "",
+      itemName = "令狐冲的佩剑",
+      npcId = "linghu chong",
+      npcName = "令狐冲"
+    },
+    {
+      itemId = "",
+      itemName = "岳灵珊的玉佩",
+      npcId = "yue lingshan",
+      npcName = "岳灵珊"
+    },
+    {
+      itemId = "",
+      itemName = "郭芙的头巾",
+      npcId = "guo fu",
+      npcName = "郭芙"
+    },
+    {
+      itemId = "",
+      itemName = "宁中则的淑女剑",
+      npcId = "ning zhongze",
+      npcName = "宁中则"
+    },
+
+  }
+
+
   function prototype:FSM()
     local obj = FSM:new()
     setmetatable(obj, self or prototype)

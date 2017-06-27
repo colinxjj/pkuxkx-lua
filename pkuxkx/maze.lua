@@ -266,8 +266,9 @@ local define_maze = function()
         self:setPathExplored(move)
         -- check whether the current room id is same as move.startid
         if self.currRoomId == move.startid then
-          self:moveTo(move.startid)
+          self:moveUntilArrived(move.startid)
         end
+        self:moveOnExploring(move)
       end
     else
       return self:fire(Events.EXPLORED)

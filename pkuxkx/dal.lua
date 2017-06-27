@@ -21,6 +21,7 @@ local ZonePath = require "pkuxkx.ZonePath"
 local Room = require "pkuxkx.Room"
 local RoomPath = require "pkuxkx.RoomPath"
 local gb2312 = require "pkuxkx.gb2312"
+local NPC = require "pkuxkx.NPC"
 
 local define_dal = function()
   local prototype = {}
@@ -43,7 +44,10 @@ local define_dal = function()
     where zc.startcode = sz.code
     and zc.endcode = ez.code]],
     GET_ALL_AVAILABLE_ROOMS = "select * from rooms where name <> '' and zone <> ''",
-    GET_ALL_AVAILABLE_PATHS = "select * from paths where enabled = 1"
+    GET_ALL_AVAILABLE_PATHS = "select * from paths where enabled = 1",
+    GET_NPCS_BY_NAME = "select * from npcs where name = ?",
+    GET_NPCS_BY_ID = "select * from npcs where id = ?",
+    INS_NPC = "insert into npcs (id, name, roomid, zone) select :id, :name, :roomid, zone from rooms where id = :roomid",
   }
 
   local nameGetPinyinByCharCode = function(n)
@@ -308,6 +312,30 @@ local define_dal = function()
     return self.db:fetchRowsAs {
       stmt = "GET_ALL_ZONE_PATHS",
       constructor = ZonePath.decorate
+    }
+  end
+
+  function prototype:getNpcsByName(name)
+    return self.db:fetchRowsAs {
+      stmt = "GET_NPCS_BY_NAME",
+      constructor = NPC.decorate,
+      params = name
+    }
+  end
+
+  function prototype:getNpcsById(id)
+    return self.db:fetchRowsAs {
+      stmt = "GET_NPCS_BY_ID",
+      constructor = NPC.decorate,
+      params = id
+    }
+  end
+
+  function prototype:insertNpc(npc)
+    return self.db:executeUpdate {
+      stmt = "INS_NPC",
+      params = npc,
+      ignoreError = true
     }
   end
 

@@ -42,7 +42,7 @@ local define_xiulian = function()
     self:initTriggers()
     self:initAliases()
 
-    self.forceId = "huashan-neigong"
+    self.forceId = "zixia-shengong"
     self.roomId = 2918
     self.includeNanjue = true
   end

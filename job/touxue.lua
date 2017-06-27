@@ -88,6 +88,7 @@ local define_touxue = function()
     ALIAS_RECALL = "^touxue\\s+recall\\s+(\\d+)\\s*$",
     ALIAS_SEARCH = "^touxue\\s+search\\s+(.+?)\\s+(.+?)\\s*$",
     ALIAS_FIGHT = "^touxue\\s+fight\\s+(.+?)\\s*$",
+    ALIAS_MANUAL = "^touxue\\s+manual\\s+(on|off)\\s*$",
     JOB_SKILL = "^[ >]*慕容复说道：「.*，我近来习武遇到障碍，听说有人擅长(.*)。」$",
     JOB_NPC_ZONE = "^[ >]*慕容复在你的耳边悄声说道：其人名曰(.*?)，正在(.*?)一带活动。$",
     JOB_MOTION = "^[ >]*慕容复在你的耳边悄声说道：(.*)$",
@@ -125,6 +126,7 @@ local define_touxue = function()
       neili = 0.95,
       jingli = 0.95
     }
+    self.manual = true
     self:debugOn()
   end
 
@@ -408,12 +410,33 @@ local define_touxue = function()
       group = "touxue",
       regexp = REGEXP.ALIAS_FIGHT,
       response = function(name, line, wildcards)
+        local npcId = wildcards[1]
         if self.currState ~= "search" then
-          self:debug("将当前状态修改：" .. self.currState .. " -> " .. States.fight)
-          self.currState = States.fight
+          if not self.npc or not self.rawMotions then
+            ColourNote("red", "", "无NPC信息或无招数信息，无法进行偷学")
+            return
+          else
+            self:debug("当前状态修改为：" .. self.currState .. " -> " .. States.search)
+            self:debug("目标NPC ID修改为：" .. npcId)
+            self.currState = States.search
+          end
         end
-        self.npcId = wildcards[1]
+        self.npcId = npcId
         return self:fire(Events.TARGET_FOUND)
+      end
+    }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_MANUAL,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self:debug("开启手动模式，当无法自动遍历到NPC时，可手动找到执行命令touxue fight <npc id>")
+          self.manual = true
+        else
+          self:debug("关闭手动模式，无法自动遍历到NPC时，直接取消任务")
+          self.manual = false
+        end
       end
     }
   end
@@ -455,6 +478,9 @@ local define_touxue = function()
       return
     elseif not self.zoneName or not self.npc or not self.skill or not self.rawMotions or #(self.rawMotions) == 0 then
       ColourNote("yellow", "", "无法获取到任务信息，任务失败")
+      return self:doCancel()
+    elseif self.skill == "玄冥神掌" then
+      ColourNote("red", "", "偷学玄冥神掌要死！放弃该任务")
       return self:doCancel()
     end
     if self.DEBUG then self:show() end
@@ -518,7 +544,11 @@ local define_touxue = function()
         return self:fire(Events.TARGET_FOUND)
       else
         ColourNote("yellow", "", "未发现目标，任务失败")
-        return self:doCancel()
+        if self.manual then
+          ColourNote("yellow", "", "请手动寻找目标，找到后执行命令touxue fight <npc id>")
+        else
+          return self:doCancel()
+        end
       end
     end
     helper.checkUntilNotBusy()
@@ -582,7 +612,7 @@ local define_touxue = function()
     }
     helper.enableTriggerGroups("touxue_fight_npc")
     combat:stop()
-    SendNoEcho("kill " .. self.npcId)
+    SendNoEcho("killall " .. self.npcId)
     while true do
       wait.time(1)
       -- always busy myself

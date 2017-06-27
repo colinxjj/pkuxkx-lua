@@ -152,8 +152,9 @@ local define_travel = function()
     ALIAS_WALKTO_CODE = "^walkto\\s+([a-z][a-z0-9]+)\\s*$",
     ALIAS_WALKTO_LIST = "^walkto\\s+listzone\\s+([a-z]+)\\s*$",
     ALIAS_WALKTO_MODE = "^walkto\\s+mode\\s+(quick|normal|slow)$",
-    ALIAS_WALKTO_FIRST = "^walkf\\s+(.*)$",
-    ALIAS_WALKTO_BEFORE_FIRST = "^walkbf\\s+(.*)$",
+    ALIAS_WALKTO_FIRST = "^walkf\\s+(.*?)\\s*$",
+    ALIAS_WALKTO_BEFORE_FIRST = "^walkbf\\s+(.*?)\\s*$",
+    ALIAS_WALK_NPC = "^walknpc\\s+(.*?)\\s*$",
     ALIAS_TRAVERSE = "^traverse\\s+(\\d+)\\s*([^ ]*)$",
     ALIAS_TRAVERSE_ZONE = "^traverse\\s+([a-z][a-z0-9]+)\\s*([^ ]*)$",
     ALIAS_LOC_HERE = "^loc\\s+here\\s*$",
@@ -164,7 +165,9 @@ local define_travel = function()
     ALIAS_LOC_MU_ID = "^loc\\s+mu\\s+(\\d+)\\s*$",
     ALIAS_LOC_SHOW = "^loc\\s+show\\s*$",
     ALIAS_LOC_LMU_ID = "^loc\\s+lmu\\s+(\\d+)\\s*$",
-    ALIAS_TASKLOC = "^taskloc\\s+(.+?)\\s+(.+?)\\s*$",
+    ALIAS_LOC_TASK = "^loctask\\s+(.+?)\\s+(.+?)\\s*$",
+    ALIAS_LOC_NPC = "^locnpc\\s+(.+?)\\s*$",
+    ALIAS_ADD_NPC = "^addnpc\\s+(.+?)\\s+(.+?)\\s*$",
     -- triggers
     ROOM_NAME_WITH_AREA = "^[ >]*(.{0,14}) {1,2}\\- \\[[^ ]+\\]$",
     ROOM_NAME_WITHOUT_AREA = "^[ >]*(.{0,14}) {1,2}\\- $",
@@ -774,7 +777,7 @@ local define_travel = function()
     end
   end
 
-  function prototype:taskloc(args)
+  function prototype:loctask(args)
     local words = args.words
     local exits = args.exits
     local results = {}
@@ -1574,7 +1577,7 @@ local define_travel = function()
   -- 初始化别名
   function prototype:initAliases()
     helper.removeAliasGroups("travel")
-    -- 通用
+    -- 说明
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_TRAVEL,
@@ -1597,8 +1600,13 @@ local define_travel = function()
         print("loc guess", "通过房间名称的拼音查找类似的房间")
         print("loc mu <number>", "将当前房间与目标房间对比，如果信息匹配，则更新")
         print("loc lmu <number>", "查看当前房间，与目标房间对比并进行更新，该操作主要用于为地图添加或更新节点")
+        print("提供npc定位，行走以及录入功能：")
+        print("locnpc <npc name or id>", "定位同名或同id的npc房间")
+        print("walknpc <npc name or id>", "行走至同名或同id的npc房间")
+        print("addnpc <npc name> <npc id>", "添加npc到数据库，npc的中文名(不可有空格分隔)为参数1，npc的英文id（可有空格分隔，建议用全名）为参数2")
       end
     }
+    -- 调试模式
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_DEBUG,
@@ -1611,6 +1619,7 @@ local define_travel = function()
         end
       end
     }
+    -- 停止行走
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_STOP,
@@ -1626,7 +1635,7 @@ local define_travel = function()
         self:reloc()
       end
     }
-    -- 自动行走
+    -- 自动行走(房间编号)
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_WALKTO_ID,
@@ -1637,6 +1646,7 @@ local define_travel = function()
         self:debug("到达目的地")
       end
     }
+    -- 自动行走(房间代码)
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_WALKTO_CODE,
@@ -1666,6 +1676,7 @@ local define_travel = function()
         end
       end
     }
+    -- 房间列表
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_WALKTO_LIST,
@@ -1683,6 +1694,7 @@ local define_travel = function()
         end
       end
     }
+    -- 行走模式
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_WALKTO_MODE,
@@ -1766,6 +1778,7 @@ local define_travel = function()
         self:show()
       end
     }
+    -- 查询房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_ID,
@@ -1785,6 +1798,7 @@ local define_travel = function()
         end
       end
     }
+    -- 猜测房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_GUESS,
@@ -1792,6 +1806,7 @@ local define_travel = function()
         self:guess()
       end
     }
+    -- 匹配房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_MATCH_ID,
@@ -1800,6 +1815,7 @@ local define_travel = function()
         self:match(targetRoomId)
       end
     }
+    -- 更新房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_UPDATE_ID,
@@ -1808,6 +1824,7 @@ local define_travel = function()
         self:update(targetRoomId)
       end
     }
+    -- 匹配并更新房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_MU_ID,
@@ -1816,6 +1833,7 @@ local define_travel = function()
         self:match(targetRoomId, true)
       end
     }
+    -- 显示房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_SHOW,
@@ -1823,6 +1841,7 @@ local define_travel = function()
         self:show()
       end
     }
+    -- 查看匹配并更新房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_LOC_LMU_ID,
@@ -1836,17 +1855,17 @@ local define_travel = function()
     -- task相关查询功能
     helper.addAlias {
       group = "travel",
-      regexp = REGEXP.ALIAS_TASKLOC,
+      regexp = REGEXP.ALIAS_LOC_TASK,
       response = function(name, line, wildcards)
         local words = utils.split(wildcards[1], ",")
         local exits = utils.split(wildcards[2], ",")
-        return self:taskloc {
+        return self:loctask {
           words = words,
           exits = exits
         }
       end
     }
-    -- walkto第一个房间
+    -- 行走到第一个房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_WALKTO_FIRST,
@@ -1857,6 +1876,7 @@ local define_travel = function()
         }
       end
     }
+    -- 行走到第一个房间前的一个房间
     helper.addAlias {
       group = "travel",
       regexp = REGEXP.ALIAS_WALKTO_BEFORE_FIRST,
@@ -1865,6 +1885,78 @@ local define_travel = function()
         return self:walktoBeforeFirst {
           fullname = location
         }
+      end
+    }
+    -- 定位npc
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_LOC_NPC,
+      response = function(name, line, wildcards)
+        local searchPattern = wildcards[1]
+        local npcs
+        npcs = dal:getNpcsByName(searchPattern)
+        if not npcs or #npcs == 0 then
+          npcs = dal:getNpcsById(searchPattern)
+        end
+
+        if not npcs or #npcs == 0 then
+          ColourNote("yellow", "", "无法查询到NPC：" .. searchPattern)
+        else
+          print(string.format("%20s %20s %10s %20s", "名字", "ID", "房间", "区域"))
+          for _, npc in ipairs(npcs) do
+            print(string.format("%20s %20s %10d %20s", npc.name, npc.id, npc.roomid, npc.zone))
+          end
+        end
+      end
+    }
+    -- 行走到指定npc
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_WALK_NPC,
+      response = function(name, line, wildcards)
+        local searchPattern = wildcards[1]
+        local npcs
+        npcs = dal:getNpcsByName(searchPattern)
+        if not npcs or #npcs == 0 then
+          npcs = dal:getNpcsById(searchPattern)
+        end
+
+        if not npcs or #npcs == 0 then
+          ColourNote("yellow", "", "无法查询到NPC: " .. searchPattern)
+        else
+          if #npcs > 1 then
+            print("发现多个同名npc：")
+            for _, npc in ipairs(npcs) do
+              print(string.format("%20s %20s %10d %20s", npc.name, npc.id, npc.roomid, npc.zone))
+            end
+          end
+          return self:walkto(npcs[1].roomid)
+        end
+      end
+    }
+    -- 添加npc
+    helper.addAlias {
+      group = "travel",
+      regexp = REGEXP.ALIAS_ADD_NPC,
+      response = function(name, line, wildcards)
+        local npcName = wildcards[1]
+        local npcId = wildcards[2]
+        if self.currState ~= States.located then
+          ColourNote("yellow", "", "当前房间未定位，不可添加NPC")
+        else
+          local roomId = self.currRoomId
+          dal:insertNpc {
+            id = npcId,
+            name = npcName,
+            roomid = roomId
+          }
+          local npcs = dal:getNpcsByName(npcName)
+          -- 打印结果
+          Note("更新成功，同名npc列表:")
+          for _, npc in ipairs(npcs) do
+            Note(string.format("%20s %20s %10d %20s", npc.name, npc.id, npc.roomid, npc.zone))
+          end
+        end
       end
     }
   end
