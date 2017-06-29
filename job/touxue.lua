@@ -88,6 +88,7 @@ local define_touxue = function()
     ALIAS_RECALL = "^touxue\\s+recall\\s+(\\d+)\\s*$",
     ALIAS_SEARCH = "^touxue\\s+search\\s+(.+?)\\s+(.+?)\\s*$",
     ALIAS_FIGHT = "^touxue\\s+fight\\s+(.+?)\\s*$",
+    ALIAS_FIGHT2 = "^touxue\\s+fight2\\s+(.*?)\\s+(.*?)\\s*$",
     ALIAS_MANUAL = "^touxue\\s+manual\\s+(on|off)\\s*$",
     JOB_SKILL = "^[ >]*慕容复说道：「.*，我近来习武遇到障碍，听说有人擅长(.*)。」$",
     JOB_NPC_ZONE = "^[ >]*慕容复在你的耳边悄声说道：其人名曰(.*?)，正在(.*?)一带活动。$",
@@ -327,14 +328,6 @@ local define_touxue = function()
         self.cannotTouxue = true
       end
     }
---    helper.addTrigger {
---      group = "touxue_fight",
---      regexp = REGEXP.WON,
---      response = function()
---        self:debug("WON triggered")
---        self.cannotTouxue = true
---      end
---    }
   end
 
   function prototype:initAliases()
@@ -427,6 +420,27 @@ local define_touxue = function()
     }
     helper.addAlias {
       group = "touxue",
+      regexp = REGEXP.ALIAS_FIGHT2,
+      response = function(name, line, wildcards)
+        local npcName = wildcards[1]
+        local npcId = wildcards[2]
+        if self.currState ~= "search" then
+          if not self.npc or not self.rawMotions then
+            ColourNote("red", "", "无NPC信息或无招数信息，无法进行偷学")
+            return
+          else
+            self:debug("当前状态修改为：" .. self.currState .. " -> " .. States.search)
+            self:debug("目标NPC ID修改为：" .. npcId)
+            self.currState = States.search
+          end
+        end
+        self.npc = npcName
+        self.npcId = npcId
+        return self:fire(Events.TARGET_FOUND)
+      end
+    }
+    helper.addAlias {
+      group = "touxue",
       regexp = REGEXP.ALIAS_MANUAL,
       response = function(name, line, wildcards)
         local cmd = wildcards[1]
@@ -492,8 +506,12 @@ local define_touxue = function()
     local zone = travel:getMatchedZone(self.zoneName)
     if not zone then
       ColourNote("red", "", "区域 " .. self.zoneName .. " 不可达，任务失败")
-      wait.time(1)
-      return self:doCancel()
+      if self.manual then
+        ColourNote("yellow", "", "手动模式，可在找到后touxue fight 人名")
+      else
+        wait.time(1)
+        return self:doCancel()
+      end
     end
     -- 从区域中心开始遍历
     local startRoomCode = zone.centercode
