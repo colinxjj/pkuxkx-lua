@@ -90,6 +90,7 @@ local define_touxue = function()
     ALIAS_FIGHT = "^touxue\\s+fight\\s+(.+?)\\s*$",
     ALIAS_FIGHT2 = "^touxue\\s+fight2\\s+(.*?)\\s+(.*?)\\s*$",
     ALIAS_MANUAL = "^touxue\\s+manual\\s+(on|off)\\s*$",
+    ALIAS_MANUAL_SEARCH = "^touxue\\s+manualsearch\\s+(on|off)\\s*$",
     JOB_SKILL = "^[ >]*慕容复说道：「.*，我近来习武遇到障碍，听说有人擅长(.*)。」$",
     JOB_NPC_ZONE = "^[ >]*慕容复在你的耳边悄声说道：其人名曰(.*?)，正在(.*?)一带活动。$",
     JOB_MOTION = "^[ >]*慕容复在你的耳边悄声说道：(.*)$",
@@ -128,6 +129,7 @@ local define_touxue = function()
       jingli = 0.95
     }
     self.manual = true
+    self.manualsearch = false
     self:debugOn()
   end
 
@@ -453,6 +455,20 @@ local define_touxue = function()
         end
       end
     }
+    helper.addAlias {
+      group = "touxue",
+      regexp = REGEXP.ALIAS_MANUAL_SEARCH,
+      response = function(name, line, wildcards)
+        local cmd = wildcards[1]
+        if cmd == "on" then
+          self:debug("开启手动搜索模式，找到目标执行touxue fight <npc id>")
+          self.manualsearch = true
+        else
+          self:debug("关闭手动搜索模式，自动遍历搜索目标并执行偷学")
+          self.manualsearch = false
+        end
+      end
+    }
   end
 
   function prototype:initTimers()
@@ -496,6 +512,9 @@ local define_touxue = function()
     elseif self.skill == "玄冥神掌" then
       ColourNote("red", "", "偷学玄冥神掌要死！放弃该任务")
       return self:doCancel()
+    elseif self.manualsearch then
+      ColourNote("yellow", "", "手动搜索模式，找到目标后执行touxue fight <npc id>")
+      return
     end
     if self.DEBUG then self:show() end
     return self:doPrepare()
@@ -507,7 +526,7 @@ local define_touxue = function()
     if not zone then
       ColourNote("red", "", "区域 " .. self.zoneName .. " 不可达，任务失败")
       if self.manual then
-        ColourNote("yellow", "", "手动模式，可在找到后touxue fight 人名")
+        ColourNote("yellow", "", "手动模式，可在找到后touxue fight <npc id>")
       else
         wait.time(1)
         return self:doCancel()
@@ -626,6 +645,14 @@ local define_touxue = function()
             end
           end
         end
+      end
+    }
+    helper.addTrigger {
+      group = "touxue_fight_npc",
+      regexp = "^[ >]*" .. self.npc .. "死了。$",
+      response = function()
+        ColourNote("yellow", "", "偷学目标已死，无法偷学，准备返回")
+        self.cannotTouxue = true
       end
     }
     helper.enableTriggerGroups("touxue_fight_npc")
