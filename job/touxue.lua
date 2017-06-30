@@ -512,9 +512,6 @@ local define_touxue = function()
     elseif self.skill == "玄冥神掌" then
       ColourNote("red", "", "偷学玄冥神掌要死！放弃该任务")
       return self:doCancel()
-    elseif self.manualsearch then
-      ColourNote("yellow", "", "手动搜索模式，找到目标后执行touxue fight <npc id>")
-      return
     end
     if self.DEBUG then self:show() end
     return self:doPrepare()
@@ -562,6 +559,12 @@ local define_touxue = function()
     SendNoEcho("halt")
     travel:walkto(self.startRoom.id)
     travel:waitUntilArrived()
+
+    -- 当使用手动搜索模式时，提示信息不进行遍历
+    if self.manualsearch then
+      ColourNote("yellow", "", "手动搜索模式，找到目标后执行touxue fight <npc id>")
+      return
+    end
     -- 寻找目标
     self.npcId = nil
     helper.addOneShotTrigger {
