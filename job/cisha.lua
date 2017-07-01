@@ -130,6 +130,7 @@ local define_cisha = function()
       enter = function()
         helper.removeTriggerGroups("cisha_one_shot")
         self:disableAllTriggers()
+        SendNoEcho("set jobs job_done")
       end,
       exit = function() end
     }

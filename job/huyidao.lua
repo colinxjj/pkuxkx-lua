@@ -48,6 +48,15 @@ ask sui cong about 藏宝图
     这里明显的出口是 northeast 和 west。
 get map from corpse
 你从贝杰的尸体身上搜出一片宝藏地图残片。
+
+>
+ask sui cong about 藏宝图
+你向胡二打听有关『藏宝图』的消息。
+我发现附近的小树林里面藏着一伙盗宝人，从他们身上可能会获得线索。我这就带你过去。
+林间小道
+>
+
+
 ]]}
 
 local helper = require "pkuxkx.helper"
@@ -85,7 +94,10 @@ local define_huyidao = function()
     JOB_INFO = "^[ >]*胡一刀说道：『我收到消息，听说(.*?)有盗宝人(.*?)\\((.*?)\\)找到了闯王宝藏的地图,你可否帮忙找回来！』$",
     MAP_COUNT = "^\\( *(\\d+)\\) *宝藏地图残片\\(Map piece\\d+\\)$",
     GIVEN = "^[ >]*你给胡一刀一.*$",
-    CAPTCHA = "^获得关于盗宝人的消息。$",
+--    CAPTCHA = "^获得关于盗宝人的消息。$",
+    CAPTCHA = "^[ >]*请注意，忽略验证码中的红色文字。$",
+    CAPTCHA_NEXT = "^[ >]*盗宝人(.*?)在(.*?)$",
+
   }
 
   local JobRoomId = 38
@@ -112,6 +124,13 @@ local define_huyidao = function()
 
     self:resetOnStop()
     self.DEBUG = true
+
+    self.precondition = {
+      jing = 1,
+      qi = 1,
+      neili = 1.6,
+      jingli = 1
+    }
   end
 
   function prototype:resetOnStop()
@@ -127,7 +146,7 @@ local define_huyidao = function()
       state = States.stop,
       enter = function()
         self:resetOnStop()
-        self:removeTriggerGroups("huyidao_one_shot")
+        helper.removeTriggerGroups("huyidao_one_shot")
         self:disableAllTriggers()
       end,
       exit = function() end
@@ -597,6 +616,10 @@ local define_huyidao = function()
       helper.checkUntilNotBusy()
       return self:fire(Events.STOP)
     end
+  end
+
+  function prototype:doStart()
+    return self:fire(Events.START)
   end
 
   return prototype

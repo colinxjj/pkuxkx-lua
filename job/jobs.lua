@@ -17,6 +17,8 @@ local murong = require "job.murong"
 local touxue = require "job.touxue"
 local tianzhu = require "job.tianzhu"
 local cisha = require "job.cisha"
+local huyidao = require "job.huyidao"
+local wananta = require "job.wananta"
 
 -- ∞Ôª·»ŒŒÒ
 local banghui = require "common.banghui"
@@ -410,6 +412,7 @@ local define_jobs = function()
     self.jobSeq = 0
     -- add jobs by priority
     table.insert(self.jobs, self.definedJobs.touxue)
+    table.insert(self.jobs, self.definedJobs.cisha)
     table.insert(self.jobs, self.definedJobs.murong)
   end
 
@@ -462,6 +465,10 @@ local define_jobs = function()
     self.definedJobs.cisha = Job:decorate {
       def = JobDefinition.cisha,
       impl = cisha
+    }
+    self.definedJobs.huyidao = Job:decorate {
+      def = JobDefinition.huyidao,
+      impl = huyidao
     }
   end
 
