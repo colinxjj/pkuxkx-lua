@@ -143,10 +143,20 @@ local define_wananta = function()
     }
     self:addTransitionToStop(States.ask)
     -- transition from state<kill>
+    self:addTransition {
+      oldState = States.kill,
+      newState = States.kill,
+      event = Events.NEXT,
+      action = function()
+        self.floor = self.floor + 1
+        SendNoEcho("up")
+        return self:doKill()
+      end
+    }
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroup("wananta_ask_start", "wananta_ask_done")
+    helper.removeTriggerGroups("wananta_ask_start", "wananta_ask_done")
     helper.addTriggerSettingsPair {
       group = "wananta",
       start = "ask_start",
@@ -202,7 +212,8 @@ local define_wananta = function()
     travel:walkto(29)
     travel:waitUntilArrived()
 
-    self:doPowerup()
+    SendNoEcho("yun powerup")
+    SendNoEcho("yun shield")
     self.towerLevel = 1
     self.askSuccess = false
     SendNoEcho("follow none")

@@ -457,6 +457,8 @@ local define_murong = function()
   function prototype:doKill()
     SendNoEcho("halt")
     self:doPowerup()
+    SendNoEcho("follow jiazei")
+    SendNoEcho("ask jiazei about fight")
     SendNoEcho("killall " .. self.jiazeiId)
     SendNoEcho("perform dugu-jiujian.poqi")
     self.killSeconds = nil

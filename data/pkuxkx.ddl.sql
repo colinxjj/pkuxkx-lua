@@ -46,7 +46,7 @@ create table if not exists chr2pinyin (
   chrcode integer,
   pinyin text
 );
-create index if not exists idx_chr2pinyin on chr2pinyin (unicode);
+create index if not exists idx_chr2pinyin on chr2pinyin (chrcode);
 
 create table if not exists zones (
   id integer primary key AUTOINCREMENT,

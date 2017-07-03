@@ -569,8 +569,14 @@ local define_cisha = function()
     SendNoEcho("set cisha look_done")
     helper.checkUntilNotBusy()
     if self.npcMingjiao then
-      self:debug("敌人是明教，使用三仙剑攻击")
-      combat:start("jianzong-mingjiao")
+      self:debug("敌人是明教，使用化学攻击")
+      if combat.defaultPFM == "qizong" then
+        combat:start("qizong-mingjiao")
+      elseif combat.defaultPFM == "jianzong" then
+        combat:start("jianzong-mingjiao")
+      else
+        combat:start()
+      end
     else
       self:debug("敌人不是明教，使用通常攻击")
       combat:start()
