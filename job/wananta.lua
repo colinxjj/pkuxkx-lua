@@ -96,6 +96,7 @@ local define_wananta = function()
       enter = function()
         self:disableAllTriggers()
         self:resetOnStop()
+        SendNoEcho("set jobs job_done")
       end,
       exit = function() end
     }
@@ -267,6 +268,13 @@ local define_wananta = function()
 
   function prototype:doStart()
     return self:fire(Events.START)
+  end
+
+  function prototype:doCancel()
+    SendNoEcho("qiao luo")
+    SendNoEcho("kouling Ð¡±¦")
+    SendNoEcho("qiao luo")
+    return self:fire(Events.STOP)
   end
 
   return prototype

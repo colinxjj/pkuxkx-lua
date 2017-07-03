@@ -247,7 +247,7 @@ local define_Job = function()
     assert(obj.def, "definition of job cannot be nil")
     local impl = assert(obj.impl, "implementation cannot be nil")
     assert(type(impl.doStart) == "function", "doStart() of job implementation must be function")
-    assert(type(impl.doCancel) == "function", "doStop() of job implementation must be function")
+    assert(type(impl.doCancel) == "function", "doCancel() of job implementation must be function")
     assert(type(impl.getLastUpdateTime) == "function", "getLastUpdateTime() of job implementation must be function")
     assert(type(impl.precondition) == "table",
       "precondition of job implementation must be table, containing fields 'jing', 'qi', 'neili', 'jingli'")
@@ -413,6 +413,7 @@ local define_jobs = function()
     -- add jobs by priority
     table.insert(self.jobs, self.definedJobs.touxue)
     table.insert(self.jobs, self.definedJobs.cisha)
+    table.insert(self.jobs, self.definedJobs.wananta)
     table.insert(self.jobs, self.definedJobs.murong)
   end
 
@@ -469,6 +470,10 @@ local define_jobs = function()
     self.definedJobs.huyidao = Job:decorate {
       def = JobDefinition.huyidao,
       impl = huyidao
+    }
+    self.definedJobs.wananta = Job:decorate {
+      def = JobDefinition.wananta,
+      impl = wananta
     }
   end
 
