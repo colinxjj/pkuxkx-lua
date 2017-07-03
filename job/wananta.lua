@@ -153,6 +153,7 @@ local define_wananta = function()
         return self:doKill()
       end
     }
+    self:addTransitionToStop(States.kill)
   end
 
   function prototype:initTriggers()
