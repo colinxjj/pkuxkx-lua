@@ -196,6 +196,16 @@ local define_combat = function()
     }
   end
 
+  function prototype:setMode(mode)
+    if PFM[mode] then
+      self.pfms = PFM[mode]
+      self.pfmId = 1
+      self:debug("战斗模式设置为：", mode)
+    else
+      self:debug("战斗模式无法被设置为：", mode)
+    end
+  end
+
   function prototype:addTransitionToStop(fromState)
     self:addTransition {
       oldState = fromState,

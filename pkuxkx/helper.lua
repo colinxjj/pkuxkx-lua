@@ -167,6 +167,7 @@ local define_helper = function()
         trigger_flag.RegularExpression,
         trigger_flag.Temporary,
         trigger_flag.Replace,
+        trigger_flag.KeepEvaluating,
         trigger_flag.OneShot),
         custom_colour.NoChange,
         COPY_WILDCARDS_NONE, SOUND_FILE_NONE, name, sendto.script, sequence))

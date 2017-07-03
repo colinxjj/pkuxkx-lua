@@ -158,8 +158,7 @@ local define_hubiao = function()
     self.maxRounds = 8
     self.rounds = 0
     -- special variable
-    self.playerName = "撸啊"
-    self.playerId = "luar"
+    self.myId = "luar"
     self.robbersPresent = 0
     self.qiPresent = false
     self.powerupPresent = false
@@ -781,7 +780,7 @@ local define_hubiao = function()
       group = "hubiao",
       regexp = REGEXP.ALIAS_START,
       response = function()
-        return self:fire(Events.START)
+        return self:doStart()
       end
     }
     helper.addAlias {
@@ -856,11 +855,12 @@ local define_hubiao = function()
         travel:walkto(JobRoomId)
         travel:waitUntilArrived()
         wait.time(1)
+        SendNoEcho("ask " .. JobNpcId .. "about finish")
         SendNoEcho("ask " .. JobNpcId .. " about fail")
         SendNoEcho("ask " .. JobNpcId .. " about 重置任务")
         self.rounds = 0
         wait.time(1)
-        return self:fire(Events.START)
+        return self:doStart()
       end
     }
   end
@@ -877,6 +877,11 @@ local define_hubiao = function()
   end
 
   function prototype:doStart()
+    status:score()
+    self.myId = status.id
+    self:debug("当前人物ID：", self.myId)
+    combat:setMode("jianzong")
+    self:debug("设置战斗模式：", "jianzong")
     return self:fire(Events.START)
   end
 
@@ -1152,7 +1157,7 @@ local define_hubiao = function()
   function prototype:doStep()
     while true do
       self.robberExists = true
-      SendNoEcho("ask " .. self.playerId .. "'s robber about 去死")
+      SendNoEcho("ask " .. self.myId .. "'s robber about 去死")
       SendNoEcho("set hubiao check_robber")
       local line = wait.regexp(REGEXP.ROBBER_CHECKED, 2)
       if not line then

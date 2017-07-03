@@ -128,7 +128,7 @@ local define_touxue = function()
       neili = 0.95,
       jingli = 0.95
     }
-    self.manual = true
+    self.manual = false
     self.manualsearch = false
     self:debugOn()
   end

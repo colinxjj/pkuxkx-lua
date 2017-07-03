@@ -75,6 +75,7 @@ local define_cisha = function()
     ALIAS_START = "^cisha\\s+start\\s*$",
     ALIAS_STOP = "^cisha\\s+stop\\s*$",
     ALIAS_DEBUG = "^cisha\\s+debug\\s+(on|off)\\s*$",
+    ALIAS_DUIZHAO = "^cisha\\s+duizhao\\s+(.*?)$",
     JOB_WAIT_LOCATION = "^[ >]*孟之经说道：「这里人多眼杂，你先到(.*?)等候，我自会通知你。」$",
     WORK_TOO_FAST = "^[ >]*孟之经说道：「你上次大发神威之后，汉奸们都大多不敢出头了，过段时间再来吧.*」$",
     PREV_NOT_FINISH = "^[ >]*孟之经说道：「我给你的你上一个任务还没完成呢。」$",
@@ -86,6 +87,7 @@ local define_cisha = function()
     FINISHED = "^[ >]*恭喜！你完成了都统制府行刺任务！$",
     GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰|陨铁)【.*?】。$",
     MINGJIAO_WEAPON = "^ *□手持.*?圣火令\\(.*?\\)$",
+    CAPTCHA = "^[ >]*请注意，忽略验证码中的红色文字。$",
   }
   local JobRoomId = 975
 
@@ -114,7 +116,7 @@ local define_cisha = function()
   end
 
   function prototype:disableAllTriggers()
-    helper.disableTimerGroups(
+    helper.disableTriggerGroups(
       "cisha_ask_start", "cisha_ask_done",
       "cisha_wait",
       "cisha_duizhao_start", "cisha_duizhao_done",
@@ -298,6 +300,14 @@ local define_cisha = function()
         end
       end
     }
+    helper.addTrigger {
+      group = "cisha_wait",
+      regexp = REGEXP.CAPTCHA,
+      response = function(name, line, wildcards)
+        self:debug("CAPTCHA triggered")
+        self.needCaptcha = true
+      end
+    }
     helper.addTriggerSettingsPair {
       group = "cisha",
       start = "duizhao_start",
@@ -328,11 +338,20 @@ local define_cisha = function()
       regexp = REGEXP.TITLE_NAME,
       response = function(name, line, wildcards)
         self:debug("TITLE_NAME triggered")
-        if self.npcName then
-          if self.npcName == wildcards[1] then
-            self.npcId = string.lower(wildcards[2])
-            self:debug("贼人ID为：", self.npcId)
+        if self.searching then
+          if self.npcName then
+            if self.npcName == wildcards[1] then
+              self.npcId = string.lower(wildcards[2])
+              self:debug("贼人ID为：", self.npcId)
+              self.npcFound = true
+            else
+              self:debug("这是别人的贼人，目标名称：", self.npcName)
+            end
+          else
+            self:debug("这是别人的贼人，目标还未遭遇")
           end
+        else
+          self:debug("不在搜索过程中，忽略该贼人")
         end
       end
     }
@@ -401,6 +420,21 @@ local define_cisha = function()
         end
       end
     }
+    helper.addAlias {
+      group = "cisha",
+      regexp = REGEXP.ALIAS_DUIZHAO,
+      response = function(name, line, wildcards)
+        self.hint = {}
+        for _, pos in ipairs(utils.split(wildcards[1], " ")) do
+          local ps = utils.split(pos, ",")
+          table.insert(self.hint, {
+            row = tonumber(ps[1]),
+            column = tonumber(ps[2])
+          })
+        end
+        return self:doDuizhao()
+      end
+    }
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -448,24 +482,32 @@ local define_cisha = function()
   end
 
   function prototype:doWait()
+    self.needCaptcha = false
     travel:walkto(self.waitRoomId)
     travel:waitUntilArrived()
     SendNoEcho("yun recover")
     SendNoEcho("dazuo max")
     self.hint = nil
     local waitTime = 0
-    while not self.hint do
+    while not self.needCaptcha and not self.hint do
       self:debug("等待密语提示", waitTime)
       wait.time(5)
       waitTime = waitTime + 5
     end
-    if self.DEBUG then
+    if self.needCaptcha then
+      ColourNote("yellow", "", "请手动输入需要对照的行列数cisha duizhao <c1>,<r1> <c2>,<r2> ...")
+      return
+    elseif self.DEBUG then
       print("已获取提示信息：")
       for i, h in ipairs(self.hint) do
         print("第" .. i .. "字：", "r" .. h.row, "c" .. h.column)
       end
     end
-    wait.time(1)
+    return self:doDuizhao()
+  end
+
+  function prototype:doDuizhao()
+    assert(self.hint, "hint cannot be nil")
     self.duizhaoMap = nil
     SendNoEcho("halt")
     SendNoEcho("set cisha duizhao_start")
@@ -499,34 +541,16 @@ local define_cisha = function()
     self:debug("前进至区域中心节点后遍历：", centerRoom.id)
     travel:walkto(centerRoom.id)
     travel:waitUntilArrived()
-    self:debug("到达中心节点")
+    self:debug("到达中心节点，当前贼人名：", self.npcName)
 
+    self.searching = true
     self.npcFound = false
-    if self.npcName then
-      self:debug("行进途中已经遇到过贼人，修改遍历条件", self.npcName, self.npcId)
-      helper.addOneShotTrigger {
-        group = "cisha_one_shot",
-        regexp = "^ *大元.*?副使 *" .. self.npcName .. "\\(.*\\)$",
-        response = function()
-          self.npcFound = true
-        end
-      }
-    else
-      self:debug("尚未遇到贼人，遍历寻找")
-      helper.addOneShotTrigger {
-        group = "cisha_one_shot",
-        regexp = REGEXP.FOUND,
-        response = function()
-          self.npcFound = true
-        end
-      }
-    end
     local onStep = function()
       return self.npcFound
     end
     travel:traverseZone(self.searchZone.code, onStep)
     travel:waitUntilArrived()
-
+    self.searching = false
     if self.npcFound then
       self:debug("发现贼人，杀之")
       return self:fire(Events.KILL)
@@ -561,6 +585,7 @@ local define_cisha = function()
       SendNoEcho("ask " .. self.npcId .. " about fight")
       SendNoEcho("killall " .. self.npcId)
       wait.time(5)
+      waitTime = waitTime + 5
     end
     SendNoEcho("follow none")
     SendNoEcho("halt")

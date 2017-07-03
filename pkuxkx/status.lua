@@ -90,7 +90,7 @@ local define_status = function()
     ALIAS_STATUS_ID = "^status\\s+(id|idhere)\\s*$",
     ALIAS_STATUS_INVENTORY = "^status\\s+i\\s*$",
     ALIAS_STATUS_SCORE = "^status\\s+sc\\s*$",
-    ALIAS_STATUS_SHOW = "^status\\s+show\\s+(hp|money|items|weight)\\s*$",
+    ALIAS_STATUS_SHOW = "^status\\s+show\\s+(hp|money|items|weight|sc)\\s*$",
     ALIAS_DEBUG = "^status\\s+debug\\s+(on|off)\\s*$",
     -- 经验，潜能，最大内力，当前内力，最大精力，当前精力
     -- 最大气血，有效气血，当前气血，最大精神，有效精神，当前精神
@@ -104,7 +104,7 @@ local define_status = function()
     GOLDS_DESC = "^[ >]*(.*)两黄金\\((Gold)\\)$",
     MONEY_MISS_STOP_EVALUATION = "^[ >]*你要看什么？$",
     SYSTEM_BUSY = "^[ >]*等等，系统喘气中......$",
-    TITLE_DESC = "^\\s*【\\s*(.*?)\\s*】([^ ]+) (.*?)\\(([A-Z][a-z]*)\\)$",
+    TITLE_DESC = "^\\s*【\\s*(.*?)\\s*】([^ ]+)(?: |「.*?」)(.*?)\\(([A-Z][a-z]*)\\)$",
     MURDEROUS_LEVEL = "^\\s*杀    气：\\s*(.+)$",
     SKBRIEF = "^[ >]*#(\\d+)/(\\d+)$",
     SKILL_LIMIT = "^[ >]*你目前所学过的技能：（共(.*?)项技能，你的技能等级最多能达到(.*?)级）$",
@@ -754,8 +754,10 @@ local define_status = function()
           self:showMoney()
         elseif cmd == "weight" then
           self:showInventory()
+        elseif cmd == "sc" then
+          self:showScore()
         else
-          error("unknown command:" .. cmd, 2)
+          ColourNote("red", "", "unknown command:" .. cmd, 2)
         end
       end
     }
