@@ -160,7 +160,10 @@ local define_xiaofeng = function()
   function prototype:initTransitions()
     -- transition from state<stop>
     self:addTransitionToStop(States.stop)
+    self:addTransition {
+      oldState = States.stop,
 
+    }
   end
 
   function prototype:initTriggers()

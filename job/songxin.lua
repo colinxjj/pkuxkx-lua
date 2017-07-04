@@ -83,10 +83,10 @@ local define_songxin = function()
     self.traverseDepth = 6
     -- threshold of jing, jingli, qi, neili
     self.precondition = {
-      jing = 0.96,
-      qi = 0.96,
-      jingli = 0.96,
-      neili = 1.2
+      jing = 1,
+      qi = 1,
+      jingli = 1,
+      neili = 1.4
     }
   end
 

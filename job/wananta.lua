@@ -234,13 +234,13 @@ local define_wananta = function()
 
   function prototype:doKill()
     self.allKilled = false
-    SendNoEcho("kill wu shi")
+    SendNoEcho("kill wushi")
     while true do
       wait.time(5)
       if self.allKilled then
         break
       else
-        SendNoEcho("kill wu shi")
+        SendNoEcho("kill wushi")
       end
     end
     self:debug("敌人已被清除，当前层数：" .. self.floor)

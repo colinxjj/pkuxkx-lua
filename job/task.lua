@@ -101,7 +101,9 @@ local define_fsm = function()
   local prototype = FSM.inheritedMeta()
 
   local States = {
-    stop = "stop"
+    stop = "stop",
+    item = "item",
+    kill = "kill"
   }
   local Events = {
     STOP = "stop",
@@ -164,7 +166,6 @@ local define_fsm = function()
     },
 
   }
-
 
   function prototype:FSM()
     local obj = FSM:new()

@@ -48,6 +48,8 @@ local define_dal = function()
     GET_NPCS_BY_NAME = "select * from npcs where name = ?",
     GET_NPCS_BY_ID = "select * from npcs where id = ?",
     INS_NPC = "insert into npcs (id, name, roomid, zone) select :id, :name, :roomid, zone from rooms where id = :roomid",
+    GET_ROOMS_LIKE_DESC = "select * from rooms where instr(description, ?)",
+    GET_ROOMS_LIKE_2_DESC = "select * from rooms where instr(description, ?) and instr(description, ?)",
   }
 
   local nameGetPinyinByCharCode = function(n)
@@ -336,6 +338,28 @@ local define_dal = function()
       stmt = "INS_NPC",
       params = npc,
       ignoreError = true
+    }
+  end
+
+  function prototype:getRoomsLikeDesc(pattern)
+    return self.db:fetchRowsAs {
+      stmt = "GET_ROOMS_LIKE_DESC",
+      constructor = Room.decorate,
+      params = pattern
+    }
+  end
+
+  function prototype:getRoomsLikeDesc2(patterns)
+    local params
+    if type(patterns) == "string" then
+      params = utils.split(patterns, ",")
+    elseif type(patterns) == "table" then
+      params = patterns
+    end
+    return self.db:fetchRowsAs {
+      stmt = "GET_ROOMS_LIKE_2_DESC",
+      constructor = Room.decorate,
+      params = params
     }
   end
 
