@@ -132,7 +132,10 @@ local define_combat = function()
       oldState = States.stop,
       newState = States.fight,
       event = Events.START,
-      action = function() end
+      action = function()
+        SendNoEcho("wear shield")
+        SendNoEcho("wield my sword 2")
+      end
     }
     self:addTransitionToStop(States.stop)
     -- transition from state<fight>
