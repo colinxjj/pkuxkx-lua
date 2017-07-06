@@ -581,8 +581,14 @@ local define_jobs = function()
       event = Events.JOB_READY,
       action = function()
         assert(self.currJob, "current job cannot be nil")
+        -- 取消难度设置，仅在任务模块内部设置难度系数
+        SendNoEcho("unset adv_quest")
         self.currJob:start()
         self.currJob:waitUntilDone()
+        -- 取消难度设置，保证其他任务不受影响
+        SendNoEcho("unset adv_quest")
+        -- 删除任务执行设置的临时状态
+        SendNoEcho("unset " .. self.currJob.def.code)
         self:fire(Events.JOB_FINISH)
       end
     }
@@ -755,7 +761,8 @@ local define_jobs = function()
 
   function prototype:doPrepare()
     -- check status
-    print("准备任务")
+    print("准备任务，取消难度设置")
+    SendNoEcho("unset adv_quest")
     wait.time(0.5)
     self.jobDelays = {}
     helper.enableTriggerGroups("jobs_query_start")

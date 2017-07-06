@@ -102,8 +102,11 @@ local define_touxue = function()
     TICK = helper.settingRegexp("touxue", "tick"),
     MOTION_LEARNED = "^[ >]*你从.*?身上偷学到了一招！$",
     -- WON = "^[ >]*你战胜了(.*?)!$",
+    JITUI = "^[ >]*一枝烤得香喷喷的鸡腿。$",
+    NOT_FULLME = "^[ >]*慕容复说道：「你太长时间没有fullme了，完成再来吧。」$",
   }
 
+  local JituiRoomId = 90
   local JobRoomId = 479
 
   function prototype:FSM()
@@ -150,10 +153,12 @@ local define_touxue = function()
     self:addState {
       state = States.ask,
       enter = function()
-        helper.enableTriggerGroups("touxue_ask_start")
+        helper.enableTriggerGroups("touxue_ask_start", "touxue_jitui_start")
       end,
       exit = function()
-        helper.disableTriggerGroups("touxue_ask_start", "touxue_ask_done")
+        helper.disableTriggerGroups(
+          "touxue_ask_start", "touxue_ask_done",
+          "touxue_jitui_start", "touxue_jitui_done")
       end
     }
     self:addState {
@@ -188,13 +193,7 @@ local define_touxue = function()
       newState = States.ask,
       event = Events.START,
       action = function()
-        helper.checkUntilNotBusy()
-        SendNoEcho("halt")
-        travel:walkto(JobRoomId)
-        travel:waitUntilArrived()
-        self:debug("等待1秒后请求任务")
-        wait.time(1)
-        return self:doAsk()
+        return self:doGetJob()
       end
     }
     self:addTransitionToStop(States.stop)
@@ -240,8 +239,28 @@ local define_touxue = function()
     helper.removeTriggerGroups("touxue_ask_start", "touxue_ask_done", "touxue_fight")
     helper.addTriggerSettingsPair {
       group = "touxue",
+      start = "jitui_start",
+      done = "jitui_done"
+    }
+    helper.addTrigger {
+      group = "touxue_jitui_done",
+      regexp = REGEXP.JITUI,
+      response = function()
+        self:debug("JITUI triggered")
+        self.hasJitui = true
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "touxue",
       start = "ask_start",
       done = "ask_done"
+    }
+    helper.addTrigger {
+      group = "touxue_ask_done",
+      regexp = REGEXP.NOT_FULLME,
+      response = function()
+        self.notFullme = true
+      end
     }
     helper.addTrigger {
       group = "touxue_ask_done",
@@ -486,7 +505,24 @@ local define_touxue = function()
     }
   end
 
-  function prototype:doAsk()
+  function prototype:doGetJob()
+    self:debug("检查装备")
+    self.hasJitui = false
+    SendNoEcho("set touxue jitui_start")
+    SendNoEcho("look jitui")
+    SendNoEcho("set touxue jitui_done")
+    helper.checkUntilNotBusy()
+    if not self.hasJitui then
+      travel:walkto(JituiRoomId)
+      travel:waitUntilArrived()
+      helper.checkUntilNotBusy()
+      SendNoEcho("buy jitui 2")
+    end
+    SendNoEcho("halt")
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    self:debug("等待1秒后请求任务")
+    wait.time(1)
     -- reset all job info
     self.zoneName = nil
     self.npc = nil
@@ -495,14 +531,17 @@ local define_touxue = function()
     self.jobMotionInline = true
     self.needCaptcha = nil
     self.workTooFast = false
+    self.notFullme = false
     SendNoEcho("set touxue ask_start")
     SendNoEcho("ask murong fu about job")
     SendNoEcho("set touxue ask_done")
     helper.checkUntilNotBusy()
-    if self.workTooFast then
+    if self.notFullme then
+      error("需要执行fullme了！")
+    elseif self.workTooFast then
       self:debug("任务CD中，等待8秒后继续接")
       wait.time(10)
-      return self:doAsk()
+      return self:doGetJob()
     elseif self.needCaptcha then
       ColourNote("yellow", "", "请手动输入验证信息，格式为：touxue search <人名> <区域名>")
       return

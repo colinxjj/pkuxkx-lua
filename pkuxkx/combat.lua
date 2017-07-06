@@ -69,12 +69,12 @@ local define_combat = function()
         energy = 12,
       }
     },
-    -- 气宗对明教，默认三青峰
+    -- 气宗对明教，默认破气和无极
     ["qizong-mingjiao"] = {
       {
         weapon = "sword",
         name = "dugu-jiujian.poqi",
-        energy = 4
+        energy = 8
       },
       {
         name = "hunyuan-zhang.wuji",
@@ -134,7 +134,7 @@ local define_combat = function()
       event = Events.START,
       action = function()
         SendNoEcho("wear shield")
-        SendNoEcho("wield my sword 2")
+        SendNoEcho("wield my sword")
       end
     }
     self:addTransitionToStop(States.stop)

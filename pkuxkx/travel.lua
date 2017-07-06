@@ -665,7 +665,7 @@ local define_travel = function()
       id = roomId,
       name = self.currRoomName,
       code = "",
-      description = table.concat(self.currRoomDesc),
+      description = table.concat(self.currRoomDesc, ""),
       exits = self.currRoomExits
     }
     dal:updateRoom(room)

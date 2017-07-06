@@ -9,6 +9,9 @@
 local patterns = {[[
 7
 
+你向蒙面杀手打听有关『fight』的消息。
+蒙面杀手说道：「要打便打，不必多言！」
+
 ask xiao about job
 你向萧峰打听有关『job』的消息。
 萧峰点了点头：好！
@@ -28,6 +31,22 @@ http://pkuxkx.net/antirobot/robot.php?filename=1496619389147359
 > 你向蒙面杀手打听有关『认输』的消息。
 蒙面杀手说道：「老子已经认输了，你还讨什么口舌之利？！」
 > 蒙面杀手纵身远远的去了。
+
+
+突然间你身形电闪，瞬间逼近蒙面杀手，剑掌交替中向蒙面杀手奋力击出三剑两掌！
+
+( 蒙面杀手似乎十分疲惫，看来需要好好休息了。 )『蒙面杀手(damage:+1154 wound:+384 气血:49%/68%)』
+( 蒙面杀手已经一副头重脚轻的模样，正在勉力支撑著不倒下去。 )『蒙面杀手(damage:+668 气血:31%/68%)』
+
+蒙面杀手向后一纵，恨恨地说道：「君子报仇，十年不晚！」
+
+
+你战胜了蒙面杀手!
+蒙面杀手深深地叹了口气。
+从蒙面杀手身上掉了出来一些黄金
+算了，我认输啦，算你狠！
+> 你向蒙面杀手打听有关『认输』的消息。
+蒙面杀手说道：「老子已经认输了，你还讨什么口舌之利？！」
 
 -- qin
 你向萧峰打听有关『job』的消息。
@@ -83,6 +102,18 @@ ask xiao about finish
 萧峰说道：「虽然不多，但是略表心意。」
 你获得了四份火铜【劣质】。ll
 
+ask xiao about finish
+你向萧峰打听有关『finish』的消息。
+萧峰说道：「很好。撸兄弟，辛苦你了！」
+你被奖励了：
+        一万零六百七十二点经验；
+        六千四百零三点潜能；
+        一千一百十六点江湖声望。
+你已经完成了四次战胜杀手的工作。
+萧峰说道：「我也筹集了一些银两，已经嘱人存入你的帐户。」
+萧峰说道：「虽然不多，但是略表心意。」
+你获得了三份陨铁【劣质】。
+
 ]]}
 
 
@@ -102,7 +133,8 @@ local define_xiaofeng = function()
   local prototype = FSM.inheritedMeta()
 
   local States = {
-    stop = "stop"
+    stop = "stop",
+    ask = "ask",
   }
   local Events = {
     STOP = "stop",
@@ -112,10 +144,11 @@ local define_xiaofeng = function()
     ALIAS_START = "^xiaofeng\\s+start\\s*$",
     ALIAS_STOP = "^xiaofeng\\s+stop\\s*$",
     ALIAS_DEBUG = "^xiaofeng\\s+debug\\s+(on|off)\\s*$",
-    ALIAS_CAPTURE = "^xiaofeng\\s+capture\\s+(.*)\\s*$",
-    ALIAS_PERSUADE = "^xiaofeng\\s+persuade\\s+(.*)\\s*$",
-    ALIAS_KILL = "^xiaofeng\\s+kill\\s+(.*)\\s*$",
-    ALIAS_WIN = "^xiaofeng\\s+win\\s+(.*)\\s*$",
+--    ALIAS_CAPTURE = "^xiaofeng\\s+capture\\s+(.*)\\s*$",
+--    ALIAS_PERSUADE = "^xiaofeng\\s+persuade\\s+(.*)\\s*$",
+--    ALIAS_KILL = "^xiaofeng\\s+kill\\s+(.*)\\s*$",
+--    ALIAS_WIN = "^xiaofeng\\s+win\\s+(.*)\\s*$",
+    ALIAS_DO = "^xiaofeng\\s+(擒|杀|劝|降)\\s+(.*?)\\s*$",
     JOB_CAPTURE = "^ *此人于中原武林颇为有用，你去将他擒回这里交给我。打晕其之后若他再醒来.*$",
     JOB_PERSUADE = "^ *此人加入西夏一品堂不久，尚可教化，你去劝劝.*$",
     JOB_KILL = "^ *kill shashou$",
@@ -123,7 +156,10 @@ local define_xiaofeng = function()
     JOB_CAPTCHA = "^请注意，忽略验证码中的红色文字。$",
     WORK_TOO_FAST = "^work too fast$",
     PREV_NOT_FINISH = "^prev not finish$",
+    MR_RIGHT = "^[ >]*蒙面杀手说道：「要打便打，不必多言！」$",
   }
+
+  local JobRoomId = 7
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -138,9 +174,8 @@ local define_xiaofeng = function()
     self:initTriggers()
     self:initAliases()
     self:setState(States.stop)
-
     self.mode = nil
-
+    self.DEBUG = true
   end
 
   function prototype:disableAllTriggers()
@@ -162,12 +197,61 @@ local define_xiaofeng = function()
     self:addTransitionToStop(States.stop)
     self:addTransition {
       oldState = States.stop,
-
+      newState = States.ask,
+      event = Events.START,
+      action = function()
+        self:doGetJob()
+      end
     }
   end
 
   function prototype:initTriggers()
-
+    helper.removeTriggerGroups("xiaofeng_ask_start", "xiaofeng_ask_done")
+    helper.addTriggerSettingsPair {
+      group = "xiaofeng",
+      start = "ask_start",
+      done = "ask_done"
+    }
+    helper.addTrigger {
+      group = "xiaofeng_ask_done",
+      regexp = REGEXP.JOB_KILL,
+      response = function()
+        self.mode = XiaofengMode.KILL
+      end
+    }
+    helper.addTrigger {
+      group = "xiaofeng_ask_done",
+      regexp = REGEXP.JOB_CAPTURE,
+      response = function()
+        self.mode = XiaofengMode.CAPTURE
+      end
+    }
+    helper.addTrigger {
+      group = "xiaofeng_ask_done",
+      regexp = REGEXP.JOB_PERSUADE,
+      response = function()
+        self.mode = XiaofengMode.PERSUADE
+      end
+    }
+    helper.addTrigger {
+      group = "xiaofeng_ask_done",
+      regexp = REGEXP.JOB_WIN,
+      response = function()
+        self.mode = XiaofengMode.WIN
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "xiaofeng",
+      start = "identify_start",
+      done = "identify_done"
+    }
+    helper.addTrigger {
+      group = "xiaofeng_identify_done",
+      regexp = REGEXP.MR_RIGHT,
+      response = function()
+        self.identified = true
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -209,6 +293,41 @@ local define_xiaofeng = function()
         print("停止 - 当前状态", self.currState)
       end
     }
+  end
+
+  function prototype:doGetJob()
+    helper.checkUntilNotBusy()
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    wait.time(1)
+    self.needCaptcha = false
+    self.workTooFast = false
+    self.prevNotFinish = false
+    self.location = nil
+    self.mode = nil
+    SendNoEcho("set xiaofeng ask_start")
+    SendNoEcho("ask xiaofeng about job")
+    SendNoEcho("set xiaofeng ask_done")
+    helper.checkUntilNotBusy()
+    if self.needCaptcha then
+      ColourNote("yellow", "", "请手动输入验证码，xiaofeng 劝/擒/降/杀 地点")
+      return
+    elseif self.workTooFast then
+      self:debug("等待8秒后再次询问")
+      wait.time(8)
+      return self:doGetJob()
+    elseif self.prevNotFinish then
+      self:debug("前次任务没有完成，取消之")
+      wait.time(1)
+      SendNoEcho("ask xiao about fail")
+      return self:doGetJob()
+    end
+
+    return self:fire(Events.SEARCH)
+  end
+
+  function prototype:doStart()
+    return self:fire(Events.START)
   end
 
   return prototype
