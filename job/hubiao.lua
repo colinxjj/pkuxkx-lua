@@ -175,10 +175,10 @@ local define_hubiao = function()
     -- 乘船状态
     self.boatStatus = "yelling"
     -- 武器
-    self.weaponName = "百合 追日之剑"
+    self.weaponName = "暗光寒毒 刑天之剑"
     self.weaponId = nil
     self.needWield = true
-    self.wieldCmd = "wield sword"
+    self.wieldCmd = "wield my sword"
     self.weaponDurability = 500
     -- 开启调试
     self:debugOn()
@@ -933,7 +933,7 @@ local define_hubiao = function()
     SendNoEcho("look " .. self.weaponId)
     SendNoEcho("set hubiao weapon_dura_done")
     helper.checkUntilNotBusy()
-    if self.weaponDurability <= 100 then
+    if self.weaponDurability <= 150 then
       travel:walkto(WeaponFixRoomId)
       travel:waitUntilArrived()
       wait.time(1)

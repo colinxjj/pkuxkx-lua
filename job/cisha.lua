@@ -75,7 +75,7 @@ local define_cisha = function()
     ALIAS_START = "^cisha\\s+start\\s*$",
     ALIAS_STOP = "^cisha\\s+stop\\s*$",
     ALIAS_DEBUG = "^cisha\\s+debug\\s+(on|off)\\s*$",
-    ALIAS_DUIZHAO = "^cisha\\s+duizhao\\s+(.*?)$",
+    ALIAS_DUIZHAO = "^cisha\\s+duizhao\\s+([0-9,]+?)$",
     JOB_WAIT_LOCATION = "^[ >]*孟之经说道：「这里人多眼杂，你先到(.*?)等候，我自会通知你。」$",
     WORK_TOO_FAST = "^[ >]*孟之经说道：「你上次大发神威之后，汉奸们都大多不敢出头了，过段时间再来吧.*」$",
     PREV_NOT_FINISH = "^[ >]*孟之经说道：「我给你的你上一个任务还没完成呢。」$",
@@ -425,11 +425,11 @@ local define_cisha = function()
       regexp = REGEXP.ALIAS_DUIZHAO,
       response = function(name, line, wildcards)
         self.hint = {}
-        for _, pos in ipairs(utils.split(wildcards[1], " ")) do
-          local ps = utils.split(pos, ",")
+        local ns = utils.split(wildcards[1], ",")
+        for i = 1, #(ns), 2 do
           table.insert(self.hint, {
-            row = tonumber(ps[1]),
-            column = tonumber(ps[2])
+            row = tonumber(ns[i]),
+            column = tonumber(ns[i + 1])
           })
         end
         return self:doDuizhao()
@@ -495,7 +495,7 @@ local define_cisha = function()
       waitTime = waitTime + 5
     end
     if self.needCaptcha then
-      ColourNote("yellow", "", "请手动输入需要对照的行列数cisha duizhao <c1>,<r1> <c2>,<r2> ...")
+      ColourNote("yellow", "", "请手动输入需要对照的行列数cisha duizhao <c1>,<r1>,<c2>,<r2>,...")
       return
     elseif self.DEBUG then
       print("已获取提示信息：")

@@ -81,6 +81,14 @@ local define_combat = function()
         jiali = "max",
         energy = 12
       }
+    },
+    ["xiaofeng"] = {
+      {
+        weapon = "sword",
+        name = "huashan-jianfa.jianzhang",
+        energy = 12,
+        extraAction = "ask shashou about 认输"
+      }
     }
   }
 
@@ -240,6 +248,19 @@ local define_combat = function()
       end
       if currPfm.jiali then
         SendNoEcho("jiali 0")
+      end
+      if currPfm.extraAction then
+        if type(currPfm.extraAction) == "string" then
+          SendNoEcho(currPfm.extraAction)
+        elseif type(currPfm.extraAction) == "table" then
+          for _, action in ipairs(currPfm.extraAction) do
+            SendNoEcho(action)
+          end
+        elseif type(currPfm.extraAction) == "function" then
+          currPfm.extraAction()
+        else
+          error("Perform的额外动作无法辨识", 2)
+        end
       end
       -- 目前暂不判断是否成功
       self.pfmId = self.pfmId + 1

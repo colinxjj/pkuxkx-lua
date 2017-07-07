@@ -135,10 +135,17 @@ local define_xiaofeng = function()
   local States = {
     stop = "stop",
     ask = "ask",
+    search = "search",
+    kill = "kill",
+    persuade = "persuade",
+    win = "win",
+    capture = "capture",
+    submit = "submit",
   }
   local Events = {
-    STOP = "stop",
-    START = "start"
+    STOP = "stop",  -- any state -> stop
+    START = "start",  -- stop -> ask
+    SEARCH = "search",
   }
   local REGEXP = {
     ALIAS_START = "^xiaofeng\\s+start\\s*$",
@@ -194,14 +201,26 @@ local define_xiaofeng = function()
 
   function prototype:initTransitions()
     -- transition from state<stop>
-    self:addTransitionToStop(States.stop)
     self:addTransition {
       oldState = States.stop,
       newState = States.ask,
       event = Events.START,
       action = function()
-        self:doGetJob()
+        return self:doGetJob()
       end
+    }
+    self:addTransitionToStop(States.stop)
+    -- transition from state<ask>
+    self:addTransition {
+      oldState = States.ask,
+      newState = States.search,
+      event = Events.SEARCH,
+      action = function()
+        return self:doSearch()
+      end
+    }
+    self:addTransition {
+
     }
   end
 

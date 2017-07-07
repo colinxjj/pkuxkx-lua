@@ -18,6 +18,7 @@ local define_helper = function()
     SETTING = "^[ >]*设定环境变量：__SETTING_NAME__ = \"__SETTING_VALUE__\"$",
     ALIAS_TP_SET = "^tp\\s+(.+)$",
     ALIAS_TP = "^tp$",
+    ALIAS_JIANDING = "^jianding([0-9]+)\\s+([^ ]+)\\s*$",
   }
 
   helper.settingRegexp = function(name, value)
@@ -708,6 +709,18 @@ local define_helper = function()
       if direction then
         SendNoEcho(direction)
       end
+    end
+  }
+  helper.addAlias {
+    group = "helper",
+    regexp = REGEXP.ALIAS_JIANDING,
+    response = function(name, line, wildcards)
+      local n = tonumber(wildcards[1])
+      local item = wildcards[2]
+      for i = 1, n do
+        SendNoEcho("jianding " .. item .. " " .. i)
+      end
+      SendNoEcho("i " .. item)
     end
   }
 

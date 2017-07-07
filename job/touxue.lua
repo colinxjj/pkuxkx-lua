@@ -548,7 +548,7 @@ local define_touxue = function()
     elseif not self.zoneName or not self.npc or not self.skill or not self.rawMotions or #(self.rawMotions) == 0 then
       ColourNote("yellow", "", "无法获取到任务信息，任务失败")
       return self:doCancel()
-    elseif self.skill == "玄冥掌法" or self.skill == "先天拳" then
+    elseif string.find(self.skill, "玄冥") or self.skill == "先天拳" then
       ColourNote("red", "", "偷学玄冥神掌或先天拳会死！放弃该任务")
       return self:doCancel()
     end
