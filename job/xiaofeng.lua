@@ -12,6 +12,10 @@ local patterns = {[[
 你向蒙面杀手打听有关『fight』的消息。
 蒙面杀手说道：「要打便打，不必多言！」
 
+
+你向蒙面杀手打听有关『fight』的消息。
+蒙面杀手说道：「就你也配跟我讨教功夫？！」
+
 ask xiao about job
 你向萧峰打听有关『job』的消息。
 萧峰点了点头：好！
@@ -20,6 +24,11 @@ ask xiao about job
 http://pkuxkx.net/antirobot/robot.php?filename=1496619389147359
 
 蒙面杀手脸色微变，说道：「佩服，佩服！」
+
+
+
+-- sha
+
 
 
 -- sheng
