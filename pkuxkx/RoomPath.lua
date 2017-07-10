@@ -26,6 +26,7 @@ local define_RoomPath = function()
     boat = 4,
     pause = 5,
     block = 6,
+    checkbusy = 7,
   }
 
   function prototype:new(args)

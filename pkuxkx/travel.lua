@@ -331,7 +331,7 @@ local define_travel = function()
   -- 设置遍历参数
   function prototype:setTraverse(args)
     local rooms = assert(type(args.rooms) == "table" and args.rooms, "rooms must be a table")
-    local check = assert(type(args.check) == "function" and args.check, "check must be a function")
+    local check = assert(type(args.check) == "function" and args.check, "check must be a function or thread")
     -- no defensive copy, user should make sure immutable :)
     self.traverseRooms = rooms
     self.traverseCheck = check
@@ -2220,6 +2220,9 @@ local define_travel = function()
         self.blockCmd = move.path
         self.blockers = move.blockers
         return self:fire(Events.BLOCKED)
+      elseif move.category == PathCategory.checkbusy then
+        self:sendPath(move.path)
+        helper.checkUntilNotBusy()
       else
         error("current version does not support this path category:" .. move.category, 2)
       end

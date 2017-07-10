@@ -177,6 +177,7 @@ local define_xiaofeng = function()
   }
 
   local JobRoomId = 7
+  local SearchDepth = 5
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -207,6 +208,24 @@ local define_xiaofeng = function()
       end,
       exit = function() end
     }
+    self:addState {
+      state = States.ask,
+      enter = function()
+        helper.enableTriggerGroups("xiaofeng_ask_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("xiaofeng_ask_start", "xiaofeng_ask_done")
+      end
+    }
+    self:addState {
+      state = States.search,
+      enter = function()
+        helper.enableTriggerGroups("xiaofeng_identify_start")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("xiaofeng_identify_start", "xiaofeng_identify_done")
+      end
+    }
   end
 
   function prototype:initTransitions()
@@ -229,9 +248,68 @@ local define_xiaofeng = function()
         return self:doSearch()
       end
     }
+    self:addTransitionToStop(States.ask)
+    -- transition from state<search>
     self:addTransition {
-
+      oldState = States.search,
+      newState = States.search,
+      event = Events.MISSED,
+      action = function()
+        return self:doNearbySearch()
+      end
     }
+    self:addTransition {
+      oldState = States.search,
+      newState = States.search,
+      event = Events.FOLLOWED,
+      action = function()
+        -- 决定用何种模式
+        if self.mode == XiaofengMode.KILL then
+          return self.fire(Events.BEGIN_KILL)
+        elseif self.mode == XiaofengMode.CAPTURE then
+          return self.fire(Events.BEGIN_CAPTURE)
+        elseif self.mode == XiaofengMode.PERSUADE then
+          return self.fire(Events.BEGIN_PERSUADE)
+        elseif self.mode == XiaofengMode.WIN then
+          return self.fire(Events.BEGIN_WIN)
+        else
+          error("萧峰模式错误", 3)
+        end
+      end
+    }
+    self:addTransition {
+      oldState = States.search,
+      newState = States.kill,
+      event = Events.BEGIN_KILL,
+      action = function()
+        return self:doKill()
+      end
+    }
+    self:addTransition {
+      oldState = States.search,
+      newState = States.capture,
+      event = Events.BEGIN_CAPTURE,
+      action = function()
+        return self:doCapture()
+      end
+    }
+    self:addTransition {
+      oldState = States.search,
+      newState = States.win,
+      event = Events.BEGIN_WIN,
+      action = function()
+        return self:doWin()
+      end
+    }
+    self:addTransition {
+      oldState = States.search,
+      newState = States.persuade,
+      event = Events.BEGIN_PERSUADE,
+      action = function()
+        return self:doPersuade()
+      end
+    }
+    self:addTransitionToStop(States.search)
   end
 
   function prototype:initTriggers()
@@ -243,8 +321,18 @@ local define_xiaofeng = function()
     }
     helper.addTrigger {
       group = "xiaofeng_ask_done",
+      regexp = REGEXP.JOB_LOCATION,
+      response = function(name, line, wildcards)
+        self:debug("JOB_LOCATION triggered")
+        self.zoneName = wildcards[1]
+        self.roomName = wildcards[2]
+      end
+    }
+    helper.addTrigger {
+      group = "xiaofeng_ask_done",
       regexp = REGEXP.JOB_KILL,
       response = function()
+        self:debug("JOB_KILL triggered")
         self.mode = XiaofengMode.KILL
       end
     }
@@ -252,6 +340,7 @@ local define_xiaofeng = function()
       group = "xiaofeng_ask_done",
       regexp = REGEXP.JOB_CAPTURE,
       response = function()
+        self:debug("JOB_CAPTURE triggered")
         self.mode = XiaofengMode.CAPTURE
       end
     }
@@ -259,6 +348,7 @@ local define_xiaofeng = function()
       group = "xiaofeng_ask_done",
       regexp = REGEXP.JOB_PERSUADE,
       response = function()
+        self:debug("JOB_PERSUADE triggered")
         self.mode = XiaofengMode.PERSUADE
       end
     }
@@ -266,6 +356,7 @@ local define_xiaofeng = function()
       group = "xiaofeng_ask_done",
       regexp = REGEXP.JOB_WIN,
       response = function()
+        self:debug("JOB_WIN triggered")
         self.mode = XiaofengMode.WIN
       end
     }
@@ -332,7 +423,8 @@ local define_xiaofeng = function()
     self.needCaptcha = false
     self.workTooFast = false
     self.prevNotFinish = false
-    self.location = nil
+    self.zoneName = nil
+    self.roomName = nil
     self.mode = nil
     SendNoEcho("set xiaofeng ask_start")
     SendNoEcho("ask xiaofeng about job")
@@ -350,13 +442,88 @@ local define_xiaofeng = function()
       wait.time(1)
       SendNoEcho("ask xiao about fail")
       return self:doGetJob()
+    elseif not self.zoneName or not self.roomName then
+      error("无法获取到杀手位置信息", 3)
     end
+    return self:doPrepareSearch()
+  end
 
-    return self:fire(Events.SEARCH)
+  function prototype:doPrepareSearch()
+    local searchRooms = travel:getMatchedRooms {
+      zone = self.zoneName,
+      name = self.roomName
+    }
+    if #(searchRooms) == 0 then
+      ColourNote("yellow", "", "任务失败，无法匹配到房间 " .. self.zoneName .. " " .. self.roomName)
+      return self:doCancel()
+    else
+      self.searchRooms = searchRooms
+      self.searchedRoomIds = {}
+      return self:fire(Events.NEXT_SEARCH)
+    end
+  end
+
+  function prototype:doSearch()
+    if #(self.searchRooms) == 0 then
+      ColourNote("yellow", "", "任务失败，没有更多的可搜索房间")
+      return self:doCancel()
+    else
+      local nextRoom = table.remove(self.searchRooms)
+      if self.searchedRoomIds[nextRoom.id] then
+        self:debug("房间" .. nextRoom.id .. "已搜索过")
+        return self:doSearch()
+      end
+      self.identified = false
+      helper.checkUntilNotBusy()
+      travel:walkto(nextRoom.id)
+      travel:waitUntilArrived()
+      -- build a coroutine to check own shashou
+      local onStep = function()
+        SendNoEcho("set xiaofeng identify_start")
+        SendNoEcho("ask mengmian shashou about fight")
+        SendNoEcho("set xiaofeng identify_done")
+        helper.checkUntilNotBusy()
+        -- 将每个经历的地点都放入已搜索列表
+        self.searchedRoomIds[travel.traverseRoomId] = true
+        return self.identified
+      end
+      local onArrive = function()
+        if self.identified then
+          self:debug("遍历结束，已经发现蒙面杀手，并确定目标房间：", self.targetRoomId)
+          return self:doFollow()
+        else
+          self:debug("没有发现蒙面杀手，尝试下一个地点")
+          wait.time(1)
+          return self:fire(Events.NEXT_SEARCH)
+        end
+      end
+      return travel:traverseNearby(SearchDepth, onStep, onArrive)
+    end
+  end
+
+  function prototype:doFollow()
+    self.followed = false
+    SendNoEcho("set xiaofeng follow_start")
+    SendNoEcho("follow mengmian shashou")
+    SendNoEcho("set xiaofeng follow_done")
+    helper.checkUntilNotBusy()
+    if not self.followed then
+      return self:fire(Events.MISSED)
+    else
+      return self:fire(Events.FOLLOWED)
+    end
   end
 
   function prototype:doStart()
     return self:fire(Events.START)
+  end
+
+  function prototype:doCancel()
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    wait.time(1)
+    SendNoEcho("ask xiao about fail")
+    return self:fire(Events.STOP)
   end
 
   return prototype

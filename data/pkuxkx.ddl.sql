@@ -35,7 +35,8 @@ insert into path_category (id, name, description) values
   (3, 'busy', '单个命令，将导致busy状态，可能需要多次重复执行'),
   (4, 'boat', '乘船命令'),
   (5, 'pause', '行走暂停'),
-  (6, 'block', '被阻挡，有npc挡路需要清除');
+  (6, 'block', '被阻挡，有npc挡路需要清除'),
+  (7, 'checkbusy', '行走后检查直到不busy');
 
 create table if not exists pinyin2chr (
   pinyin text primary key,

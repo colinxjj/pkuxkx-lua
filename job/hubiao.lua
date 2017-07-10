@@ -603,6 +603,7 @@ local define_hubiao = function()
         if self.currStep then
           -- 在触发车子行走时设置运输房间编号
           self.transferRoomId = self.currStep.endid
+          travel.currRoomId = self.transferRoomId
           self:debug("设置运输房间编号为", self.currStep.endid)
         end
       end

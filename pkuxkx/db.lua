@@ -160,21 +160,11 @@ local define_db = function()
     assert(type(args.params) == "table", "params in update must be name table")
     --always reset the statement
 
-    if params.description then
-      ColourNote("green", "", params.description)
-      ColourNote("green", "", string.len(params.description))
-    end
-
     stmt:reset()
     for k, v in pairs(params) do
       if type(v) == "string" then
         params[k] = codec:utf8(v)
       end
-    end
-
-    if params.description then
-      ColourNote("yellow", "", params.description)
-      ColourNote("green", "", string.len(params.description))
     end
 
     assert(stmt:bind_names(params) == sqlite3.OK, "failed to bind params with nametable")
