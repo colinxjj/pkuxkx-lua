@@ -10,6 +10,7 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local status = require "pkuxkx.status"
+local recover = require "pkuxkx.recover"
 -- 导入所有任务实现
 local songxin = require "job.songxin"
 local nanjue = require "job.nanjue"
@@ -341,17 +342,15 @@ local define_jobs = function()
     stop = "stop",
     prepare = "prepare",
     wait = "wait",
-    dining = "dining",
-    store = "store",
+--    dining = "dining",
+--    store = "store",
     equip = "equip",
-    recover = "recover",
+--    recover = "recover",
     job = "job",
   }
   local Events = {
     STOP = "stop",  -- any state -> stop
     START = "start",  -- stop -> prepare
-    HUNGRY = "hungry",  -- prepare -> dining
-    FULL = "full",  -- dining -> prepare
     RICH = "rich",  -- prepare -> store
     POOR = "poor",  -- store -> prepare
     TO_RECOVER = "to_recover",  -- prepare -> recover
@@ -400,11 +399,12 @@ local define_jobs = function()
     self.weaponId = "sword"
     self.silverThreshold = 300
     self.goldThreshold = 20
+    self.leastGoldAmount = 3
     self:debugOn()
   end
 
   function prototype:disableAllTriggers()
-    helper.disableTriggerGroups("jobs_recover")
+    helper.disableTriggerGroups("jobs_query_start", "jobs_query_done")
   end
 
   function prototype:initJobs()
@@ -501,28 +501,9 @@ local define_jobs = function()
       exit = function() end
     }
     self:addState {
-      state = States.dining,
-      enter = function() end,
-      exit = function() end
-    }
-    self:addState {
-      state = States.store,
-      enter = function() end,
-      exit = function() end
-    }
-    self:addState {
       state = States.equip,
       enter = function() end,
       exit = function() end
-    }
-    self:addState {
-      state = States.recover,
-      enter = function()
-        helper.enableTriggerGroups("jobs_recover")
-      end,
-      exit = function()
-        helper.disableTriggerGroups("jobs_recover")
-      end
     }
     self:addState {
       state = States.job,
@@ -545,34 +526,10 @@ local define_jobs = function()
     -- transition from state<prepare>
     self:addTransition {
       oldState = States.prepare,
-      newState = States.dining,
-      event = Events.HUNGRY,
-      action = function()
-        return self:doDining()
-      end
-    }
-    self:addTransition {
-      oldState = States.prepare,
-      newState = States.store,
-      event = Events.RICH,
-      action = function()
-        return self:doStore()
-      end
-    }
-    self:addTransition {
-      oldState = States.prepare,
       newState = States.equip,
       event = Events.TO_EQUIP,
       action = function()
         return self:doEquip()
-      end
-    }
-    self:addTransition {
-      oldState = States.prepare,
-      newState = States.recover,
-      event = Events.TO_RECOVER,
-      action = function()
-        return self:doRecover()
       end
     }
     self:addTransition {
@@ -592,36 +549,6 @@ local define_jobs = function()
         self:fire(Events.JOB_FINISH)
       end
     }
-    -- transition from state<dining>
-    self:addTransition {
-      oldState = States.dining,
-      newState = States.prepare,
-      event = Events.FULL,
-      action = function()
-        return self:doPrepare()
-      end
-    }
-    self:addTransitionToStop(States.dining)
-    -- transition from state<store>
-    self:addTransition {
-      oldState = States.store,
-      newState = States.prepare,
-      event = Events.POOR,
-      action = function()
-        return self:doPrepare()
-      end
-    }
-    self:addTransitionToStop(States.store)
-    -- transition from state<recover>
-    self:addTransition {
-      oldState = States.recover,
-      newState = States.prepare,
-      event = Events.RECOVERED,
-      action = function()
-        return self:doPrepare()
-      end
-    }
-    self:addTransitionToStop(States.recover)
     -- transition from state<job>
     self:addTransition {
       oldState = States.job,
@@ -636,21 +563,7 @@ local define_jobs = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("jobs_recover", "jobs_query_start", "jobs_query_done")
-    helper.addTrigger {
-      group = "jobs_recover",
-      regexp = REGEXP.DAZUO_FINISH,
-      response = function()
-        return self:doRecover()
-      end
-    }
-    helper.addTrigger {
-      group = "jobs_recover",
-      regexp = REGEXP.TUNA_FINISH,
-      response = function()
-        return self:doRecover()
-      end
-    }
+    helper.removeTriggerGroups("jobs_query_start", "jobs_query_done")
     helper.addTriggerSettingsPair {
       group = "jobs",
       start = "query_start",
@@ -776,11 +689,7 @@ local define_jobs = function()
     status:money()
     if status.silvers > self.silverThreshold
       or status.golds > self.goldThreshold then
-      self:debug(
-        "身上金钱超过限额：",
-        "gold:" .. status.golds,
-        "silver:" .. status.silvers)
-      return self:fire(Events.RICH)
+      self:doStore()
     end
     print("携带金钱检查完毕")
     wait.time(0.5)
@@ -794,16 +703,10 @@ local define_jobs = function()
     helper.assureNotBusy()
     status:hpbrief()
     if status.food < 120 or status.drink < 120 then
-      return self:fire(Events.HUNGRY)
+      self:doDining()
     end
     print("食物饮水检查完毕")
-    local precondition = self.currJob:getPrecondition()
-    if status.effJing < precondition.jing * status.maxJing - 1
-      or status.currJingli < precondition.jingli * status.maxJingli - 1
-      or status.effQi < precondition.qi * status.maxQi - 1
-      or status.currNeili < precondition.neili * status.maxNeili - 1 then
-      return self:fire(Events.TO_RECOVER)
-    end
+    self:doRecover()
     print("身体状态检查完毕")
     return self:fire(Events.JOB_READY)
   end
@@ -827,7 +730,6 @@ local define_jobs = function()
     helper.assureNotBusy()
     -- assume is full
     wait.time(1)
-    return self:fire(Events.FULL)
   end
 
   function prototype:doEquip()
@@ -835,107 +737,35 @@ local define_jobs = function()
   end
 
   function prototype:doStore()
-    print("准备前往钱庄存钱")
-    wait.time(1)
-    helper.assureNotBusy()
     travel:walkto(StoreRoomId)
     travel:waitUntilArrived()
     wait.time(1)
     status:money()
     if status.silvers > self.silverThreshold then
       helper.assureNotBusy()
-      SendNoEcho("convert " .. self.silverThreshold .. " silver to gold")
-      wait.time(2)
+      SendNoEcho("cun all silver")
+      wait.time(1)
       status:money()
     end
     if status.golds > self.goldThreshold then
       helper.assureNotBusy()
-      SendNoEcho("cun " .. self.goldThreshold .. " gold")
-    end
-    local line = wait.regexp(REGEXP.CANNOT_STORE_MONEY, 3)
-    if line then
-      print("钱庄存储金额到达上限")
-      return self:fire(Events.STOP)
-    else
-      return self:fire(Events.POOR)
+      local amount = status.golds - 3
+      SendNoEcho("cun " .. amount .. " gold")
     end
   end
 
   function prototype:doRecover()
-    wait.time(1)
     local pct = self.currJob:getPrecondition()
-    status:hpbrief()
-    -- 先恢复精
-    local neiliUsed = false
-    if status.effJing < status.maxJing * pct.jing - 1 then
-      self:debug("精受损，进行恢复")
-      if status.effJing < status.maxJing * 0.7 then
-        ColourNote("yellow", "", "精严重受损，吃药！")
-        SendNoEcho("do 2 eat dan")
-      end
-      SendNoEcho("yun inspire")
-      helper.checkUntilNotBusy()
-      SendNoEcho("yun inspire")
-      helper.checkUntilNotBusy()
-      neiliUsed = true
-    end
-    -- 再恢复气
-    if status.effQi < status.maxQi * pct.qi - 1 then
-      if status.effQi < status.maxQi * 0.7 then
-        ColourNote("yellow", "", "气严重受损，吃药！")
-        SendNoEcho("do 2 eat yao")
-      end
-      self:debug("气受损，进行恢复")
-      SendNoEcho("do 2 yun heal")
-      neiliUsed = true
-    end
-    -- 先恢复内力
-    if neiliUsed then status:hpbrief() end
-    if status.currNeili < status.maxNeili * pct.neili - 1 then
-      local diff = status.maxNeili * pct.neili - status.currNeili
-      local dzNum = math.floor(diff)
-      if status.currNeili < status.maxNeili * 2 - 550 and diff < 500 then
-        dzNum = 500
-      end
-      if dzNum > status.currQi - status.maxQi * 0.2 then
-        if status.currQi <= status.maxQi * 0.5 then
-          SendNoEcho("yun recover")
-        end
-        SendNoEcho("dazuo max")
-        local line = wait.regexp(REGEXP.DAZUO_BEGIN, 4)
-        if not line then
-          -- todo
-          return self:doRecover()
-        end
-      else
-        SendNoEcho("dazuo " .. dzNum)
-        local line = wait.regexp(REGEXP.DAZUO_BEGIN, 4)
-        if not line then
-          -- todo
-          return self:doRecover()
-        end
-      end
-      -- 再恢复精力
-    elseif status.currJingli < status.maxJingli * pct.jingli - 1 then
-      local diff = status.maxJingli * pct.jingli - status.currJingli
-      if diff > status.currJing - status.maxJing * 0.2 then
-        SendNoEcho("tuna max")
-        local line = wait.regexp(REGEXP.TUNA_BEGIN, 4)
-        if not line then
-          -- todo
-          return self:doRecover()
-        end
-      else
-        SendNoEcho("tuna " .. math.floor(diff))
-        local line = wait.regexp(REGEXP.TUNA_BEGIN, 4)
-        if not line then
-          -- todo
-          return self:doRecover()
-        end
-      end
-    else
-      return self:fire(Events.RECOVERED)
-    end
+    recover:settings {
+      jingLowerBound = pct.jing,
+      jingUpperBound = pct.jing,
+      qiLowerBound = pct.qi,
+      qiUpperBound = pct.qi,
+      neiliThreshold = pct.neili,
+      jingliThreshold = pct.jingli,
+    }
+    recover:start()
+    recover:waitUntilRecovered()
   end
 
   return prototype

@@ -130,6 +130,8 @@ local helper = require "pkuxkx.helper"
 local FSM = require "pkuxkx.FSM"
 local travel = require "pkuxkx.travel"
 local captcha = require "pkuxkx.captcha"
+local combat = require "pkuxkx.combat"
+local status = require "pkuxkx.status"
 
 local XiaofengMode = {
   KILL = 1,  -- 杀
@@ -174,6 +176,8 @@ local define_xiaofeng = function()
     WORK_TOO_FAST = "^work too fast$",
     PREV_NOT_FINISH = "^prev not finish$",
     MR_RIGHT = "^[ >]*蒙面杀手说道：「要打便打，不必多言！」$",
+    FOLLOWED = "^[ >]*你决定开始跟随蒙面杀手一起行动。$",
+    KILLED = "^[ >]*蒙面杀手眼见今日就要死在你手中，叹了口气，一咬衣领，便直挺挺的倒了下去！$",
   }
 
   local JobRoomId = 7
@@ -220,10 +224,14 @@ local define_xiaofeng = function()
     self:addState {
       state = States.search,
       enter = function()
-        helper.enableTriggerGroups("xiaofeng_identify_start")
+        helper.enableTriggerGroups(
+          "xiaofeng_identify_start",
+          "xiaofeng_follow_start")
       end,
       exit = function()
-        helper.disableTriggerGroups("xiaofeng_identify_start", "xiaofeng_identify_done")
+        helper.disableTriggerGroups(
+          "xiaofeng_identify_start", "xiaofeng_identify_done",
+          "xiaofeng_follow_start", "xiaofeng_follow_done")
       end
     }
   end
@@ -256,25 +264,6 @@ local define_xiaofeng = function()
       event = Events.MISSED,
       action = function()
         return self:doNearbySearch()
-      end
-    }
-    self:addTransition {
-      oldState = States.search,
-      newState = States.search,
-      event = Events.FOLLOWED,
-      action = function()
-        -- 决定用何种模式
-        if self.mode == XiaofengMode.KILL then
-          return self.fire(Events.BEGIN_KILL)
-        elseif self.mode == XiaofengMode.CAPTURE then
-          return self.fire(Events.BEGIN_CAPTURE)
-        elseif self.mode == XiaofengMode.PERSUADE then
-          return self.fire(Events.BEGIN_PERSUADE)
-        elseif self.mode == XiaofengMode.WIN then
-          return self.fire(Events.BEGIN_WIN)
-        else
-          error("萧峰模式错误", 3)
-        end
       end
     }
     self:addTransition {
@@ -313,7 +302,11 @@ local define_xiaofeng = function()
   end
 
   function prototype:initTriggers()
-    helper.removeTriggerGroups("xiaofeng_ask_start", "xiaofeng_ask_done")
+    helper.removeTriggerGroups(
+      "xiaofeng_ask_start", "xiaofeng_ask_done",
+      "xiaofeng_identify_start", "xiaofeng_ifentify_done",
+      "xiaofeng_follow_start", "xiaofeng_follow_done",
+      "xiaofeng_kill")
     helper.addTriggerSettingsPair {
       group = "xiaofeng",
       start = "ask_start",
@@ -370,6 +363,32 @@ local define_xiaofeng = function()
       regexp = REGEXP.MR_RIGHT,
       response = function()
         self.identified = true
+      end
+    }
+    helper.addTriggerSettingsPair {
+      group = "xiaofeng",
+      start = "follow_start",
+      done = "follow_done"
+    }
+    helper.addTrigger {
+      group = "xiaofeng_follow_done",
+      regexp = REGEXP.FOLLOWED,
+      response = function()
+        self.followed = true
+      end
+    }
+    helper.addTrigger {
+      group = "xiaofeng_kill",
+      regexp = REGEXP.KILLED,
+      response = function()
+        self.killed = true
+      end
+    }
+    helper.addTrigger {
+      group = "xiaofeng_capture",
+      regexp = REGEXP.FAINT,
+      response = function()
+
       end
     }
   end
@@ -431,7 +450,7 @@ local define_xiaofeng = function()
     SendNoEcho("set xiaofeng ask_done")
     helper.checkUntilNotBusy()
     if self.needCaptcha then
-      ColourNote("yellow", "", "请手动输入验证码，xiaofeng 劝/擒/降/杀 地点")
+      ColourNote("yellow", "", "请手动输入验证码，xiaofeng 劝/擒/降/杀 区域 房间")
       return
     elseif self.workTooFast then
       self:debug("等待8秒后再次询问")
@@ -477,28 +496,34 @@ local define_xiaofeng = function()
       helper.checkUntilNotBusy()
       travel:walkto(nextRoom.id)
       travel:waitUntilArrived()
-      -- build a coroutine to check own shashou
-      local onStep = function()
-        SendNoEcho("set xiaofeng identify_start")
-        SendNoEcho("ask mengmian shashou about fight")
-        SendNoEcho("set xiaofeng identify_done")
-        helper.checkUntilNotBusy()
-        -- 将每个经历的地点都放入已搜索列表
-        self.searchedRoomIds[travel.traverseRoomId] = true
-        return self.identified
-      end
-      local onArrive = function()
-        if self.identified then
-          self:debug("遍历结束，已经发现蒙面杀手，并确定目标房间：", self.targetRoomId)
-          return self:doFollow()
-        else
-          self:debug("没有发现蒙面杀手，尝试下一个地点")
-          wait.time(1)
-          return self:fire(Events.NEXT_SEARCH)
-        end
-      end
-      return travel:traverseNearby(SearchDepth, onStep, onArrive)
+      -- nearby search
+      return self:doNearbySearch()
     end
+  end
+
+  function prototype:doNearbySearch()
+    local onStep = function()
+      SendNoEcho("set xiaofeng identify_start")
+      SendNoEcho("ask mengmian shashou about fight")
+      SendNoEcho("set xiaofeng identify_done")
+      helper.checkUntilNotBusy()
+      -- 将每个经历的地点都放入已搜索列表
+      self.searchedRoomIds[travel.traverseRoomId] = true
+      return self.identified
+    end
+    local onArrive = function()
+      if self.identified then
+        self:debug("遍历结束，已经发现蒙面杀手，尝试跟踪")
+        travel.currRoomId = travel.traverseRoomId
+        self:refreshRoomInfo()
+        return self:doFollow()
+      else
+        self:debug("没有发现蒙面杀手，尝试下一个地点")
+        wait.time(1)
+        return self:fire(Events.NEXT_SEARCH)
+      end
+    end
+    return travel:traverseNearby(SearchDepth, onStep, onArrive)
   end
 
   function prototype:doFollow()
@@ -510,7 +535,70 @@ local define_xiaofeng = function()
     if not self.followed then
       return self:fire(Events.MISSED)
     else
-      return self:fire(Events.FOLLOWED)
+      if self.mode == XiaofengMode.KILL then
+        return self.fire(Events.BEGIN_KILL)
+      elseif self.mode == XiaofengMode.CAPTURE then
+        return self.fire(Events.BEGIN_CAPTURE)
+      elseif self.mode == XiaofengMode.PERSUADE then
+        return self.fire(Events.BEGIN_PERSUADE)
+      elseif self.mode == XiaofengMode.WIN then
+        return self.fire(Events.BEGIN_WIN)
+      else
+        error("萧峰模式错误", 3)
+      end
+    end
+  end
+
+  function prototype:doKill()
+    self.killed = false
+    combat:start()
+    SendNoEcho("ask mengmian shashou about fight")
+    SendNoEcho("killall mengmian shashou")
+    local waitTime = 0
+    while not self.killed do
+      wait.time(5)
+      waitTime = waitTime + 5
+      self:debug("战斗时间：", waitTime)
+      SendNoEcho("ask mengmian shashou about fight")
+      SendNoEcho("killall mengmian shashou")
+    end
+    wait.time(1)
+    self:debug("斩首级")
+    SendNoEcho("unwield all")
+    SendNoEcho("zhan corpse")
+    ColourNote("green", "", "准备返回")
+  end
+
+  function prototype:doCapture()
+    self.faint = false
+    self.killed = false
+    self.realName = nil
+    combat:start()
+    local waitTime = 0
+    while not self.faint and not self.killed do
+      SendNoEcho("do 2 hit mengmian shashou")
+      wait.time(5)
+      waitTime = waitTime + 5
+      self:debug("战斗时间：", waitTime)
+    end
+    self:debug("杀手真名：", self.realName)
+    helper.checkUntilNotBusy()
+    status:idhere()
+    self.realId = nil
+    for _, item in ipairs(status.items) do
+      if item.name == self.realName then
+        self.realId = item.id
+        break
+      end
+    end
+    if self.realId then
+      SendNoEcho("get " .. self.realId)
+      travel:walkto(JobRoomId)
+      travel:waitUntilArrived()
+      SendNoEcho("give xiao " .. self.realId)
+      return self:fire(Events.STOP)
+    else
+      error("无法获取杀手姓名", 3)
     end
   end
 

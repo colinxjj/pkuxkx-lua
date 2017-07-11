@@ -106,7 +106,7 @@ local define_touxue = function()
     NOT_FULLME = "^[ >]*慕容复说道：「你太长时间没有fullme了，完成再来吧。」$",
   }
 
-  local JituiRoomId = 90
+  local JituiRoomId = 351
   local JobRoomId = 479
 
   function prototype:FSM()
