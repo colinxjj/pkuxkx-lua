@@ -209,6 +209,7 @@ local define_travel = function()
         "沙石地几乎没有路了，你走不了那么快",  -- huangzhong
         "荒路几乎没有路了，你走不了那么快",  -- huangzhong
         "沙漠中几乎没有路了，你走不了那么快",  -- huangzhong
+        "你把花盆搬回了原位。洞口被封住了",  -- baituo
       }, "|"), -- 挡路触发
       ").*$", -- 匹配结束
     }, ""),
@@ -246,9 +247,13 @@ local define_travel = function()
         "神龙教弟子大喝一声：里面是教主和夫人休息",  -- shenlongdao
         "王兴隆说道：“后面是我家，没事别瞎转悠",  -- tidufu
         "童百熊说道：「你不是我日月神教弟子，来我教干什么",  -- riyue
+        "门卫把手一拦：你这种正派人物，老子一看就恶心，快滚",  -- baituo
+        "门卫把手一拦：你这种所谓的正派人物不能进去",  -- baituo
       }, "|"), -- 挡路触发
       ").*$", -- 匹配结束
     }, ""),
+    -- 马车到达
+    BUS_ARRIVED = "^[ >]*大车停稳了下来，你可以下车\\(xia\\)了。$",
   }
   -- 重定位最多重试次数，当进入located或stop状态时重置，当进入locating时减一
   local RELOC_MAX_RETRIES = 4
@@ -1532,6 +1537,13 @@ local define_travel = function()
         self:debug("洪水泛滥，房间出口改变")
       end
     }
+    helper.addTrigger {
+      group = "travel_walk",
+      regexp = REGEXP.BUS_ARRIVED,
+      response = function()
+        self.busArrived = true
+      end
+    }
     -- busy触发
     helper.addTrigger {
       group = "travel_walk_busy_start",
@@ -2223,6 +2235,17 @@ local define_travel = function()
       elseif move.category == PathCategory.checkbusy then
         self:sendPath(move.path)
         helper.checkUntilNotBusy()
+      elseif move.category == PathCategory.bus then
+        self.busArrived = false
+        SendNoEcho("gu")
+        SendNoEcho(move.path)
+        local busTime = 0
+        while not self.busArrived do
+          wait.time(3)
+          busTime = busTime + 3
+          self:debug("坐车等待时间：", busTime)
+        end
+        SendNoEcho("xia")
       else
         error("current version does not support this path category:" .. move.category, 2)
       end

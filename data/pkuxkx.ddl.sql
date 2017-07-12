@@ -36,7 +36,9 @@ insert into path_category (id, name, description) values
   (4, 'boat', '乘船命令'),
   (5, 'pause', '行走暂停'),
   (6, 'block', '被阻挡，有npc挡路需要清除'),
-  (7, 'checkbusy', '行走后检查直到不busy');
+  (7, 'checkbusy', '行走后检查直到不busy'),
+  (8, 'bus', '乘坐公共马车')
+;
 
 create table if not exists pinyin2chr (
   pinyin text primary key,
@@ -123,8 +125,8 @@ values
   ('tiantan', '天坛', 'tiantanxitianmen'),
   ('shenlongdao', '神龙岛', 'shenlongdaofengding'),
   ('shashoubang', '杀手帮', 'shashoubangguangchang'),
-  ('gaibang', '丐帮', 'gaibangshudongneibu')
-  -- ('miaoling', '苗岭', 'miaolingbianyuan')
+  ('gaibang', '丐帮', 'gaibangshudongneibu'),
+  ('baituo', '白驼山', 'baituogebi')
 ;
 
 create table if not exists zone_connectivity (
@@ -332,8 +334,11 @@ values
   ('nanchang', 'miaoling', 6),
   ('miaoling', 'nanchang', 6),
   ('kunming', 'miaoling', 6),
-  ('miaoling', 'yueyang', 6),
-  ('yueyang', 'miaoling', 6)
+  ('baituo', 'huangzhong', 5),
+  ('huangzhong', 'baituo', 5),
+  ('baituo', 'mingjiao', 10),
+  ('mingjiao', 'baituo', 10),
+  ('baituo', 'yangzhou', 15)
 ;
 
 update zone_connectivity set boat = 1

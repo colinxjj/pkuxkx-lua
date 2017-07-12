@@ -29,7 +29,6 @@ local define_murong = function()
     START = "start",  -- stop -> ask
     NEW_JOB = "new_job",  -- ask -> search
     NEW_JOB_CAPTCHA = "new_job_captcha",
-    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰)【.*?】。$",
     NEXT_SEARCH = "next_search",  -- search -> search
     JIAZEI_FOUND = "jiazei_found",  -- search -> kill
     JIAZEI_MISS = "jiazei_miss", -- kill -> search
@@ -48,6 +47,7 @@ local define_murong = function()
     JIAZEI_KILLED = "^[ >]*慕容世家内鬼死了。$",
     JIAZEI_MISSED = "^[ >]*你想杀谁？$",
     PU_BUSY = "^[ >]*仆人忙着呢，等会吧。$",
+    GARBAGE = "^[ >]*你获得了.*份(石炭|玄冰|陨铁)【.*?】。$",
   }
 
   local JobRoomId = 479
@@ -116,10 +116,13 @@ local define_murong = function()
     self:addState {
       state = States.submit,
       enter = function()
-        helper.enableTriggerGroups("murong_submit_start")
+        helper.enableTriggerGroups(
+          "murong_submit_start", "murong_submit")
       end,
       exit = function()
-        helper.disableTriggerGroups("murong_submit_start", "murong_submit_done")
+        helper.disableTriggerGroups(
+          "murong_submit_start", "murong_submit_done",
+          "murong_submit")
       end
     }
   end
@@ -297,6 +300,13 @@ local define_murong = function()
         self.puBusy = true
       end
     }
+    helper.addTrigger {
+      group = "murong_submit",
+      regexp = REGEXP.GARBAGE,
+      response = function(name, line, wildcards)
+        self.garbage = wildcards[1]
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -441,12 +451,18 @@ local define_murong = function()
     travel:walkto(JobRoomId)
     travel:waitUntilArrived()
     self.puBusy = false
+    self.garbage = nil
     SendNoEcho("set murong submit_start")
     SendNoEcho("give xin to pu")
     SendNoEcho("set murong submit_done")
     helper.checkUntilNotBusy()
-    SendNoEcho("drop shi tan")
-    SendNoEcho("drop xuan bing")
+    if self.garbage == "石炭" then
+      SendNoEcho("drop shi tan")
+    elseif self.garbage == "玄冰" then
+      SendNoEcho("drop xuan bing")
+    elseif self.garbage == "陨铁" then
+      SendNoEcho("drop yun tie")
+    end
     if self.puBusy then
       return self:fire(Events.PU_BUSY)
     else

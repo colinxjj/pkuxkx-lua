@@ -176,6 +176,4 @@ local define_db = function()
 
   return prototype
 end
--- easy to switch to memory db
--- local db = define_db().open_memory_copied("xxx.db")
-return define_db()  -- .open("data/pkuxkx-gb2312.db")
+return define_db()

@@ -194,20 +194,21 @@ local define_captcha = function()
   end
 
   function prototype:doGetHTML(url)
-    http.TIMEOUT = 2
-    local result
-    if string.find(url, self.baseUrl) then
-      result = http.request(url)
+    http.TIMEOUT = 3
+    if self.useFallback then
+      local fallbackUrl = string.gsub(url, "pkuxkx.net", "pkuxkx.com")
+      return http.request(fallbackUrl)
+    else
+      local result = http.request(url)
       if not result then
         -- 官网可能遭到攻击了，使用备用网址
+        self.useFallback = true
         self.baseUrl = "http://pkuxkx.com"
         local fallbackUrl = string.gsub(url, "pkuxkx.net", "pkuxkx.com")
         result = http.request(fallbackUrl)
       end
-    else
-      result = http.request(url)
+      return result
     end
-    return result
   end
 
   function prototype:doGetJpgUrl(htmlText)

@@ -20,6 +20,7 @@ local tianzhu = require "job.tianzhu"
 local cisha = require "job.cisha"
 local huyidao = require "job.huyidao"
 local wananta = require "job.wananta"
+local xiaofeng = require "job.xiaofeng"
 
 -- ∞Ôª·»ŒŒÒ
 local banghui = require "common.banghui"
@@ -474,6 +475,10 @@ local define_jobs = function()
     self.definedJobs.wananta = Job:decorate {
       def = JobDefinition.wananta,
       impl = wananta
+    }
+    self.definedJobs.xiaofeng = Job:decorate {
+      def = JobDefinition.xiaofeng,
+      impl = xiaofeng
     }
   end
 

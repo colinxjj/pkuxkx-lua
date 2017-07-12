@@ -156,28 +156,30 @@ local define_xiaofeng = function()
   local Events = {
     STOP = "stop",  -- any state -> stop
     START = "start",  -- stop -> ask
-    SEARCH = "search",
+    SEARCH = "search",  -- ask -> search
+    MISSED = "missed",  -- search -> search
+    BEGIN_KILL = "begin_kill",  -- search -> kill
+    BEGIN_CAPTURE = "begin_capture",  -- search -> capture
+    BEGIN_PERSUADE = "begin_persuade",  -- search -> persuade
+    BEGIN_WIN = "begin_win",  -- search -> win
   }
   local REGEXP = {
     ALIAS_START = "^xiaofeng\\s+start\\s*$",
     ALIAS_STOP = "^xiaofeng\\s+stop\\s*$",
     ALIAS_DEBUG = "^xiaofeng\\s+debug\\s+(on|off)\\s*$",
---    ALIAS_CAPTURE = "^xiaofeng\\s+capture\\s+(.*)\\s*$",
---    ALIAS_PERSUADE = "^xiaofeng\\s+persuade\\s+(.*)\\s*$",
---    ALIAS_KILL = "^xiaofeng\\s+kill\\s+(.*)\\s*$",
---    ALIAS_WIN = "^xiaofeng\\s+win\\s+(.*)\\s*$",
     ALIAS_DO = "^xiaofeng\\s+(擒|杀|劝|降)\\s+(.*?)\\s*$",
     JOB_LOCATION = "^[ >]*萧峰道：「传闻西夏一品堂派出了若干蒙面杀手，最近出现在(.*?)附近的(.*?)。$",
     JOB_CAPTURE = "^ *此人于中原武林颇为有用，你去将他擒回这里交给我。打晕其之后若他再醒来.*$",
     JOB_PERSUADE = "^ *此人加入西夏一品堂不久，尚可教化，你去劝劝.*$",
     JOB_KILL = "^ *此人为非作歹，早已恶贯满盈。你去将他除掉，取其首级回来。$",
     JOB_WIN = "^ *此人气焰甚是嚣张，你去给他点颜色瞧瞧，让他认输就好。$",
-    JOB_CAPTCHA = "^请注意，忽略验证码中的红色文字。$",
+    CAPTCHA = "^[ >]*请注意，忽略验证码中的红色文字。$",
     WORK_TOO_FAST = "^work too fast$",
     PREV_NOT_FINISH = "^prev not finish$",
     MR_RIGHT = "^[ >]*蒙面杀手说道：「要打便打，不必多言！」$",
     FOLLOWED = "^[ >]*你决定开始跟随蒙面杀手一起行动。$",
     KILLED = "^[ >]*蒙面杀手眼见今日就要死在你手中，叹了口气，一咬衣领，便直挺挺的倒了下去！$",
+    FAINT = "^[ >]*(.*?)脚下一个不稳，跌在地上一动也不动了。",
   }
 
   local JobRoomId = 7
@@ -198,6 +200,13 @@ local define_xiaofeng = function()
     self:setState(States.stop)
     self.mode = nil
     self.DEBUG = true
+
+    self.precondition = {
+      jing = 1,
+      qi = 1,
+      neili = 1.6,
+      jingli = 1
+    }
   end
 
   function prototype:disableAllTriggers()
@@ -232,6 +241,42 @@ local define_xiaofeng = function()
         helper.disableTriggerGroups(
           "xiaofeng_identify_start", "xiaofeng_identify_done",
           "xiaofeng_follow_start", "xiaofeng_follow_done")
+      end
+    }
+    self:addState {
+      state = States.kill,
+      enter = function()
+        helper.enableTriggerGroups("xiaofeng_kill")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("xiaofeng_kill")
+      end
+    }
+    self:addState {
+      state = States.capture,
+      enter = function()
+        helper.enableTriggerGroups("xiaofeng_capture")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("xiaofeng_capture")
+      end
+    }
+    self:addState {
+      state = States.persuade,
+      enter = function()
+        helper.enableTriggerGroups("xiaofeng_persuade")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("xiaofeng_persuade")
+      end
+    }
+    self:addState {
+      state = States.win,
+      enter = function()
+        helper.enableTriggerGroups("xiaofeng_win")
+      end,
+      exit = function()
+        helper.disableTriggerGroups("xiaofeng_win")
       end
     }
   end
@@ -353,6 +398,13 @@ local define_xiaofeng = function()
         self.mode = XiaofengMode.WIN
       end
     }
+    helper.addTrigger {
+      group = "xiaofeng_ask_done",
+      regexp = REGEXP.CAPTCHA,
+      response = function()
+        self.needCaptcha = true
+      end
+    }
     helper.addTriggerSettingsPair {
       group = "xiaofeng",
       start = "identify_start",
@@ -446,7 +498,7 @@ local define_xiaofeng = function()
     self.roomName = nil
     self.mode = nil
     SendNoEcho("set xiaofeng ask_start")
-    SendNoEcho("ask xiaofeng about job")
+    SendNoEcho("ask xiao about job")
     SendNoEcho("set xiaofeng ask_done")
     helper.checkUntilNotBusy()
     if self.needCaptcha then
