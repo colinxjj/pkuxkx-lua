@@ -29,6 +29,24 @@ http://pkuxkx.net/antirobot/robot.php?filename=1496619389147359
 
 -- sha
 
+蒙面杀手眼见今日就要死在你手中，叹了口气，一咬衣领，便直挺挺的倒了下去！
+sq
+你蓄势不足，目前只积累了4%气势。
+> 【五行武功测试信息】：速度增加5%。
+( 蒙面杀手已经陷入半昏迷状态，随时都可能摔倒晕去。 )『蒙面杀手(damage:+1591 气血:0%/20%)』
+你在攻击中不断积蓄攻势。(气势：8%)
+
+你抢上一步，只见蒙面杀手衣领上几个蝇头小字，显是蒙面杀手姓名。
+而此时蒙面杀手嘴唇青黑，身中剧毒，眼见不活了。
+从项海身上掉了出来一柄赤焰之杖
+
+项海死了。
+
+经过一段时间后，你终于完全从紧张地战斗氛围中解脱出来。
+【闲聊】恨天低(Htd): >
+zhan corpse
+
+你提起手中的青陽地灵 断阙之剑，对准项海的尸体的脖颈中猛斩了下去，将血淋淋的首级提在手中。
 
 
 -- sheng
@@ -56,6 +74,19 @@ http://pkuxkx.net/antirobot/robot.php?filename=1496619389147359
 算了，我认输啦，算你狠！
 > 你向蒙面杀手打听有关『认输』的消息。
 蒙面杀手说道：「老子已经认输了，你还讨什么口舌之利？！」
+
+> 你向蒙面杀手打听有关『认输』的消息。
+蒙面杀手身行向后一跃，跳出战圈不打了。
+蒙面杀手深深地叹了口气。
+从蒙面杀手身上掉了出来一些黄金
+蒙面杀手说道：「算了，我认输啦，算你狠！」
+> 【五行武功测试信息】：速度增加5%。
+( 蒙面杀手已经陷入半昏迷状态，随时都可能摔倒晕去。 )『蒙面杀手(damage:+1868 气血:0%/47%)』
+你在攻击中不断积蓄攻势。(气势：4%)
+
+蒙面杀手眼见今日就要死在你手中，叹了口气，一咬衣领，便直挺挺的倒了下去！
+蒙面杀手纵身远远的去了。
+
 
 -- qin
 你向萧峰打听有关『job』的消息。
@@ -156,7 +187,7 @@ local define_xiaofeng = function()
   local Events = {
     STOP = "stop",  -- any state -> stop
     START = "start",  -- stop -> ask
-    SEARCH = "search",  -- ask -> search
+    NEXT_SEARCH = "next_search",  -- ask -> search
     MISSED = "missed",  -- search -> search
     BEGIN_KILL = "begin_kill",  -- search -> kill
     BEGIN_CAPTURE = "begin_capture",  -- search -> capture
@@ -179,7 +210,10 @@ local define_xiaofeng = function()
     MR_RIGHT = "^[ >]*蒙面杀手说道：「要打便打，不必多言！」$",
     FOLLOWED = "^[ >]*你决定开始跟随蒙面杀手一起行动。$",
     KILLED = "^[ >]*蒙面杀手眼见今日就要死在你手中，叹了口气，一咬衣领，便直挺挺的倒了下去！$",
+    NAME_LEAK = "^[ >]*你走近蒙面杀手，只见蒙面杀手衣领上几个蝇头小字，显是蒙面杀手姓名。$",
     FAINT = "^[ >]*(.*?)脚下一个不稳，跌在地上一动也不动了。",
+    NAME_KILLED = "^[ >]*(.{2,10})死了。$",
+    PERSUADED = "^[ >]*蒙面杀手深深地叹了口气。$",
   }
 
   local JobRoomId = 7
@@ -296,7 +330,7 @@ local define_xiaofeng = function()
     self:addTransition {
       oldState = States.ask,
       newState = States.search,
-      event = Events.SEARCH,
+      event = Events.NEXT_SEARCH,
       action = function()
         return self:doSearch()
       end
@@ -309,6 +343,14 @@ local define_xiaofeng = function()
       event = Events.MISSED,
       action = function()
         return self:doNearbySearch()
+      end
+    }
+    self:addTransition {
+      oldState = States.search,
+      newState = States.search,
+      event = Events.NEXT_SEARCH,
+      action = function()
+        return self:doSearch()
       end
     }
     self:addTransition {
@@ -429,6 +471,7 @@ local define_xiaofeng = function()
         self.followed = true
       end
     }
+    -- trigger for kill
     helper.addTrigger {
       group = "xiaofeng_kill",
       regexp = REGEXP.KILLED,
@@ -436,12 +479,44 @@ local define_xiaofeng = function()
         self.killed = true
       end
     }
+    -- trigger for capture
+    helper.addTrigger {
+      group = "xiaofeng_capture",
+      regexp = REGEXP.NAME_LEAK,
+      response = function()
+        self.nameLeaked = true
+      end
+    }
     helper.addTrigger {
       group = "xiaofeng_capture",
       regexp = REGEXP.FAINT,
-      response = function()
-
+      response = function(name, line, wildcards)
+        if self.nameLeaked then
+          self.killerName = wildcards[1]
+          self.nameLeaked = false
+        else
+          ColourNote("yellow", "", "不是我的杀手")
+        end
       end
+    }
+    helper.addTrigger {
+      group = "xiaofeng_capture",
+      regexp = REGEXP.NAME_KILLED,
+      response = function(name, line, wildcards)
+        if self.nameLeaked then
+          self.killerName = wildcards[1]
+          self.nameLeaked = false
+          self.killed = true
+        elseif self.killerName == wildcards[1] then
+          self.killed = true
+        else
+          ColourNote("yellow", "", "不是我的杀手")
+        end
+      end
+    }
+    -- trigger for persuade
+    helper.addTrigger {
+
     }
   end
 
@@ -470,6 +545,23 @@ local define_xiaofeng = function()
           self:debugOn()
         else
           self:debugOff()
+        end
+      end
+    }
+    helper.addAlias {
+      group = "xiaofeng",
+      regexp = REGEXP.ALIAS_DO,
+      response = function(name, line, wildcards)
+        local mode = wildcards[1]
+        local fullname = wildcards[2]
+        if string.find(fullname, "的") then
+          local ss = utils.split(fullname, "的")
+          self.mode = mode
+          self.zoneName = ss[1]
+          self.roomName = ss[2]
+          return self:doPrepareSearch()
+        else
+          ColourNote("yellow", "", "地点必须包含区域和房间，用'的'分隔")
         end
       end
     }
@@ -624,7 +716,7 @@ local define_xiaofeng = function()
   function prototype:doCapture()
     self.faint = false
     self.killed = false
-    self.realName = nil
+    self.killerName = nil
     combat:start()
     local waitTime = 0
     while not self.faint and not self.killed do
@@ -633,25 +725,65 @@ local define_xiaofeng = function()
       waitTime = waitTime + 5
       self:debug("战斗时间：", waitTime)
     end
-    self:debug("杀手真名：", self.realName)
+    self:debug("杀手真名：", self.killerName)
     helper.checkUntilNotBusy()
+    if self.killed then
+      ColourNote("red", "", "杀手已死，擒获失败")
+      return self:doCancel()
+    end
     status:idhere()
-    self.realId = nil
+    self.killerId = nil
     for _, item in ipairs(status.items) do
-      if item.name == self.realName then
-        self.realId = item.id
+      if item.name == self.killerName then
+        self.killerId = item.id
         break
       end
     end
-    if self.realId then
-      SendNoEcho("get " .. self.realId)
+    if self.killerId then
+      SendNoEcho("get " .. self.killerId)
       travel:walkto(JobRoomId)
       travel:waitUntilArrived()
-      SendNoEcho("give xiao " .. self.realId)
+      SendNoEcho("give xiao " .. self.killerId)
       return self:fire(Events.STOP)
     else
       error("无法获取杀手姓名", 3)
     end
+  end
+
+  function prototype:doPersuade()
+    self.killed = false
+    self.persuaded = false
+    self.beated = false
+    self.injuredBadly = false
+    while true do
+      SendNoEcho("fight mengmian shashou")
+      SendNoEcho("perform yangwu-jian.yangwu")
+      wait.time(5)
+      if self.persuaded then
+        self:debug("已劝服，任务完成")
+        return self:doSubmitDirectly()
+      elseif self.killed then
+        ColourNote("red", "", "杀手已死，任务失败")
+        return self:doCancel()
+      elseif self.beated then
+        SendNoEcho("set xiaofeng lookheal_start")
+        SendNoEcho("look mengmian shashou")
+        SendNoEcho("set xiaofeng lookheal_done")
+        helper.checkUntilNotBusy()
+        if self.injuredBadly then
+        end
+      end
+    end
+
+  end
+
+  -- 劝和胜，可以直接提交
+  function prototype:doSubmitDirectly()
+    travel:walkto(JobRoomId)
+    travel:waitUntilArrived()
+    wait.time(1)
+    SendNoEcho("ask xiao about finish")
+    return self:fire(Events.STOP)
   end
 
   function prototype:doStart()
