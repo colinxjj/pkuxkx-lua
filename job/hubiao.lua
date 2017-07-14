@@ -104,6 +104,7 @@ local define_hubiao = function()
     BOAT_FORCED_DEPART = "^[ >]*艄公要继续做生意了，所有人被赶下了渡船。$",
     BOAT_OFFSHORE = "^[ >]*(艄公把踏脚板收起来|船夫把踏脚板收起来|小舟在湖中藕菱之间的水路|你跃上小舟，船就划了起来|你拿起船桨用力划了起来|番僧用力一推，将藤筐推离平台，绞盘跟着慢慢放松，藤筐一荡，降了下去|绳索一紧，藤筐左右摇晃振动了几下，冉冉向上升了起来).*$",
     WAKEUP = "^[ >]*慢慢地你终于又有了知觉....$",
+    DYING = "^[ >]*你已经受伤过重，只怕一运真气便有生命危险！$",
   }
 
   local SpecialRenameRooms = {
@@ -141,6 +142,9 @@ local define_hubiao = function()
   local DoubleSearchDepth = 3
   local WeaponFixRoomId = 2167
   local DiningRoomId = 3797
+  local DrugRoomId = 194
+  local StoreRoomId = 271
+
 
   function prototype:FSM()
     local obj = FSM:new()
@@ -182,7 +186,8 @@ local define_hubiao = function()
     self.weaponDurability = 500
     -- 开启调试
     self:debugOn()
-    -- 开启日志
+    -- 濒死保护
+    helper.enableTriggerGroups("hubiao_dying")
   end
 
   function prototype:disableAllTriggers()
@@ -496,7 +501,8 @@ local define_hubiao = function()
       "hubiao_transfer_traverse",
       "hubiao_prefetch_traverse",
       "hubiao_robber",
-      "hubiao_force"
+      "hubiao_force",
+      "hubiao_dying"
     )
     -- info
     helper.addTriggerSettingsPair {
@@ -773,6 +779,15 @@ local define_hubiao = function()
         self.qiPresent = true
       end
     }
+    -- dying
+    helper.addTrigger {
+      group = "hubiao_dying",
+      regexp = REGEXP.DYING,
+      response = function()
+        SendNoEcho("halt")
+        SendNoEcho("quit")
+      end
+    }
   end
 
   function prototype:initAliases()
@@ -852,11 +867,22 @@ local define_hubiao = function()
       regexp = REGEXP.ALIAS_HBST,
       response = function()
         self:fire(Events.STOP)
+        self:debug("购买药品")
+        wait.time(1)
+        travel:walkto(StoreRoomId)
+        travel:waitUntilArrived()
+        wait.time(0.5)
+        SendNoEcho("qu 3 cash")
+        travel:walkto(DrugRoomId)
+        travel:waitUntilArrived()
+        SendNoEcho("buy jinchuang yao 100")
+        wait.time(2)
+        SendNoEcho("buy yangjing dan 100")
         wait.time(1)
         travel:walkto(JobRoomId)
         travel:waitUntilArrived()
         wait.time(1)
-        SendNoEcho("ask " .. JobNpcId .. "about finish")
+        SendNoEcho("ask " .. JobNpcId .. " about finish")
         SendNoEcho("ask " .. JobNpcId .. " about fail")
         SendNoEcho("ask " .. JobNpcId .. " about 重置任务")
         self.rounds = 0
@@ -956,6 +982,8 @@ local define_hubiao = function()
       qiUpperBound = self.qiUpperBound,
       neiliThreshold = self.neiliUpperBound,
       jingliThreshold = self.jingliUpperBound,
+      useDrug = true,
+      drugRate = 0.8
     }
     recover:start()
     recover:waitUntilRecovered()
@@ -967,6 +995,7 @@ local define_hubiao = function()
       qiUpperBound = self.qiUpperBound,
       neiliThreshold = self.neiliLowerBound,
       jingliThreshold = self.jingliLowerBound,
+      useDrug = false
     }
     self:debug("等待1秒后查询任务")
     wait.time(1)

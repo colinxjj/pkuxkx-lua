@@ -59,6 +59,9 @@ local define_recover = function()
     self.qiLowerBound = 0.9
     self.neiliThreshold = 1
     self.jingliThreshold = 1
+
+    self.useDrug = false
+    self.drugRate = 0.6
   end
 
   function prototype:disableAllTriggers()
@@ -247,6 +250,9 @@ local define_recover = function()
       useNeili = true
     end
     if status.effQi < status.maxQi * self.qiLowerBound then
+      if self.useDrug and status.effQi < status.maxQi * self.drugRate then
+        SendNoEcho("do 5 eat jinchuang yao")
+      end
       while status.effQi < status.maxQi * self.qiUpperBound do
         SendNoEcho("do 2 yun heal")
         wait.time(1)
@@ -255,6 +261,9 @@ local define_recover = function()
       useNeili = true
     end
     if status.effJing < status.maxJing * self.jingLowerBound then
+      if self.useDrug and status.effJing < status.maxJing * self.drugRate then
+        SendNoEcho("do 5 eat yangjing dan")
+      end
       while status.effJing < status.maxJing * self.jingUpperBound do
         SendNoEcho("yun inspire")
         wait.time(1)
@@ -326,6 +335,12 @@ local define_recover = function()
     end
     if args.jingliThreshold then
       self.jingliThreshold = self:limit(args.jingliThreshold, 0.5, 1.95)
+    end
+    if args.drugRate then
+      self.drugRate = self:limit(args.drugRate, 0, 1.0)
+    end
+    if args.useDrug ~= nil then
+      self.useDrug = args.useDrug
     end
   end
 
