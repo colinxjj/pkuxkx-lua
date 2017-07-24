@@ -515,9 +515,9 @@ local define_xiaofeng = function()
       end
     }
     -- trigger for persuade
-    helper.addTrigger {
-
-    }
+--    helper.addTrigger {
+--
+--    }
   end
 
   function prototype:initAliases()
@@ -554,17 +554,31 @@ local define_xiaofeng = function()
       response = function(name, line, wildcards)
         local mode = wildcards[1]
         local fullname = wildcards[2]
-        if string.find(fullname, "的") then
-          local ss = utils.split(fullname, "的")
-          self.mode = mode
-          self.zoneName = ss[1]
-          self.roomName = ss[2]
+        local ss, se = string.find(fullname, "的")
+        if ss then
+          self.mode = self:translateMode(mode)
+          self.zoneName = string.sub(fullname, 1, ss - 1)
+          self.roomName = string.sub(fullname, se + 1)
           return self:doPrepareSearch()
         else
           ColourNote("yellow", "", "地点必须包含区域和房间，用'的'分隔")
         end
       end
     }
+  end
+
+  function prototype:translateMode(mode)
+    if mode == "劝" then
+      return XiaofengMode.PERSUADE
+    elseif mode == "杀" then
+      return XiaofengMode.KILL
+    elseif mode == "擒" then
+      return XiaofengMode.CAPTURE
+    elseif mode == "胜" then
+      return XiaofengMode.WIN
+    else
+      return nil
+    end
   end
 
   function prototype:addTransitionToStop(fromState)
@@ -594,7 +608,7 @@ local define_xiaofeng = function()
     SendNoEcho("set xiaofeng ask_done")
     helper.checkUntilNotBusy()
     if self.needCaptcha then
-      ColourNote("yellow", "", "请手动输入验证码，xiaofeng 劝/擒/降/杀 区域 房间")
+      ColourNote("yellow", "", "请手动输入验证码，xiaofeng 劝/擒/降/杀 <区域名>的<房间名>")
       return
     elseif self.workTooFast then
       self:debug("等待8秒后再次询问")
@@ -659,7 +673,7 @@ local define_xiaofeng = function()
       if self.identified then
         self:debug("遍历结束，已经发现蒙面杀手，尝试跟踪")
         travel.currRoomId = travel.traverseRoomId
-        self:refreshRoomInfo()
+        travel:refreshRoomInfo()
         return self:doFollow()
       else
         self:debug("没有发现蒙面杀手，尝试下一个地点")
